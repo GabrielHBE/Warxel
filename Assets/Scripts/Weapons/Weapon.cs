@@ -173,7 +173,6 @@ public class Weapon : MonoBehaviour
 
     void SwitchFireMode()
     {
-        Debug.Log(current_fire_mode);
 
         if (Input.GetKeyDown(switch_fire_mode))
         {

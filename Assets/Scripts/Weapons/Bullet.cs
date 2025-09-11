@@ -17,6 +17,7 @@ public class Bullet : MonoBehaviour
     private RicochetSounds ricochetSounds;
     private Vector3 original_position;
 
+    bool did_ricochet;
 
     float timer;
 
@@ -28,6 +29,7 @@ public class Bullet : MonoBehaviour
 
     public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer)
     {
+        did_ricochet = false;
         damage = dmg;
         damage_dropoff = dmg_dropoff;
         damage_dropoff_timer = dmg_dropoff_timer;
@@ -66,19 +68,37 @@ public class Bullet : MonoBehaviour
     {
         if (!collision.gameObject.CompareTag("Bullet"))
         {
+
+            if (did_ricochet)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             if (collision.contacts.Length > 0)
             {
 
                 ContactPoint contact = collision.contacts[0];
                 float calculated_position = Vector3.Distance(original_position, contact.point);
+
                 if (calculated_position > 3)
                 {
-                    CreateHole(contact.point, contact.normal);
-                    Destroy(gameObject);
-                }
-                else if (collision.gameObject.CompareTag("Player"))
-                {
-                    Destroy(gameObject);
+
+                    if (collision.gameObject.CompareTag("Player"))
+                    {
+                        Destroy(gameObject);
+                    }
+                    else if (collision.gameObject.CompareTag("Voxel"))
+                    {
+
+                        Destroy(gameObject);
+                    }
+                    else
+                    {
+                        CreateHole(contact.point, contact.normal);
+
+                    }
+
                 }
                 else
                 {
@@ -100,9 +120,9 @@ public class Bullet : MonoBehaviour
     }
 
 
-
     void Ricochet(Vector3 position, Vector3 normal)
     {
+        did_ricochet = true;
         rb.linearVelocity /= 1.5f;
         GameObject ricochet = Instantiate(ricochet_sound, position, Quaternion.LookRotation(normal));
         ricochetSounds = ricochet.GetComponent<RicochetSounds>();

@@ -9,7 +9,7 @@ public class WeaponAnimation : MonoBehaviour
     private Animator anim;
     private PlayerProperties player;
     private WeaponProperties weaponProperties;
-    private BulletExtractor bulletExtractor;
+
     private Weapon weapon;
     private float delay_to_shoot_timer = 0f;
     private float animation_timer = 0f;
