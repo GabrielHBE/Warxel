@@ -154,7 +154,7 @@ public class SwitchWeapon : MonoBehaviour
             switch (current_weapon)
             {
                 case 1:
-
+                    weapon.is_active = true;
                     saving_timer += Time.deltaTime;
 
                     if (saving_timer <= switch_timer)
@@ -219,7 +219,7 @@ public class SwitchWeapon : MonoBehaviour
                     break;
 
                 case 2:
-
+                    weapon.is_active = true;
                     saving_timer += Time.deltaTime;
 
                     if (saving_timer <= switch_timer)
@@ -283,6 +283,7 @@ public class SwitchWeapon : MonoBehaviour
                     break;
 
                 case 3:
+                    weapon.is_active = false;
                     saving_timer += Time.deltaTime;
 
                     if (saving_timer <= switch_timer)
@@ -318,23 +319,15 @@ public class SwitchWeapon : MonoBehaviour
                                 gadget2.SetActive(false);
                             }
                             do_once = false;
-                            weaponProperties = GetComponentInChildren<WeaponProperties>();
-                            Shell = GetComponentInChildren<Shell>();
-                            Shell = GetComponentInChildren<Shell>();
-                            if (Shell != null)
+
+                            C4 c4 = GetComponentInChildren<C4>();
+                            if (c4 != null)
                             {
-                                Shell.Restart(weaponProperties);
+                                c4.is_active = true;
                             }
-                            weaponProperties.Restart();
-                            weapon.Restart();
-                            weapon.can_shoot = false;
-                            sway.Restart();
-                            magCounter.Restart();
-                            weapon_animation.Restart();
-                            reticle.Restart();
-                            playerController.ChangeWeaponVelocitySpeed(weaponProperties.speed_change);
-                            weaponHolder = GetComponentInChildren<WeaponHolder>();
-                            weaponHolder.SetHandsToWeapon(0);
+                            
+                
+
 
                         }
 

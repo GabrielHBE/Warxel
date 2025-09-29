@@ -33,7 +33,7 @@ public class CameraShake : MonoBehaviour
             Run();
         }
 
-        bobSpeed = playerController.MoveSpeed * 2;
+        bobSpeed = playerController.currentMoveSpeed * 2;
 
     }
 
@@ -176,7 +176,7 @@ public class CameraShake : MonoBehaviour
 
         transform.localRotation = originalRot;
     }
-    
+
     public IEnumerator SniperShake(float tension, float duration)
     {
         Quaternion originalRot = transform.localRotation;
@@ -204,9 +204,43 @@ public class CameraShake : MonoBehaviour
 
         transform.localRotation = originalRot;
     }
-    
-    
-    
+
+    public IEnumerator ExplosionShake(float tension, float duration)
+    {
+        Debug.Log("Explosion Shake");
+        Quaternion originalRot = transform.localRotation;
+
+        Quaternion upRot = originalRot * Quaternion.Euler(Random.Range(-tension, tension), Random.Range(-tension, tension), Random.Range(-tension, tension));
+
+        float elapsed = 0f;
+
+
+
+        while (elapsed < duration)
+        {
+            float x =(Random.Range(-0.1f, 0.1f) * tension) - elapsed/10;
+            if (x < 0)
+            {
+                x = 0;
+            }
+
+            float y =(Random.Range(-0.1f, 0.1f) * tension) - elapsed/10;
+            if(y < 0)
+            {
+                y = 0;
+            }
+
+            transform.localRotation = new Quaternion(transform.localRotation.x + x, transform.localRotation.y + y, transform.localRotation.z + ((x+y)/2), transform.localRotation.w);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+
+        transform.localRotation = originalRot;
+    }
+
+
+
 
 
 }

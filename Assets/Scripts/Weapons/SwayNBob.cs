@@ -15,13 +15,16 @@ public class SwayNBobScript : MonoBehaviour
     public GameObject reticle;
 
     [Header("Weapon")]
-    private GameObject weapon;
+
     private SwitchWeapon switchWeapon;
 
     [Header("Sway")]
     public float step = 0.01f;
     public float maxStepDistance = 0.06f;
     [HideInInspector] public Vector3 swayPos;
+
+    [HideInInspector] public float[] vector3Values = new float[3];
+    [HideInInspector] public float[] quaternionValues = new float[3];
 
     [Header("Sway Rotation")]
     public float rotationStep = 4f;
@@ -46,9 +49,6 @@ public class SwayNBobScript : MonoBehaviour
     private Vector3 current_multiplier;
 
     Vector3 bobEulerRotation;
-
-    [HideInInspector] public Vector3 initialWeaponPosition;
-    [HideInInspector] public Quaternion initialWeaponRotation;
 
 
     private Quaternion sprintTargetWeaponRotation;
@@ -84,19 +84,10 @@ public class SwayNBobScript : MonoBehaviour
         playerProperties = GetComponentInParent<PlayerProperties>();
         weaponProperties = GetComponentInChildren<WeaponProperties>();
 
-        weapon = weaponProperties.weapon;
-
         current_multiplier = weaponProperties.walk_multiplier;
 
-
-
-        initialWeaponPosition = weaponProperties.initial_potiion;
-        initialWeaponRotation = weapon.transform.localRotation;
-        initialWeaponRotation = new Quaternion(weaponProperties.inicial_rotation.x, weaponProperties.inicial_rotation.y, weaponProperties.inicial_rotation.z, initialWeaponRotation.w);
-
-        //initialWeaponPosition = transform.localPosition;
-        //initialWeaponRotation = transform.localRotation;
-        //sprintTargetWeaponRotation = initialWeaponRotation;
+        quaternionValues = weaponProperties.quaternionValues;
+        vector3Values = weaponProperties.vector3Values;
 
         sprintTargetWeaponRotation = initial_rotation;
 
@@ -197,8 +188,8 @@ public class SwayNBobScript : MonoBehaviour
         //sprintTargetWeaponPosition = initialWeaponPosition + new Vector3(weaponProperties.vector3Values[0], weaponProperties.vector3Values[1], weaponProperties.vector3Values[2]);
         //sprintTargetWeaponRotation = initialWeaponRotation * Quaternion.Euler(weaponProperties.quaternionValues[0], weaponProperties.quaternionValues[1], weaponProperties.quaternionValues[2]);
 
-        sprintTargetWeaponPosition = initial_position + new Vector3(weaponProperties.vector3Values[0], weaponProperties.vector3Values[1], weaponProperties.vector3Values[2]);
-        sprintTargetWeaponRotation = initial_rotation * Quaternion.Euler(weaponProperties.quaternionValues[0], weaponProperties.quaternionValues[1], weaponProperties.quaternionValues[2]);
+        sprintTargetWeaponPosition = initial_position + new Vector3(vector3Values[0], vector3Values[1], vector3Values[2]);
+        sprintTargetWeaponRotation = initial_rotation * Quaternion.Euler(quaternionValues[0], quaternionValues[1], quaternionValues[2]);
 
         
         current_position_sprinting += sprintDirection * Time.deltaTime * 8;

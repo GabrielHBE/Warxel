@@ -1,15 +1,17 @@
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class WeaponProperties : MonoBehaviour
 {
 
     [Header("Weapon properties")]
-    public bool calculate_fire_rate;
+    public bool manual_calculate_recoil;
     public bool is_shotgun;
     public bool single_reload;
     public bool can_hold_trigger;
     public bool can_reload_aiming;
+
     public string weapon_name;
     public float rate_of_fire;
     public float ads_speed;
@@ -17,16 +19,20 @@ public class WeaponProperties : MonoBehaviour
     public float zoom;
     public Light muzzle_lightinig;
     public Vector3 ads_position;
+    
     public List<string> fire_modes = new List<string>();
+
+
+    [Header("Destruction")]
     public float destruction_force;
-    public float explosion_radious;
 
     [Header("Shotgun")]
-    public int bullets_per_shot;
+
     public int shells;
 
     [Header("Damage")]
     public float damage;
+    public float headshot_multiplier;
     public float damage_dropoff;
     public float damage_dropoff_timer;
 
@@ -58,9 +64,11 @@ public class WeaponProperties : MonoBehaviour
     public float vertical_recoil_media;
 
     [Header("Bullet")]
+    public int bullets_per_shot;
     public Transform bullefPref;
     public float muzzle_velocity;
     public float bullet_drop;
+
 
     [Header("Magazine / Reload")]
     public float reload_time;
@@ -96,7 +104,6 @@ public class WeaponProperties : MonoBehaviour
     public Quaternion inicial_rotation;
     private Sight sight;
     private Grip grip;
-    private SideGrip sideGrip;
     private Mag mag;
     private Barrel _barrel;
     float auto_reset_recoil_speed;
@@ -128,11 +135,17 @@ public class WeaponProperties : MonoBehaviour
 
         CalculateMedia();
         interval = 60f / rate_of_fire;
-        if (reset_recoil_speed == 0) auto_reset_recoil_speed = interval / 2;
-        if (apply_recoil_speed == 0) auto_apply_recoil_speed = interval / 2;
+
+        if (!manual_calculate_recoil)
+        {
+            reset_recoil_speed = interval / 2;
+            apply_recoil_speed = interval / 2;
+        }
+
+        //if (reset_recoil_speed == 0) auto_reset_recoil_speed = interval / 2;
+        //if (apply_recoil_speed == 0) auto_apply_recoil_speed = interval / 2;
 
     }
-
 
     void FillMags()
     {
@@ -144,13 +157,14 @@ public class WeaponProperties : MonoBehaviour
 
     public void CalculateRecoilSpeed(bool is_burst)
     {
+        /*
         if (fire_modes.Count != 1)
         {
             if (!is_burst)
             {
 
-                reset_recoil_speed = auto_reset_recoil_speed;
-                apply_recoil_speed = auto_apply_recoil_speed;
+                //reset_recoil_speed = auto_reset_recoil_speed;
+                //apply_recoil_speed = auto_apply_recoil_speed;
 
             }
             else
@@ -158,8 +172,9 @@ public class WeaponProperties : MonoBehaviour
                 reset_recoil_speed = time_between_shots_in_burst / 2;
                 apply_recoil_speed = time_between_shots_in_burst / 2;
             }
+            
         }
-
+        */
 
 
     }
@@ -257,7 +272,7 @@ public class WeaponProperties : MonoBehaviour
         weapon_sound.shoot_sound.volume += _barrel.volume_changer;
         spread_increaser += _barrel.spread_change;
     }
-    
+
     public void CreateBulletExtractor()
     {
         bulletExtractor.CreateBullet();

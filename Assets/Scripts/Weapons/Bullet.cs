@@ -1,15 +1,19 @@
 using System.Collections;
+using Photon.Realtime;
 using UnityEngine;
+using VoxelDestructionPro.Tools;
 
 public class Bullet : MonoBehaviour
 {
     public GameObject bullet_hole;
     private Rigidbody rb;
+    private VoxCollider voxCollider;
     private float bulletDropMultiplier;
 
     private float damage;
     private float damage_dropoff;
     private float damage_dropoff_timer;
+
 
 
     [Header("Sounds")]
@@ -23,12 +27,16 @@ public class Bullet : MonoBehaviour
 
     void Awake()
     {
+        voxCollider = GetComponent<VoxCollider>();
         rb = GetComponent<Rigidbody>();
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic; // ESSENCIAL!
     }
 
-    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer)
-    {
+    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force)
+    {   
+        GetComponent<MeshRenderer>().enabled = false;
+
+        voxCollider.destructionRadius = destruction_force;
         did_ricochet = false;
         damage = dmg;
         damage_dropoff = dmg_dropoff;
@@ -61,6 +69,11 @@ public class Bullet : MonoBehaviour
             timer = 0;
         }
 
+        if (timer >= 0.05f)
+        {
+            GetComponent<MeshRenderer>().enabled = true;
+        }
+
 
     }
 
@@ -69,11 +82,13 @@ public class Bullet : MonoBehaviour
         if (!collision.gameObject.CompareTag("Bullet"))
         {
 
+            
             if (did_ricochet)
             {
                 Destroy(gameObject);
                 return;
             }
+            
 
             if (collision.contacts.Length > 0)
             {
@@ -86,18 +101,21 @@ public class Bullet : MonoBehaviour
 
                     if (collision.gameObject.CompareTag("Player"))
                     {
-                        Destroy(gameObject);
+                        PlayerProperties player = collision.gameObject.GetComponent<PlayerProperties>();
+                        player.Damage(damage);
+
                     }
                     else if (collision.gameObject.CompareTag("Voxel"))
                     {
+                        voxCollider.Collide(collision);
 
-                        Destroy(gameObject);
                     }
                     else
                     {
                         CreateHole(contact.point, contact.normal);
-
                     }
+                    
+                    Destroy(gameObject);
 
                 }
                 else
@@ -108,17 +126,9 @@ public class Bullet : MonoBehaviour
             }
 
         }
-        else if (collision.gameObject.CompareTag("Player"))
-        {
-            GameObject player = collision.gameObject;
-            PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
-            playerProperties.hp -= damage;
-
-        }
 
 
     }
-
 
     void Ricochet(Vector3 position, Vector3 normal)
     {

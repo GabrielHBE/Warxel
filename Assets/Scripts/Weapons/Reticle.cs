@@ -19,7 +19,7 @@ public class Reticle : MonoBehaviour
 
 
     Vector3 original_pos;
-    float magnitude = 0.07f;
+    float magnitude = 0.05f;
 
     void Start()
     {

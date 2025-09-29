@@ -73,10 +73,10 @@ public class WeaponAnimation : MonoBehaviour
             fired = true;
         }
 
-        //Verifica se a animação nã oé nula
+        //Verifica se a animação nãoé nula
         if (anim != null)
         {
-            //Verifica se tem uma animaçã ode atirar
+            //Verifica se tem uma animação de atirar
             if (fireClip != null)
             {
                 //Ferifica se ativou
@@ -115,71 +115,57 @@ public class WeaponAnimation : MonoBehaviour
             anim.SetFloat("Reload_speed", weaponProperties.reload_time);
 
         }
-
-
-
     }
 
     void ReloadAnimation()
     {
 
-        try
+
+        if (anim != null)
         {
-            if (anim != null)
+
+            if (weaponProperties.mags[^1] != 0)
             {
-
-                if (weaponProperties.mags[^1] != 0)
+                foreach (AnimationClip clip in rac.animationClips)
                 {
-                    foreach (AnimationClip clip in rac.animationClips)
+
+                    if (clip.name == "Reload")
                     {
+                        reloadClip = clip;
+                        reload_animation_timer = reloadClip.length;
 
-                        if (clip.name == "Reload")
-                        {
-                            reloadClip = clip;
-                            reload_animation_timer = reloadClip.length;
+                        anim.SetBool("Last_bullet", false);
+                        break;
+                    }
+                    else
+                    {
+                        reloadClip = null;
 
-                            anim.SetBool("Last_bullet", false);
-                            break;
-                        }
-                        else
-                        {
-                            reloadClip = null;
-
-                        }
                     }
                 }
-                else
-                {
-                    foreach (AnimationClip clip in rac.animationClips)
-                    {
-
-                        if (clip.name == "Reload2")
-                        {
-                            reloadClip = clip;
-                            reload_animation_timer = reloadClip.length;
-                            anim.SetBool("Last_bullet", true);
-                            break;
-                        }
-                        else
-                        {
-                            reloadClip = null;
-
-                        }
-                    }
-                }
-
             }
-        }
-        catch (Exception)
-        {
+            else
+            {
+                foreach (AnimationClip clip in rac.animationClips)
+                {
+
+                    if (clip.name == "Reload2")
+                    {
+                        reloadClip = clip;
+                        reload_animation_timer = reloadClip.length;
+                        anim.SetBool("Last_bullet", true);
+                        break;
+                    }
+                    else
+                    {
+                        reloadClip = null;
+
+                    }
+                }
+            }
 
         }
-
-
 
     }
-
-    
-
 
 }

@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class PlayerProperties : MonoBehaviour
@@ -12,5 +13,21 @@ public class PlayerProperties : MonoBehaviour
 
     public float hp;
     public float resistance;
+
+    public void Damage(float dmg)
+    {
+        hp -= dmg * (1 - resistance);
+
+        if (hp < 0)
+        {
+            hp = 0;
+        }
+            
+    }
+    
+    void Update()
+    {
+        Debug.Log(hp);
+    }
 
 }
