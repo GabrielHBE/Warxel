@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class C4 : MonoBehaviour
 {
     public bool is_active;
-
+    [SerializeField] private KeyBinds keyBinds;
     [SerializeField] private C4Explosive c4Explosive;
     [SerializeField] private int c4_qtd;
     [SerializeField] private float throw_c4_force;
@@ -37,18 +38,18 @@ public class C4 : MonoBehaviour
         hand.transform.position = transform.position;
         right_hand.transform.position = right_hand_pos.transform.position;
 
-        if (c4_qtd > 0 && Input.GetKeyDown(throw_c4_key))
+        if (c4_qtd > 0 && Input.GetKeyDown(keyBinds.throwC4Key))
         {
             Throw_C4();
         }
 
-        if (Input.GetKeyDown(pick_up_c4_key))
+        if (Input.GetKeyDown(keyBinds.interactKey))
         {
             TryPickUpC4();
         }
 
         // Iniciar detonação se houver C4s ativos
-        if (Input.GetKeyDown(detonate_c4_key) && !isDetonating)
+        if (Input.GetKeyDown(keyBinds.detonateC4Key) && !isDetonating)
         {
             CleanupDestroyedC4s(); // Limpa C4s destruídos antes de começar
             

@@ -1,3 +1,4 @@
+
 using UnityEngine;
 
 public class WeaponHolder : MonoBehaviour
@@ -56,14 +57,6 @@ public class WeaponHolder : MonoBehaviour
 
     void Update()
     {
-        /*
-        if (func == 1 || func == 2 || func == 5 || func == 6 || func == 7)
-        {
-            rightHand_origin.transform.position = rightHand_destiny.transform.position;
-            rightHand_origin.transform.rotation = rightHand_destiny.transform.rotation;
-
-        }
-        */
 
         if (func == 0)
         {

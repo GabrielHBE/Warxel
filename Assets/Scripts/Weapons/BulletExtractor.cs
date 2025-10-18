@@ -11,7 +11,7 @@ public class BulletExtractor : MonoBehaviour
     public void CreateBullet()
     {
         float random = Random.Range(1f,10f);
-        StartCoroutine(FireBulletWithDrop(gameObject.transform.position, gameObject.transform.right *random, 5, 20));
+     //   StartCoroutine(FireBulletWithDrop(gameObject.transform.position, gameObject.transform.right *random, 5, 20));
     }
 
 

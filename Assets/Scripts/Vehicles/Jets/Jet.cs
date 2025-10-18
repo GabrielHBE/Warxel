@@ -1,10 +1,12 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
-
+using VoxelDestructionPro.VoxelObjects;
+using static VoxelDestructionPro.Data.DestructionData;
 
 public class Jet : MonoBehaviour
 {
@@ -24,21 +26,29 @@ public class Jet : MonoBehaviour
     [Header("Cameras")]
     public float mouseSensitivity = 2f;
     public Camera jet_camera;
-
     public Transform foward_camera_position;
     public Transform backward_camera_position;
     public Transform inside_camera_position;
 
+    [Header("Destruction")]
+    [SerializeField] private DestructionType destructionType = DestructionType.Sphere;
+
+
     [Header("Positions")]
     public Transform exit_jet_position;
+    [SerializeField] private Transform shoot_position;
 
     [Header("Instances")]
     public GameObject player;
+    public GameObject playerPrefab;
+    public GameObject arms;
     private Vignette vignette;
     public Volume volume;
     public Image blackImage;
     public GameObject TurbineSmoke;
     public GameObject glass;
+    public GameObject crash_explosion;
+    public AudioSource crash_sound;
 
     [Header("Sound")]
     public AudioSource tinnitus;
@@ -53,13 +63,9 @@ public class Jet : MonoBehaviour
     public float currentSpeed = 0f;
     private bool start_engine;
     [HideInInspector] public float moveForward;
-    public bool is_ejecting;
     [HideInInspector] public int current_camera;
     private float minFov;
     float next_time_to_fire = 0;
-    float rotation_increaser;
-    float pitch_increaser;
-
     float overheat;
     bool overheated;
     float passout_timer;
@@ -68,10 +74,10 @@ public class Jet : MonoBehaviour
     Quaternion initial_camera_rotation;
     [HideInInspector] public float lean_value;
 
+    private float exit_cooldown;
 
     void Start()
     {
-
         TurbineSmoke.SetActive(false);
         jet_audio_listener.enabled = false;
         blackImage.enabled = false;
@@ -81,15 +87,14 @@ public class Jet : MonoBehaviour
         is_in_jet = false;
 
         current_camera = 1;
-        //rb = GetComponent<Rigidbody>();
+        rb = GetComponent<Rigidbody>();
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic; // ESSENCIAL!
         //jetProperties = GetComponent<JetProperties>();
 
         initial_camera_rotation = inside_camera_position.localRotation;
 
-
         jet_camera.transform.localPosition = inside_camera_position.transform.position;
         jet_camera.enabled = false;
-
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -116,7 +121,6 @@ public class Jet : MonoBehaviour
             audio.pitch += 0.0001f;
             yield return null;
         }
-
     }
 
     IEnumerator DecreasePitch(AudioSource audio, float duration)
@@ -131,48 +135,42 @@ public class Jet : MonoBehaviour
         }
 
         audio.Stop();
-
-
     }
 
     public void Enter_Exit(GameObject _player)
     {
         if (Input.GetKey(enter_jet_key) && !is_in_jet)
         {
+            exit_cooldown = 0;
 
-
-            is_in_jet = true;
+            is_in_jet = !is_in_jet;
             player = _player;
 
             if (is_in_jet)
             {
-                player.SetActive(false);
+                // Destroi o player atual em vez de desativar
+                Destroy(player);
                 jet_audio_listener.enabled = true;
                 minFov = jet_camera.fieldOfView;
                 jet_camera.enabled = true;
                 TurbineSmoke.SetActive(start_engine);
+                jet_camera.transform.position = new Vector3(_player.transform.position.x, _player.transform.position.y + 3, _player.transform.position.z);
+                jet_camera.transform.rotation = _player.transform.rotation;
+                arms.SetActive(true);
             }
-
         }
     }
 
-
     void Update()
     {
-
         if (is_in_jet)
         {
-            if (Input.GetKeyDown(enter_jet_key))
-            {
-                is_in_jet =false;
-                player.SetActive(true);
-                jet_camera.enabled = false;
-                jet_audio_listener.enabled = false;
-                TurbineSmoke.SetActive(false);
 
-                // Reposiciona o player na posição de saída
-                player.transform.position = exit_jet_position.position;
-                player.transform.rotation = exit_jet_position.rotation;
+            exit_cooldown += Time.deltaTime;
+
+            if (Input.GetKeyDown(enter_jet_key) && exit_cooldown > 0.1f)
+            {
+                EjectPlayer();
             }
 
             Quaternion targetRotation = Quaternion.Euler(glass.transform.localEulerAngles.x, glass.transform.localEulerAngles.y, 0);
@@ -198,12 +196,8 @@ public class Jet : MonoBehaviour
             {
                 jetProperties.interior_turbine.pitch = Math.Clamp(jetProperties.interior_turbine.pitch, 0.01f, 2);
                 TurbineSmoke.SetActive(false);
-
                 currentSpeed -= acceleration * Time.deltaTime * 1.5f; // Diminui a velocidade com o tempo
-
-
             }
-
         }
         else
         {
@@ -214,13 +208,21 @@ public class Jet : MonoBehaviour
             jetProperties.interior_turbine.pitch = 0.01f;
 
             currentSpeed -= acceleration * Time.deltaTime * 1.5f; // Diminui a velocidade com o tempo
+        }
 
+        if (currentSpeed > 100)
+        {
+            //rb.isKinematic = true;
+            rb.useGravity = false;
+        }
+        else
+        {
+            //rb.isKinematic = false;
+            rb.useGravity = true;
         }
 
         currentSpeed = Math.Clamp(currentSpeed, 0, jetProperties.max_speed);
         transform.position += forwardReference.forward * currentSpeed * Time.deltaTime;
-        //rb.linearVelocity += (forwardReference.forward * currentSpeed * Time.deltaTime) / 10;
-
     }
 
     void FreeLook()
@@ -288,10 +290,11 @@ public class Jet : MonoBehaviour
             if (next_time_to_fire <= 0f)
             {
                 jetProperties.shoot_sound.PlayOneShot(jetProperties.shoot_sound.clip);
-                Transform bulletObj = Instantiate(jetProperties.bullefPref, jetProperties.barrel.transform.position, jetProperties.barrel.transform.rotation);
+                Transform bulletObj = Instantiate(jetProperties.bullefPref, shoot_position.position, shoot_position.rotation);
+
                 Destroy(bulletObj.gameObject, 10f);
 
-                bulletObj.GetComponent<Bullet>().SetDirection(jetProperties.barrel.transform.forward, jetProperties.muzzle_velocity, jetProperties.bullet_drop);
+                bulletObj.GetComponent<Bullet>().CreateBullet(shoot_position.forward, jetProperties.muzzle_velocity, jetProperties.bullet_drop, jetProperties.damage, jetProperties.damage_dropoff, jetProperties.damage_dropoff_timer, jetProperties.destruction_force, jetProperties.bullet_hit_effect);
                 next_time_to_fire = jetProperties.interval;
 
             }
@@ -455,35 +458,10 @@ public class Jet : MonoBehaviour
         mouseX = Math.Clamp(mouseX, -jetProperties.rotation_value, jetProperties.rotation_value);
         mouseY = Math.Clamp(mouseY, -jetProperties.pitch_value, jetProperties.pitch_value);
 
-        if (mouseY != 0)
-        {
-            pitch_increaser += Time.deltaTime * jetProperties.maneuverability;
-
-        }
-        else
-        {
-            pitch_increaser = 0;
-
-        }
-
-        if (mouseX != 0)
-        {
-            rotation_increaser += Time.deltaTime * jetProperties.maneuverability;
-        }
-        else
-        {
-            rotation_increaser = 0;
-        }
-
-        pitch_increaser = Math.Clamp(pitch_increaser, 0, 1);
-        rotation_increaser = Math.Clamp(rotation_increaser, 0, 1);
-
-
-
         if (currentSpeed >= 30)
         {
-            transform.Rotate(Vector3.back * mouseY * currentSpeed / jetProperties.max_speed * pitch_increaser * jetProperties.pitch_value, Space.Self);
-            transform.Rotate(Vector3.right * mouseX * currentSpeed / jetProperties.max_speed * rotation_increaser * jetProperties.rotation_value, Space.Self);
+            transform.Rotate(Vector3.back * mouseY * currentSpeed / jetProperties.max_speed * jetProperties.pitch_value, Space.Self);
+            transform.Rotate(Vector3.right * mouseX * currentSpeed / jetProperties.max_speed * jetProperties.rotation_value, Space.Self);
         }
 
 
@@ -548,17 +526,178 @@ public class Jet : MonoBehaviour
 
         }
 
-        // Gravidade mínima e máxima (ajuste conforme necessário)
-        float minGravity = 0f;
-        float maxGravity = -2f;
-
-        // Calcula a gravidade proporcional à velocidade atual
-        float speedPercent = currentSpeed / jetProperties.max_speed; // de 0 a 1
-        float gravityY = Mathf.Lerp(maxGravity, minGravity, speedPercent); // diminui com a velocidade
-
-        Physics.gravity = new Vector3(0, gravityY, 0);
-
     }
 
 
+    void OnCollisionEnter(Collision collision)
+    {
+        float explosionForce = currentSpeed /9;
+
+        if (currentSpeed > 400)
+        {
+            explosionForce = 400 / 9;
+        }
+
+        if (collision.gameObject.CompareTag("Voxel"))
+        {
+            ContactPoint contact = collision.contacts[0];
+
+            bool do_once = true;
+            Collider[] colliders = Physics.OverlapSphere(contact.point, explosionForce);
+
+
+            if (currentSpeed > 100 && crash_explosion != null)
+            {
+
+                for (int i = 0; i < colliders.Length; i++)
+                {
+                    PlayerProperties playerProps = colliders[i].GetComponentInParent<PlayerProperties>();
+
+                    if (do_once && playerProps != null)
+                    {
+                        Debug.Log("Colidiu com Player");
+                        float distance = Vector3.Distance(transform.position, playerProps.transform.position);
+                        float damage = Mathf.Clamp(explosionForce * (1 - distance / 10), 0, explosionForce);
+                        playerProps.Damage(damage * 2);
+
+                        CameraShake cameraShake = playerProps.GetComponentInChildren<CameraShake>();
+                        if (cameraShake != null)
+                        {
+                            cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage / 10, 1f));
+                        }
+                        else
+                        {
+                            Debug.LogWarning("CameraShake não encontrado!");
+                        }
+
+                        do_once = false;
+                    }
+
+                    DynamicVoxelObj vox = colliders[i].GetComponentInParent<DynamicVoxelObj>();
+
+                    if (vox == null)
+                    {
+                        continue;
+                    }
+
+                    // PRIMEIRO: Destruição imediata (raio menor)
+                    vox.AddDestruction_Sphere(contact.point, explosionForce);
+
+
+                }
+                Mod_DestroyAfterAll mod_DestroyAfterAll = collision.gameObject.GetComponentInParent<Mod_DestroyAfterAll>();
+                mod_DestroyAfterAll?.StartCoroutine(mod_DestroyAfterAll.FallUpperVoxels(explosionForce, contact.point));
+
+
+
+                GameObject obj = Instantiate(crash_explosion, contact.point + contact.normal, Quaternion.LookRotation(contact.normal));
+                obj.transform.localScale *= explosionForce / 10;
+
+
+                AudioSource crash_sound_obj = obj.AddComponent<AudioSource>();
+                // Copiar todas as propriedades do AudioSource original
+                crash_sound_obj.clip = crash_sound.clip;
+                crash_sound_obj.volume = crash_sound.volume;
+                crash_sound_obj.pitch = crash_sound.pitch;
+                crash_sound_obj.loop = crash_sound.loop;
+                crash_sound_obj.spatialBlend = crash_sound.spatialBlend;
+                crash_sound_obj.maxDistance = crash_sound.maxDistance;
+                crash_sound_obj.rolloffMode = AudioRolloffMode.Custom;
+
+                crash_sound_obj.Play();
+
+                if (is_in_jet)
+                {
+                    EjectPlayer();
+                }
+
+                Destroy(gameObject);
+
+            }
+            else
+            {
+                for (int i = 0; i < colliders.Length; i++)
+                {
+                    PlayerProperties playerProps = colliders[i].GetComponentInParent<PlayerProperties>();
+
+                    if (do_once && playerProps != null)
+                    {
+                        Debug.Log("Colidiu com Player");
+                        float distance = Vector3.Distance(transform.position, playerProps.transform.position);
+                        float damage = Mathf.Clamp(explosionForce * (1 - distance / 10), 0, explosionForce);
+                        playerProps.Damage(damage * 2);
+
+                        CameraShake cameraShake = playerProps.GetComponentInChildren<CameraShake>();
+                        if (cameraShake != null)
+                        {
+                            cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage / 10, 1f));
+                        }
+                        else
+                        {
+                            Debug.LogWarning("CameraShake não encontrado!");
+                        }
+
+                        do_once = false;
+                    }
+
+                    DynamicVoxelObj vox = colliders[i].GetComponentInParent<DynamicVoxelObj>();
+
+                    if (vox == null)
+                        continue;
+
+
+                    vox.AddDestruction_Line(contact.point, contact.normal, explosionForce);
+                }
+
+
+            }
+
+
+        }
+    }
+
+    void EjectPlayer()
+    {
+
+        Quaternion spawnRotation = new Quaternion(0, forwardReference.transform.rotation.y, 0, forwardReference.transform.rotation.w);
+
+        if (currentSpeed < 100)
+        {
+            GameObject newPlayer = Instantiate(playerPrefab, exit_jet_position.position, spawnRotation);
+            player = newPlayer;
+
+        }
+        else
+        {
+            // Instancia um novo player em vez de ativar
+            if (playerPrefab != null)
+            {
+                Vector3 spawnPosition = new Vector3(inside_camera_position.position.x, glass.transform.position.y + 5, inside_camera_position.position.z);
+                spawnRotation = new Quaternion(0, forwardReference.transform.rotation.y, 0, forwardReference.transform.rotation.w);
+
+                GameObject newPlayer = Instantiate(playerPrefab, spawnPosition, spawnRotation);
+                player = newPlayer;
+
+                // Aplica força ao novo player
+                Rigidbody player_rb = newPlayer.GetComponent<Rigidbody>();
+                if (player_rb != null)
+                {
+                    player_rb.AddForce(Vector3.up * 10, ForceMode.Impulse);
+                    player_rb.AddForce(exit_jet_position.forward * currentSpeed / 2, ForceMode.Impulse);
+                }
+            }
+            else
+            {
+                Debug.LogError("PlayerPrefab não está atribuído no Jet!");
+            }
+
+        }
+
+
+        jet_camera.enabled = false;
+        jet_audio_listener.enabled = false;
+        TurbineSmoke.SetActive(false);
+        arms.SetActive(false);
+        is_in_jet = false;
+    }
 }

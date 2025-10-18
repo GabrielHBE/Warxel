@@ -2,6 +2,7 @@ using System.Collections;
 using Photon.Realtime;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
+using VoxelDestructionPro.VoxelObjects;
 
 public class Bullet : MonoBehaviour
 {
@@ -9,11 +10,9 @@ public class Bullet : MonoBehaviour
     private Rigidbody rb;
     private VoxCollider voxCollider;
     private float bulletDropMultiplier;
-
     private float damage;
     private float damage_dropoff;
     private float damage_dropoff_timer;
-
 
 
     [Header("Sounds")]
@@ -21,19 +20,29 @@ public class Bullet : MonoBehaviour
     private RicochetSounds ricochetSounds;
     private Vector3 original_position;
 
-    bool did_ricochet;
+    [Header("HitEffects")]
+    [SerializeField] private GameObject glass_hit_effect;
+    [SerializeField] private GameObject metal_hit_effect;
+    [SerializeField] private GameObject wood_hit_effect;
+    [SerializeField] private GameObject concrete_hit_effect;
+    [SerializeField] private GameObject sand_hit_effect;
+    [SerializeField] private GameObject dirt_hit_effect;
+    [SerializeField] private GameObject softbody_hit_effect;
 
+
+    bool did_ricochet;
+    GameObject custom_hit_effect_instance;
     float timer;
 
     void Awake()
     {
         voxCollider = GetComponent<VoxCollider>();
         rb = GetComponent<Rigidbody>();
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic; // ESSENCIAL!
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
-    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force)
-    {   
+    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force, GameObject hit_effect = null)
+    {
         GetComponent<MeshRenderer>().enabled = false;
 
         voxCollider.destructionRadius = destruction_force;
@@ -41,6 +50,7 @@ public class Bullet : MonoBehaviour
         damage = dmg;
         damage_dropoff = dmg_dropoff;
         damage_dropoff_timer = dmg_dropoff_timer;
+        custom_hit_effect_instance = hit_effect;
 
         SetDirection(direction, speed, dropMultiplier);
     }
@@ -82,13 +92,13 @@ public class Bullet : MonoBehaviour
         if (!collision.gameObject.CompareTag("Bullet"))
         {
 
-            
+
             if (did_ricochet)
             {
                 Destroy(gameObject);
                 return;
             }
-            
+
 
             if (collision.contacts.Length > 0)
             {
@@ -107,14 +117,60 @@ public class Bullet : MonoBehaviour
                     }
                     else if (collision.gameObject.CompareTag("Voxel"))
                     {
-                        voxCollider.Collide(collision);
+                        DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
+
+                        if (vox.destruction_multiplier > 0)
+                        {
+                            voxCollider.destructionRadius *= vox.destruction_multiplier;
+                        }
+
+                        HitEffects(contact.point, contact.normal, vox);
+
+                        if (voxCollider.destructionRadius > 2)
+                        {
+
+                            bool do_once = true;
+                            Collider[] colliders = Physics.OverlapSphere(contact.point, voxCollider.destructionRadius);
+
+                            for (int i = 0; i < colliders.Length; i++)
+                            {
+                                PlayerProperties playerProps = colliders[i].GetComponentInParent<PlayerProperties>();
+
+                                if (do_once && playerProps != null)
+                                {
+                                    Debug.Log("Colidiu com Player");
+                                    float distance = Vector3.Distance(transform.position, playerProps.transform.position);
+                                    float damage_distance = Mathf.Clamp(voxCollider.destructionRadius * (1 - distance / 10), 0, voxCollider.destructionRadius);
+                                    playerProps.Damage(damage * damage_distance);
+
+                                    CameraShake cameraShake = playerProps.GetComponentInChildren<CameraShake>();
+                                    if (cameraShake != null)
+                                    {
+                                        cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage_distance / 10, 1f));
+                                    }
+                                    else
+                                    {
+                                        Debug.LogWarning("CameraShake não encontrado!");
+                                    }
+
+                                    do_once = false;
+                                }
+
+                                if (vox == null)
+                                    continue;
+
+                                vox.AddDestruction_Sphere(contact.point, voxCollider.destructionRadius);
+
+                            }
+                        }
+                        else
+                        {
+                            voxCollider.Collide(collision);
+                        }
+
 
                     }
-                    else
-                    {
-                        CreateHole(contact.point, contact.normal);
-                    }
-                    
+
                     Destroy(gameObject);
 
                 }
@@ -124,6 +180,8 @@ public class Bullet : MonoBehaviour
                 }
 
             }
+
+            Debug.Log(collision.gameObject.name);
 
         }
 
@@ -141,12 +199,47 @@ public class Bullet : MonoBehaviour
         Destroy(ricochet, 2f);
     }
 
-
-    void CreateHole(Vector3 position, Vector3 normal)
+    void HitEffects(Vector3 position, Vector3 normal, DynamicVoxelObj vox)
     {
-        GameObject obj = Instantiate(bullet_hole, position + normal * 0.01f, Quaternion.LookRotation(normal));
-        obj.transform.position -= obj.transform.forward / 110f;
-        Destroy(obj, 10f);
+        if (custom_hit_effect_instance != null)
+        {
+            Instantiate(custom_hit_effect_instance, position + normal * 0.01f, Quaternion.LookRotation(normal));
+            return;
+        }
+
+        switch (vox.material)
+        {
+            case "Glass":
+                Transform child = vox.transform.GetChild(0);
+                Material mat = child.GetComponent<MeshRenderer>().material;
+
+                var particleRenderer = glass_hit_effect.GetComponent<ParticleSystemRenderer>();
+                particleRenderer.material = mat;
+
+                Instantiate(glass_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            case "Metal":
+                Instantiate(metal_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            case "Wood":
+                Instantiate(wood_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            case "Concrete":
+                Instantiate(concrete_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            case "Sand":
+                Instantiate(sand_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            case "Dirt":
+                Instantiate(dirt_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            case "SoftBody":
+                 Instantiate(softbody_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                break;
+            default:
+                break;
+        }
 
     }
+
 }

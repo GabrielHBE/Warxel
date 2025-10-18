@@ -1,4 +1,5 @@
 using System.Collections;
+using Unity.VisualScripting;
 using UnityEngine;
 
 /*
@@ -7,11 +8,14 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    [Header("Key Bindings")]
+    [SerializeField] private KeyBinds keyBinds;
+
     [Header("Camera Settings")]
     public float mouseSensitivity = 2f;
     public float mouse_aim_sensitivity = 1f;
     public Transform cameraTransform;
-    
+
     [Header("Movement Settings")]
     public float walkSpeed = 6f;
     public float sprintMultiplier = 1.7f;
@@ -19,28 +23,24 @@ public class PlayerController : MonoBehaviour
     public float jumpForce = 2f;
     public float fallMultiplier = 2.5f;
     public float ascendMultiplier = 2f;
-    
-    [Header("Key Bindings")]
-    public KeyCode sprintKey = KeyCode.LeftControl;
-    public KeyCode jumpKey = KeyCode.Space;
-    public KeyCode crouchKey = KeyCode.C;
-    
+
+
     [Header("Ground Detection")]
     public LayerMask groundLayer;
     public float groundCheckDelay = 0.3f;
-    
+
     // Private variables
     private Rigidbody rb;
     private PlayerProperties playerProperties;
     private CameraShake cameraShake;
-    
+
     // Movement
     public float moveHorizontal;
     public float moveForward;
     public float currentMoveSpeed;
     private float sprintSpeed;
     private float originalMoveSpeed;
-    
+
     // Camera
     private float verticalRotation;
     private float currentMouseSensitivity;
@@ -48,20 +48,22 @@ public class PlayerController : MonoBehaviour
     private float recoilVerticalCurrent;
     private float recoilVelocity;
     private const float recoilSmoothTime = 0.1f;
-    
+
     // Recoil Z-axis (optimized)
     private float currentRecoilZ;
     private float recoilResetVelocity;
-    
+
     // Ground check
     private bool wasGroundedLastFrame;
     private float groundCheckTimer;
     private float playerHeight;
     private float raycastDistance;
-    
+
     // Input flags
     public bool isSprintOnHold = false;
     public bool isCrouchOnHold = false;
+
+    float intecact_distance = 3f;
 
     void Start()
     {
@@ -71,12 +73,14 @@ public class PlayerController : MonoBehaviour
         SetupCursor();
     }
 
+
     void InitializeComponents()
     {
         rb = GetComponent<Rigidbody>();
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic; // ESSENCIAL!
         playerProperties = GetComponent<PlayerProperties>();
         cameraShake = GetComponentInChildren<CameraShake>();
-        
+
         if (cameraTransform == null)
             cameraTransform = Camera.main.transform;
     }
@@ -104,11 +108,28 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+
+        if (Input.GetKeyDown(keyBinds.interactKey))
+        {
+            Vector3 origin = cameraTransform.position; // Posição do objeto
+            Vector3 direction = cameraTransform.forward; // Direção para onde o objeto está olhando
+            RaycastHit hit;
+            Debug .DrawRay(origin, direction * intecact_distance, Color.red, 1f);
+            if (Physics.Raycast(origin, direction, out hit, intecact_distance))
+            {
+                ElevatorCallButton button = hit.collider.GetComponent<ElevatorCallButton>();
+                if (button != null)
+                {
+                    button.Interact();
+                }
+            }
+        }
+
         HandleInput();
         RotateCamera();
         UpdateRecoil();
-        
-        if (Input.GetKeyDown(jumpKey) && playerProperties.isGrounded)
+
+        if (Input.GetKeyDown(keyBinds.jumpKey) && playerProperties.isGrounded)
         {
             Jump();
         }
@@ -121,7 +142,7 @@ public class PlayerController : MonoBehaviour
         // Get input once per frame
         moveHorizontal = Input.GetAxisRaw("Horizontal");
         moveForward = Input.GetAxisRaw("Vertical");
-        
+
         HandleSprint();
         HandleCrouch();
         UpdateMovementSpeed();
@@ -129,32 +150,32 @@ public class PlayerController : MonoBehaviour
 
     void HandleSprint()
     {
-        if (!isSprintOnHold && Input.GetKeyDown(sprintKey))
+        if (!isSprintOnHold && Input.GetKeyDown(keyBinds.sprintKey))
         {
             playerProperties.sprinting = !playerProperties.sprinting;
-            if (playerProperties.sprinting) 
+            if (playerProperties.sprinting)
                 playerProperties.crouched = false;
         }
         else if (isSprintOnHold)
         {
-            playerProperties.sprinting = Input.GetKey(sprintKey);
-            if (playerProperties.sprinting) 
+            playerProperties.sprinting = Input.GetKey(keyBinds.sprintKey);
+            if (playerProperties.sprinting)
                 playerProperties.crouched = false;
         }
     }
 
     void HandleCrouch()
     {
-        if (!isCrouchOnHold && Input.GetKeyDown(crouchKey))
+        if (!isCrouchOnHold && Input.GetKeyDown(keyBinds.crouchKey))
         {
             playerProperties.crouched = !playerProperties.crouched;
-            if (playerProperties.crouched) 
+            if (playerProperties.crouched)
                 playerProperties.sprinting = false;
         }
         else if (isCrouchOnHold)
         {
-            playerProperties.crouched = Input.GetKey(crouchKey);
-            if (playerProperties.crouched) 
+            playerProperties.crouched = Input.GetKey(keyBinds.crouchKey);
+            if (playerProperties.crouched)
                 playerProperties.sprinting = false;
         }
     }
@@ -195,10 +216,10 @@ public class PlayerController : MonoBehaviour
 
         Vector3 moveDirection = new Vector3(moveHorizontal, 0, moveForward).normalized;
         Vector3 worldDirection = transform.TransformDirection(moveDirection);
-        
+
         Vector3 targetVelocity = worldDirection * currentMoveSpeed;
         targetVelocity.y = rb.linearVelocity.y;
-        
+
         rb.linearVelocity = targetVelocity;
     }
 
@@ -213,13 +234,13 @@ public class PlayerController : MonoBehaviour
         // Vertical rotation with recoil
         float mouseVertical = Input.GetAxis("Mouse Y") * currentMouseSensitivity;
         recoilVerticalCurrent = Mathf.SmoothDamp(recoilVerticalCurrent, recoilVerticalTarget, ref recoilVelocity, recoilSmoothTime);
-        
+
         verticalRotation -= mouseVertical + recoilVerticalCurrent;
         verticalRotation = Mathf.Clamp(verticalRotation, -80f, 80f);
-        
+
         // Apply combined rotation (vertical + recoil Z)
         cameraTransform.localEulerAngles = new Vector3(verticalRotation, 0, currentRecoilZ);
-        
+
         // Reset vertical recoil target
         recoilVerticalTarget = 0f;
     }
@@ -237,7 +258,7 @@ public class PlayerController : MonoBehaviour
     {
         recoilVerticalTarget += verticalRecoil;
         transform.Rotate(0, horizontalRecoil, 0);
-        
+
         WeaponProperties weaponProperties = GetComponentInChildren<WeaponProperties>();
         if (weaponProperties != null)
         {
@@ -279,13 +300,13 @@ public class PlayerController : MonoBehaviour
     void ApplyJumpPhysics()
     {
         Vector3 gravity = Physics.gravity.y * Vector3.up;
-        
+
         if (rb.linearVelocity.y < 0)
         {
             // Falling down
             rb.linearVelocity += gravity * (fallMultiplier - 1) * Time.fixedDeltaTime;
         }
-        else if (rb.linearVelocity.y > 0 && !Input.GetKey(jumpKey))
+        else if (rb.linearVelocity.y > 0 && !Input.GetKey(keyBinds.jumpKey))
         {
             // Rising but not holding jump (variable jump height)
             rb.linearVelocity += gravity * (ascendMultiplier - 1) * Time.fixedDeltaTime;

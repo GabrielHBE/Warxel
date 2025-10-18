@@ -12,8 +12,6 @@ public class EnterJet : MonoBehaviour
     void OnTriggerStay(Collider collision)
     {
 
-        Debug.Log(collision.gameObject.tag);
-
         if (collision.gameObject.CompareTag("Player"))
         {
             jet.Enter_Exit(collision.gameObject);

@@ -36,17 +36,12 @@ public class LeverAction : MonoBehaviour
 
     void Update()
     {
+        if(!jet.is_in_jet) return;
         
         left_hand.position = left_lever_handPosition.position;
-        if (!jet.is_ejecting)
-        {
-            CenterLever();
-            right_hand.position = center_lever_handPosition.position;
-        }
-        else
-        {
-            Eject();
-        }
+        right_hand.position = center_lever_handPosition.position;
+
+        CenterLever();
 
         LeftLever();
         
@@ -136,14 +131,6 @@ public class LeverAction : MonoBehaviour
 
     }
 
-    void Eject()
-    {
-        if (jet.is_ejecting)
-        {
-            right_hand.transform.position = Vector3.Lerp(right_hand.transform.position, EjectButton.position, Time.deltaTime * 5);
-        }
-
-    }
 
 
 }

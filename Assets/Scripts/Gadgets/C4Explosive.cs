@@ -7,6 +7,7 @@ using VoxelDestructionPro.VoxelObjects;
 
 public class C4Explosive : MonoBehaviour
 {
+    [SerializeField] private GameObject smokeEffect;
     [SerializeField] private C4 c4;
     [SerializeField] private GameObject throw_hand;
     [SerializeField] private GameObject throw_hand_original_pos;
@@ -61,8 +62,8 @@ public class C4Explosive : MonoBehaviour
                 CameraShake cameraShake = player.GetComponentInChildren<CameraShake>();
                 if (cameraShake != null)
                 {
-      
-                    cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage/10, 1f));
+
+                    cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage / 10, 1f));
                 }
                 else
                 {
@@ -73,6 +74,7 @@ public class C4Explosive : MonoBehaviour
             }
 
             DynamicVoxelObj vox = colliders[i].GetComponentInParent<DynamicVoxelObj>();
+
             if (vox == null)
                 continue;
 
@@ -81,6 +83,7 @@ public class C4Explosive : MonoBehaviour
             else
                 vox.AddDestruction_Cube(transform.position, explosionForce);
         }
+        Instantiate(smokeEffect, transform.position, Quaternion.identity);
 
         CreateSound();
         Destroy(gameObject);

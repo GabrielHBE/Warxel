@@ -4,14 +4,13 @@ using UnityEngine;
 
 public class WeaponProperties : MonoBehaviour
 {
+    public int level_to_unlock;
 
     [Header("Weapon properties")]
     public bool manual_calculate_recoil;
     public bool is_shotgun;
     public bool single_reload;
     public bool can_hold_trigger;
-    public bool can_reload_aiming;
-
     public string weapon_name;
     public float rate_of_fire;
     public float ads_speed;
@@ -19,15 +18,20 @@ public class WeaponProperties : MonoBehaviour
     public float zoom;
     public Light muzzle_lightinig;
     public Vector3 ads_position;
-    
     public List<string> fire_modes = new List<string>();
-
 
     [Header("Destruction")]
     public float destruction_force;
 
-    [Header("Shotgun")]
+    [Header("Bullet")]
+    public int bullets_per_shot;
+    public Transform bulletPref;
+    public float muzzle_velocity;
+    public float bullet_drop;
+    public GameObject bullet_hit_effect;
+    
 
+    [Header("Shotgun")]
     public int shells;
 
     [Header("Damage")]
@@ -36,10 +40,8 @@ public class WeaponProperties : MonoBehaviour
     public float damage_dropoff;
     public float damage_dropoff_timer;
 
-
     [Header("Switch Weapon")]
     public float switch_weapon_timer;
-
 
     [Header("Burst Mode")]
     public int bullets_per_tap;
@@ -49,7 +51,6 @@ public class WeaponProperties : MonoBehaviour
     [Header("Spread")]
     public float spread_increaser;
     public float max_spread;
-
 
     [Header("Recoil")]
     public float[] vertical_recoil = new float[10];
@@ -62,13 +63,6 @@ public class WeaponProperties : MonoBehaviour
     public Vector3 visual_recoil;
     public float horizontal_recoil_media;
     public float vertical_recoil_media;
-
-    [Header("Bullet")]
-    public int bullets_per_shot;
-    public Transform bullefPref;
-    public float muzzle_velocity;
-    public float bullet_drop;
-
 
     [Header("Magazine / Reload")]
     public float reload_time;
@@ -106,8 +100,6 @@ public class WeaponProperties : MonoBehaviour
     private Grip grip;
     private Mag mag;
     private Barrel _barrel;
-    float auto_reset_recoil_speed;
-    float auto_apply_recoil_speed;
     bool do_once = true;
     private BulletExtractor bulletExtractor;
 

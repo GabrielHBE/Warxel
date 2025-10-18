@@ -4,9 +4,10 @@ using UnityEngine;
 
 public class Weapon : MonoBehaviour
 {
-    public bool is_active;
+    [HideInInspector] public bool is_active;
 
     [Header("Instances")]
+    public KeyBinds keyBinds;
     public WeaponProperties weaponProperties;
     public AudioSource shoot_sound;
     public Camera player_camera;
@@ -18,12 +19,6 @@ public class Weapon : MonoBehaviour
     private WeaponAnimation weaponAnimation;
     private Sight sight_attatchment;
     private Shell Shell;
-
-    [Header("KeyCodes")]
-    public KeyCode aim_key;
-    public KeyCode shoot_key;
-    public KeyCode reload_key;
-    public KeyCode switch_fire_mode;
 
     [Header("Sounds")]
     public AudioSource switch_fire_mode_sound;
@@ -59,6 +54,7 @@ public class Weapon : MonoBehaviour
 
     public void Restart()
     {
+        
         weaponProperties = GetComponentInChildren<WeaponProperties>();
         weaponAnimation = GetComponent<WeaponAnimation>();
         playerController = GetComponentInParent<PlayerController>();
@@ -84,13 +80,13 @@ public class Weapon : MonoBehaviour
 
         next_time_to_fire = 0f;
 
-        if (aim_key == KeyCode.Alpha1)
+        if (keyBinds.aimKey == KeyCode.Alpha1)
         {
-            aim_key = KeyCode.Mouse1;
+            keyBinds.aimKey = KeyCode.Mouse1;
         }
-        if (shoot_key == KeyCode.Alpha0)
+        if (keyBinds.shootKey == KeyCode.Alpha0)
         {
-            shoot_key = KeyCode.Mouse0;
+            keyBinds.shootKey = KeyCode.Mouse0;
         }
 
         original_barrel_pos = weaponProperties.barrel.transform.localPosition;
@@ -105,13 +101,16 @@ public class Weapon : MonoBehaviour
     void Update()
     {
 
+
         if (!restarted || !is_active)
         {
             return;
         }
 
-        if (Input.GetKeyDown(reload_key))
+        if (Input.GetKeyDown(keyBinds.reloadKey))
         {
+            weaponAnimation.StartReloadAnimation();
+
             int mags_empty = 0;
 
             for (int i = 0; i < weaponProperties.mag_count; i++)
@@ -122,7 +121,7 @@ public class Weapon : MonoBehaviour
                 }
             }
 
-            if (mags_empty == weaponProperties.mag_count || weaponProperties.mags[^1] == weaponProperties.bullets_per_mag + 1)
+            if (mags_empty == weaponProperties.mag_count)
             {
                 can_reload = false;
             }
@@ -153,10 +152,15 @@ public class Weapon : MonoBehaviour
 
 
         aim();
-        shoot();
+        
+        if (can_shoot && !playerProperties.is_reloading && weaponProperties.mags[^1] > 0)
+        {
+            shoot();
+        }
+        
         Reload();
 
-        if (Input.GetKeyDown(switch_fire_mode))
+        if (Input.GetKeyDown(keyBinds.switchFireModeKey))
         {
             SwitchFireMode();
         }
@@ -253,6 +257,8 @@ public class Weapon : MonoBehaviour
                     playerProperties.is_reloading = false;
                     reload_cooldown = 0;
 
+                    weaponAnimation.FinishReloadAnimation();
+
                 }
 
             }
@@ -282,7 +288,7 @@ public class Weapon : MonoBehaviour
         float vr = weaponProperties.vertical_recoil[recoil_position_in_array];
         float hr = weaponProperties.horizontal_recoil[recoil_position_in_array];
 
-        if (is_first_shot == false)
+        if (is_first_shot == false || weaponProperties.mags[^1]==1)
         {
             playerController.ApplyCameraRecoil(vr * weaponProperties.first_shoot_increaser, hr * weaponProperties.first_shoot_increaser);
             is_first_shot = true;
@@ -363,29 +369,43 @@ public class Weapon : MonoBehaviour
         }
 
         weaponProperties.barrel.transform.localRotation = new Quaternion(Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, weaponProperties.barrel.transform.localRotation.w);
+        
 
-        Transform bulletObj = Instantiate(weaponProperties.bullefPref, weaponProperties.barrel.transform.position, weaponProperties.barrel.transform.rotation);
+        Transform bulletObj = Instantiate(weaponProperties.bulletPref, weaponProperties.barrel.transform.position, weaponProperties.barrel.transform.rotation);
 
         Destroy(bulletObj.gameObject, 10f);
+        
 
-        bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force);
+        if(weaponProperties.bullet_hit_effect != null)
+        {
+            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.bullet_hit_effect);
+        }
+        else
+        {
+            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force);
+        }
 
+     
         current_spread += weaponProperties.spread_increaser;
         current_spread = Mathf.Clamp(current_spread, 0, weaponProperties.max_spread);
-        
-        
+
+
     }
 
 
     void shoot()
     {
+        
+
         did_shoot = false; // reset
 
         if (weaponProperties.fire_modes[current_fire_mode] == "auto")
         {
 
-            if (Input.GetKey(shoot_key) && !playerProperties.is_reloading && can_shoot && weaponProperties.mags[^1] > 0)
+            if (Input.GetKey(keyBinds.shootKey))
             {
+
+                weaponAnimation.StartFireAnimation();
 
                 playerProperties.sprinting = false;
                 playerProperties.is_firing = true;
@@ -393,6 +413,7 @@ public class Weapon : MonoBehaviour
 
                 if (next_time_to_fire <= 0f)
                 {
+
 
                     did_shoot = true;
 
@@ -427,6 +448,7 @@ public class Weapon : MonoBehaviour
             }
             else
             {
+
                 recoil_position_in_array = 0;
                 weaponProperties.muzzle_lightinig.enabled = false;
                 playerProperties.is_firing = false;
@@ -439,7 +461,7 @@ public class Weapon : MonoBehaviour
         else if (weaponProperties.fire_modes[current_fire_mode] == "single")
         {
 
-            if (Input.GetKeyDown(shoot_key) && can_shoot && weaponProperties.mags[^1] > 0)
+            if (Input.GetKeyDown(keyBinds.shootKey))
             {
 
                 playerProperties.is_firing = true;
@@ -448,6 +470,9 @@ public class Weapon : MonoBehaviour
 
                 if (next_time_to_fire <= 0f)
                 {
+
+                    weaponAnimation.StartFireAnimation();
+
                     did_shoot = true;
 
                     if (weaponAnimation.fireClip == null)
@@ -457,7 +482,6 @@ public class Weapon : MonoBehaviour
                     for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
                     {
                         CreateBullet();
-                        Debug.Log("Criou bala");
                     }
 
                     StartCoroutine(ApplyVisualRecoilOffset());
@@ -475,6 +499,8 @@ public class Weapon : MonoBehaviour
             }
             else
             {
+
+
                 current_spread = 0;
                 recoil_position_in_array = 0;
                 weaponProperties.muzzle_lightinig.enabled = false;
@@ -489,12 +515,14 @@ public class Weapon : MonoBehaviour
         {
             if (!is_bursting)
             {
-               
-                if (Input.GetKeyDown(shoot_key) && !playerProperties.is_reloading && can_shoot && weaponProperties.mags[^1] > 0)
+
+                if (Input.GetKeyDown(keyBinds.shootKey))
                 {
 
                     if (next_time_to_fire <= 0f)
                     {
+                        weaponAnimation.StartFireAnimation();
+
                         playerProperties.is_firing = true;
                         playerProperties.sprinting = false;
 
@@ -505,6 +533,8 @@ public class Weapon : MonoBehaviour
                 }
                 else
                 {
+
+
                     recoil_position_in_array = 0;
                     weaponProperties.muzzle_lightinig.enabled = false;
                     playerProperties.is_firing = false;
@@ -582,110 +612,51 @@ public class Weapon : MonoBehaviour
     void aim()
     {
 
-
-        if (weaponProperties.can_reload_aiming)
+        if (Input.GetKey(keyBinds.aimKey) && !playerProperties.is_reloading && !switchWeapon._switch)
         {
-            if (Input.GetKey(aim_key) && !switchWeapon._switch)
+
+            // AIMING
+            playerProperties.sprinting = false;
+            playerProperties.is_aiming = true;
+
+            float targetFov = minFov / weaponProperties.zoom;
+
+            // POSIÇÃO
+            ads_position.transform.localPosition = Vector3.MoveTowards(
+                                                            ads_position.transform.localPosition,
+                                                            weaponProperties.ads_position + attatchment_change_ads_position,
+                                                            weaponProperties.ads_speed * Time.deltaTime
+                                                            );
+
+            if (ads_position.transform.localPosition == weaponProperties.ads_position + attatchment_change_ads_position)
             {
-
-                // AIMING
-                playerProperties.sprinting = false;
-                playerProperties.is_aiming = true;
-
-                float targetFov = minFov / weaponProperties.zoom;
-
-                // POSIÇÃO
-
-                ads_position.transform.localPosition = Vector3.MoveTowards(
-                                                                ads_position.transform.localPosition,
-                                                                weaponProperties.ads_position + attatchment_change_ads_position,
-                                                                weaponProperties.ads_speed * Time.deltaTime
-                                                                );
-
-                if (ads_position.transform.localPosition == weaponProperties.ads_position + attatchment_change_ads_position)
-                {
-                    dot_position = true;
-                    weaponProperties.barrel.transform.position = screen_center.transform.position;
-                }
-
-
-                player_camera.fieldOfView = Mathf.Lerp(player_camera.fieldOfView, targetFov, 10 * Time.deltaTime);
-
+                weaponProperties.barrel.transform.position = screen_center.transform.position;
+                dot_position = true;
             }
-            else
-            {
-                weaponProperties.barrel.transform.localPosition = original_barrel_pos;
-                dot_position = false;
-                player_camera.fieldOfView = Mathf.Lerp(
-                player_camera.fieldOfView,
-                minFov,
-                10 * Time.deltaTime);
 
-                // VOLTANDO AO ESTADO NORMAL
-                playerProperties.is_aiming = false;
-                // POSIÇÃO
+            player_camera.fieldOfView = Mathf.Lerp(player_camera.fieldOfView, targetFov, 10 * Time.deltaTime);
 
-                ads_position.transform.localPosition = Vector3.Lerp(
-                    ads_position.transform.localPosition,
-                    original_ads_position,
-                    5 * Time.deltaTime
-                );
-
-            }
         }
         else
         {
-            if (Input.GetKey(aim_key) && !playerProperties.is_reloading && !switchWeapon._switch)
-            {
+            weaponProperties.barrel.transform.localPosition = original_barrel_pos;
 
-                // AIMING
-                playerProperties.sprinting = false;
-                playerProperties.is_aiming = true;
+            dot_position = false;
+            player_camera.fieldOfView = Mathf.Lerp(
+            player_camera.fieldOfView,
+            minFov,
+            10 * Time.deltaTime);
 
-                float targetFov = minFov / weaponProperties.zoom;
+            playerProperties.is_aiming = false;
 
-                // POSIÇÃO
+            ads_position.transform.localPosition = Vector3.Lerp(
+                ads_position.transform.localPosition,
+                original_ads_position,
+                5 * Time.deltaTime
+            );
 
-                ads_position.transform.localPosition = Vector3.MoveTowards(
-                                                                ads_position.transform.localPosition,
-                                                                weaponProperties.ads_position + attatchment_change_ads_position,
-                                                                weaponProperties.ads_speed * Time.deltaTime
-                                                                );
-
-                if (ads_position.transform.localPosition == weaponProperties.ads_position + attatchment_change_ads_position)
-                {
-                    weaponProperties.barrel.transform.position = screen_center.transform.position;
-                    dot_position = true;
-                }
-
-
-                player_camera.fieldOfView = Mathf.Lerp(player_camera.fieldOfView, targetFov, 10 * Time.deltaTime);
-
-            }
-            else
-            {
-                weaponProperties.barrel.transform.localPosition = original_barrel_pos;
-
-                dot_position = false;
-                player_camera.fieldOfView = Mathf.Lerp(
-                player_camera.fieldOfView,
-                minFov,
-                10 * Time.deltaTime);
-
-                // VOLTANDO AO ESTADO NORMAL
-                playerProperties.is_aiming = false;
-                // POSIÇÃO
-
-                ads_position.transform.localPosition = Vector3.Lerp(
-                    ads_position.transform.localPosition,
-                    original_ads_position,
-                    5 * Time.deltaTime
-                );
-
-            }
         }
 
     }
-
 
 }

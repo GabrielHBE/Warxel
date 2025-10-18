@@ -66,7 +66,7 @@ public class SwitchWeapon : MonoBehaviour
 
         weapon = GetComponentInChildren<Weapon>();
         sway = GetComponentInChildren<SwayNBobScript>();
-        magCounter.Restart();
+        ////magCounter.Restart();
 
         //playerController.ChangeWeaponVelocitySpeed(weaponProperties.speed_change);
         _switch = true;
@@ -200,7 +200,7 @@ public class SwitchWeapon : MonoBehaviour
                             weapon.Restart();
                             weapon.can_shoot = false;
                             sway.Restart();
-                            magCounter.Restart();
+                            //magCounter.Restart();
                             weapon_animation.Restart();
                             reticle.Restart();
                             playerController.ChangeWeaponVelocitySpeed(weaponProperties.speed_change);
@@ -265,7 +265,7 @@ public class SwitchWeapon : MonoBehaviour
                             weapon.Restart();
                             weapon.can_shoot = false;
                             sway.Restart();
-                            magCounter.Restart();
+                            //magCounter.Restart();
                             weapon_animation.Restart();
                             reticle.Restart();
                             playerController.ChangeWeaponVelocitySpeed(weaponProperties.speed_change);
@@ -386,7 +386,7 @@ public class SwitchWeapon : MonoBehaviour
                             weapon.Restart();
                             weapon.can_shoot = false;
                             sway.Restart();
-                            magCounter.Restart();
+                            //magCounter.Restart();
                             weapon_animation.Restart();
                             reticle.Restart();
                             playerController.ChangeWeaponVelocitySpeed(weaponProperties.speed_change);

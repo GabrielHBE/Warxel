@@ -7,19 +7,13 @@ public class WeaponAnimation : MonoBehaviour
     private AnimationClip reloadClip;
 
     private Animator anim;
-    private PlayerProperties player;
     private WeaponProperties weaponProperties;
 
-    private Weapon weapon;
-    private float delay_to_shoot_timer = 0f;
-    private float animation_timer = 0f;
-    private bool fired;
     RuntimeAnimatorController rac;
     public float reload_animation_timer;
-    public float shoot_animation_timer;
-    public float elapsed;
+    private float shoot_animation_timer;
+    private float elapsed;
     public bool is_in_fire_animation;
-
 
     bool restarted;
 
@@ -28,19 +22,33 @@ public class WeaponAnimation : MonoBehaviour
         restarted = false;
     }
 
+    void Update()
+    {
+        if (!restarted) return;
+
+        // Controlar o tempo da animação de disparo
+        if (is_in_fire_animation)
+        {
+            elapsed += Time.deltaTime;
+
+            // Se o tempo da animação foi concluído, parar a animação
+            if (elapsed >= shoot_animation_timer)
+            {
+                StopFireAnimation();
+            }
+        }
+    }
+
     public void Restart()
     {
         anim = GetComponentInChildren<Animator>();
-        player = GetComponentInParent<PlayerProperties>();
         weaponProperties = GetComponentInChildren<WeaponProperties>();
-        weapon = GetComponent<Weapon>();
         anim.Play("Stop");
 
         rac = anim.runtimeAnimatorController;
 
         foreach (AnimationClip clip in rac.animationClips)
         {
-
             if (clip.name.Contains("Firing") || clip.name.Contains("Pump"))
             {
                 fireClip = clip;
@@ -52,95 +60,31 @@ public class WeaponAnimation : MonoBehaviour
             else
             {
                 fireClip = null;
-
             }
-
         }
         restarted = true;
-
     }
 
-    void Update()
+    public void StartReloadAnimation()
     {
-
-        if (!restarted)
-        {
-            return;
-        }
-
-        if (weapon.did_shoot)
-        {
-            fired = true;
-        }
-
-        //Verifica se a animação nãoé nula
-        if (anim != null)
-        {
-            //Verifica se tem uma animação de atirar
-            if (fireClip != null)
-            {
-                //Ferifica se ativou
-                if (fired)
-                {
-                    if (delay_to_shoot_timer >= weaponProperties.delay_to_shoot_animation)
-                    {
-                        is_in_fire_animation = true;
-                        anim.SetBool("Is_firing", is_in_fire_animation);
-                        animation_timer = fireClip.length / anim.speed;
-                        fired = false;
-                        delay_to_shoot_timer = 0f;
-                    }
-                    else
-                    {
-                        delay_to_shoot_timer += Time.deltaTime;
-                    }
-                }
-                else if (animation_timer > 0f)
-                {
-                    animation_timer -= Time.deltaTime;
-                    if (animation_timer <= 0f)
-                    {
-                        is_in_fire_animation = false;
-                        anim.SetBool("Is_firing", is_in_fire_animation);
-
-                    }
-                }
-                else
-                {
-                    anim.SetBool("Is_firing", false);
-                }
-            }
-            ReloadAnimation();
-            anim.SetBool("Is_reloading", player.is_reloading);
-            anim.SetFloat("Reload_speed", weaponProperties.reload_time);
-
-        }
-    }
-
-    void ReloadAnimation()
-    {
-
+        anim.SetFloat("Reload_speed", weaponProperties.reload_time);
 
         if (anim != null)
         {
-
             if (weaponProperties.mags[^1] != 0)
             {
                 foreach (AnimationClip clip in rac.animationClips)
                 {
-
                     if (clip.name == "Reload")
                     {
                         reloadClip = clip;
                         reload_animation_timer = reloadClip.length;
-
                         anim.SetBool("Last_bullet", false);
                         break;
                     }
                     else
                     {
                         reloadClip = null;
-
                     }
                 }
             }
@@ -148,7 +92,6 @@ public class WeaponAnimation : MonoBehaviour
             {
                 foreach (AnimationClip clip in rac.animationClips)
                 {
-
                     if (clip.name == "Reload2")
                     {
                         reloadClip = clip;
@@ -159,13 +102,78 @@ public class WeaponAnimation : MonoBehaviour
                     else
                     {
                         reloadClip = null;
-
                     }
                 }
             }
-
         }
 
+        anim.SetBool("Is_reloading", true);
     }
 
+    public void FinishReloadAnimation()
+    {
+        if (anim != null)
+        {
+            if (weaponProperties.mags[^1] != 0)
+            {
+                foreach (AnimationClip clip in rac.animationClips)
+                {
+                    if (clip.name == "Reload")
+                    {
+                        reloadClip = clip;
+                        reload_animation_timer = reloadClip.length;
+                        anim.SetBool("Last_bullet", false);
+                        break;
+                    }
+                    else
+                    {
+                        reloadClip = null;
+                    }
+                }
+            }
+            else
+            {
+                foreach (AnimationClip clip in rac.animationClips)
+                {
+                    if (clip.name == "Reload2")
+                    {
+                        reloadClip = clip;
+                        reload_animation_timer = reloadClip.length;
+                        anim.SetBool("Last_bullet", true);
+                        break;
+                    }
+                    else
+                    {
+                        reloadClip = null;
+                    }
+                }
+            }
+        }
+
+        anim.SetBool("Is_reloading", false);
+    }
+
+    public void StartFireAnimation()
+    {
+        if (fireClip == null) return;
+
+        StartCoroutine(ExecuteFireAnimationDelayed());
+    }
+
+    private System.Collections.IEnumerator ExecuteFireAnimationDelayed()
+    {
+        yield return new WaitForSeconds(weaponProperties.delay_to_shoot_animation);
+
+        anim.SetBool("Is_firing", true);
+        is_in_fire_animation = true;
+        elapsed = 0f;
+    }
+    public void StopFireAnimation()
+    {
+        if (fireClip == null) return;
+
+        anim.SetBool("Is_firing", false);
+        is_in_fire_animation = false;
+        elapsed = 0f;
+    }
 }

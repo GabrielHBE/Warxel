@@ -16,14 +16,19 @@ public class JetProperties : MonoBehaviour
     [Header("Bullet")]
     public float muzzle_velocity;
     public float bullet_drop;
+    public GameObject bullet_hit_effect;
 
-    [Header("Shooting")]
+    [Header("MainCannon")]
     public Transform bullefPref;
     public GameObject barrel;
     public float fire_rate;
     public float interval;
     public float zoom;
     public float overheat_time;
+    public float damage;
+    public float damage_dropoff;
+    public float damage_dropoff_timer;
+    public float destruction_force;
 
     [Header("Audio")]
     public AudioSource interior_turbine;

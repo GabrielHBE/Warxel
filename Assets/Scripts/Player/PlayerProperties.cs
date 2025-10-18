@@ -24,10 +24,5 @@ public class PlayerProperties : MonoBehaviour
         }
             
     }
-    
-    void Update()
-    {
-        Debug.Log(hp);
-    }
 
 }

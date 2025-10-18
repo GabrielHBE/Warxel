@@ -15,8 +15,10 @@ public class MainCannon : MonoBehaviour
     }
 
     void Update()
-    {
-        if (jet.is_in_jet && Input.GetKey(jet.shoot_key))
+    {   
+        if(!jet.is_in_jet) return;
+
+        if (Input.GetKey(jet.shoot_key))
         {
             rotation_value += 0.01f;
         }
