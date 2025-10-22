@@ -97,7 +97,7 @@ public class PlayerController : MonoBehaviour
     {
         CapsuleCollider collider = GetComponent<CapsuleCollider>();
         playerHeight = collider.height * transform.localScale.y;
-        raycastDistance = (playerHeight / 2) + 0.2f;
+        raycastDistance = (playerHeight / 2) + 0.02f;
     }
 
     void SetupCursor()

@@ -118,10 +118,12 @@ public class Bullet : MonoBehaviour
                     else if (collision.gameObject.CompareTag("Voxel"))
                     {
                         DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
-
-                        if (vox.destruction_multiplier > 0)
+                        if (vox != null)
                         {
-                            voxCollider.destructionRadius *= vox.destruction_multiplier;
+                            if (vox.destruction_multiplier > 0)
+                            {
+                                voxCollider.destructionRadius *= vox.destruction_multiplier;
+                            }
                         }
 
                         HitEffects(contact.point, contact.normal, vox);
@@ -181,7 +183,7 @@ public class Bullet : MonoBehaviour
 
             }
 
-            Debug.Log(collision.gameObject.name);
+            //Debug.Log(collision.gameObject.name);
 
         }
 
@@ -234,7 +236,7 @@ public class Bullet : MonoBehaviour
                 Instantiate(dirt_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
                 break;
             case "SoftBody":
-                 Instantiate(softbody_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                Instantiate(softbody_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
                 break;
             default:
                 break;

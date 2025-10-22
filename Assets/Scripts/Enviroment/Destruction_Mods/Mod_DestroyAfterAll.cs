@@ -5,6 +5,7 @@ using VoxelDestructionPro.VoxelObjects;
 
 public class Mod_DestroyAfterAll : MonoBehaviour
 {
+    [SerializeField] private bool can_collapse;
     [SerializeField] private AudioSource collapsesound;
     [SerializeField] private GameObject fallParticles;
     [SerializeField] private float distance_step = 1f;
@@ -15,7 +16,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
     [SerializeField] private float delay_to_collapse;
 
     [Header("Performance Settings")]
-    [SerializeField] private float destructionRadius = 30f;
+    [SerializeField] private float max_destructionRadius = 30f;
     [SerializeField] private float destructionDelay = 0.5f;
     [SerializeField] private float sampleProbability = 0.5f;
 
@@ -26,7 +27,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
     private bool doOnce = true;
     private Vector3 targetPosition;
     private Quaternion targetRotation;
-    private float totalDamage = 0f;
+    [HideInInspector] public float totalDamage = 0f;
     private List<Collider> collidersCache = new List<Collider>();
     private WaitForSeconds destructionWait;
     private int groundLayerMask;
@@ -37,8 +38,8 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     void Start()
     {
-        targetPosition = new Vector3(transform.position.x, transform.position.y - Random.Range(40, 60), transform.position.z);
-        targetRotation = new Quaternion(Random.Range(-0.2f, 0.2f), transform.rotation.y, Random.Range(-0.2f, 0.2f), transform.rotation.w);
+        targetPosition = new Vector3(transform.position.x, transform.position.y - Random.Range(40, 80), transform.position.z);
+        targetRotation = new Quaternion(transform.rotation.x + Random.Range(-0.2f, 0.2f), transform.rotation.y, transform.rotation.z + Random.Range(-0.2f, 0.2f), transform.rotation.w);
         childScripts = GetComponentsInChildren<DynamicVoxelObj>();
         destructionWait = new WaitForSeconds(destructionDelay);
         groundLayerMask = LayerMask.GetMask("Ground");
@@ -49,7 +50,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     void Update()
     {
-        if (isCollapsing)
+        if (isCollapsing && can_collapse)
         {
             delay_to_collapse -= Time.deltaTime;
 
@@ -60,10 +61,9 @@ public class Mod_DestroyAfterAll : MonoBehaviour
             }
         }
 
-        CalculateTotalDamage();
-
         if (totalDamage >= dmg_to_collapse && doOnce)
         {
+            Debug.Log("OI");
             isCollapsing = true;
             doOnce = false;
 
@@ -79,17 +79,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     }
 
-    private void CalculateTotalDamage()
-    {
-        totalDamage = 0f;
-        foreach (DynamicVoxelObj script in childScripts)
-        {
-            if (script != null && !script.transform.name.Contains("Glass"))
-            {
-                totalDamage += script.damage_taken;
-            }
-        }
-    }
 
     private void HandleCollapse()
     {
@@ -136,7 +125,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
                 MeshCollider meshCollider = script.transform.GetChild(0).GetComponent<MeshCollider>();
                 if (meshCollider != null)
                 {
-                    Debug.Log($"Processando MeshCollider em: {script.name}");
+                    //Debug.Log($"Processando MeshCollider em: {script.name}");
                     CollapseStructureOptimized(meshCollider, distance_step);
                 }
                 else
@@ -203,7 +192,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
             }
         }
 
-        Debug.Log($"Adicionados {pointsAdded} pontos do mesh collider {mesh.name}");
+        //Debug.Log($"Adicionados {pointsAdded} pontos do mesh collider {mesh.name}");
     }
 
     private Vector3[] GenerateSampleOffsets()
@@ -272,6 +261,8 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     private void ApplyDestructionAtPosition(Vector3 worldPos)
     {
+        float destructionRadius = Random.Range(5, max_destructionRadius);
+
         int count = Physics.OverlapSphereNonAlloc(worldPos, destructionRadius, colliderArrayCache);
 
         //Debug.Log($"Aplicando destruição em: {worldPos} - Encontrados {count} colliders");

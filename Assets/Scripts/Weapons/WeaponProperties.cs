@@ -105,8 +105,8 @@ public class WeaponProperties : MonoBehaviour
 
     void Start()
     {
-        inicial_rotation = transform.localRotation;
-        initial_potiion = transform.localPosition;
+        //inicial_rotation = transform.localRotation;
+        //initial_potiion = transform.localPosition;
         FillMags();
         Restart();
     }

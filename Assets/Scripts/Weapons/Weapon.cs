@@ -7,18 +7,13 @@ public class Weapon : MonoBehaviour
     [HideInInspector] public bool is_active;
 
     [Header("Instances")]
-    public KeyBinds keyBinds;
-    public WeaponProperties weaponProperties;
-    public AudioSource shoot_sound;
-    public Camera player_camera;
-    public GameObject ads_position;
+    [SerializeField] private GameObject left_hand;
+    [SerializeField] private GameObject right_hand;
+    [SerializeField] private KeyBinds keyBinds;
+    [SerializeField] private Camera player_camera;
+    [SerializeField] private GameObject ads_position;
     [SerializeField] private GameObject screen_center;
     [SerializeField] private SwitchWeapon switchWeapon;
-    private PlayerController playerController;
-    private PlayerProperties playerProperties;
-    private WeaponAnimation weaponAnimation;
-    private Sight sight_attatchment;
-    private Shell Shell;
 
     [Header("Sounds")]
     public AudioSource switch_fire_mode_sound;
@@ -41,21 +36,31 @@ public class Weapon : MonoBehaviour
     int recoil_position_in_array = 0;
     Vector3 original_ads_position;
     private WeaponSounds weaponSounds;
+    private WeaponProperties weaponProperties;
+    private AudioSource shoot_sound;
+    private PlayerController playerController;
+    private PlayerProperties playerProperties;
+    private WeaponAnimation weaponAnimation;
+    private Sight sight_attatchment;
+    private Shell Shell;
     float current_spread;
     [HideInInspector] public bool dot_position;
     bool restarted;
 
     Vector3 original_barrel_pos;
 
-    void Start()
+    void Awake()
     {
+        SetHandsOnWeapon();
         restarted = false;
     }
 
     public void Restart()
     {
-        
+
         weaponProperties = GetComponentInChildren<WeaponProperties>();
+        weaponProperties.weapon.transform.localPosition = weaponProperties.initial_potiion;
+        weaponProperties.weapon.transform.localRotation = weaponProperties.inicial_rotation;
         weaponAnimation = GetComponent<WeaponAnimation>();
         playerController = GetComponentInParent<PlayerController>();
         playerProperties = transform.root.GetComponent<PlayerProperties>();
@@ -152,12 +157,12 @@ public class Weapon : MonoBehaviour
 
 
         aim();
-        
+
         if (can_shoot && !playerProperties.is_reloading && weaponProperties.mags[^1] > 0)
         {
             shoot();
         }
-        
+
         Reload();
 
         if (Input.GetKeyDown(keyBinds.switchFireModeKey))
@@ -167,6 +172,18 @@ public class Weapon : MonoBehaviour
 
 
     }
+
+    void SetHandsOnWeapon()
+    {
+        WeaponHolder[] weaponHolders = GetComponentsInChildren<WeaponHolder>(true);
+        foreach (WeaponHolder holder in weaponHolders)
+        {
+
+            holder.leftHand_origin = left_hand;
+            holder.rightHand_origin = right_hand;
+        }
+    }
+
 
 
     void SwitchFireMode()
@@ -288,7 +305,7 @@ public class Weapon : MonoBehaviour
         float vr = weaponProperties.vertical_recoil[recoil_position_in_array];
         float hr = weaponProperties.horizontal_recoil[recoil_position_in_array];
 
-        if (is_first_shot == false || weaponProperties.mags[^1]==1)
+        if (is_first_shot == false || weaponProperties.mags[^1] == 1)
         {
             playerController.ApplyCameraRecoil(vr * weaponProperties.first_shoot_increaser, hr * weaponProperties.first_shoot_increaser);
             is_first_shot = true;
@@ -369,14 +386,14 @@ public class Weapon : MonoBehaviour
         }
 
         weaponProperties.barrel.transform.localRotation = new Quaternion(Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, weaponProperties.barrel.transform.localRotation.w);
-        
+
 
         Transform bulletObj = Instantiate(weaponProperties.bulletPref, weaponProperties.barrel.transform.position, weaponProperties.barrel.transform.rotation);
 
         Destroy(bulletObj.gameObject, 10f);
-        
 
-        if(weaponProperties.bullet_hit_effect != null)
+
+        if (weaponProperties.bullet_hit_effect != null)
         {
             bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.bullet_hit_effect);
         }
@@ -385,8 +402,15 @@ public class Weapon : MonoBehaviour
             bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force);
         }
 
-     
-        current_spread += weaponProperties.spread_increaser;
+        if (playerProperties.is_aiming)
+        {
+            current_spread += weaponProperties.spread_increaser;
+        }
+        else
+        {
+            current_spread += weaponProperties.spread_increaser*1.5f;
+        }
+
         current_spread = Mathf.Clamp(current_spread, 0, weaponProperties.max_spread);
 
 
@@ -395,7 +419,7 @@ public class Weapon : MonoBehaviour
 
     void shoot()
     {
-        
+
 
         did_shoot = false; // reset
 
