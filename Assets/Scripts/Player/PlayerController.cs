@@ -22,7 +22,6 @@ public class PlayerController : MonoBehaviour
     public float crouchSpeed = 2f;
     public float jumpForce = 2f;
     public float fallMultiplier = 2.5f;
-    public float ascendMultiplier = 2f;
 
 
     [Header("Ground Detection")]
@@ -111,18 +110,7 @@ public class PlayerController : MonoBehaviour
 
         if (Input.GetKeyDown(keyBinds.interactKey))
         {
-            Vector3 origin = cameraTransform.position; // Posição do objeto
-            Vector3 direction = cameraTransform.forward; // Direção para onde o objeto está olhando
-            RaycastHit hit;
-            Debug .DrawRay(origin, direction * intecact_distance, Color.red, 1f);
-            if (Physics.Raycast(origin, direction, out hit, intecact_distance))
-            {
-                ElevatorCallButton button = hit.collider.GetComponent<ElevatorCallButton>();
-                if (button != null)
-                {
-                    button.Interact();
-                }
-            }
+            Interact();
         }
 
         HandleInput();
@@ -135,6 +123,22 @@ public class PlayerController : MonoBehaviour
         }
 
         UpdateGroundCheck();
+    }
+
+    void Interact()
+    {
+        Vector3 origin = cameraTransform.position;
+        Vector3 direction = cameraTransform.forward;
+        RaycastHit hit;
+        Debug.DrawRay(origin, direction * intecact_distance, Color.red, 1f);
+        if (Physics.Raycast(origin, direction, out hit, intecact_distance))
+        {
+            ElevatorCallButton button = hit.collider.GetComponent<ElevatorCallButton>();
+            if (button != null)
+            {
+                button.Interact();
+            }
+        }
     }
 
     void HandleInput()
@@ -277,7 +281,8 @@ public class PlayerController : MonoBehaviour
         }
 
         Vector3 rayOrigin = transform.position;
-        bool isGroundedNow = Physics.Raycast(rayOrigin, Vector3.down, raycastDistance, groundLayer);
+        int voxel_ground_layer = LayerMask.GetMask("Voxel_Ground");
+        bool isGroundedNow = Physics.Raycast(rayOrigin, Vector3.down, raycastDistance, groundLayer | voxel_ground_layer);
 
         // Landed event
         if (!wasGroundedLastFrame && isGroundedNow)
@@ -299,19 +304,16 @@ public class PlayerController : MonoBehaviour
 
     void ApplyJumpPhysics()
     {
+
         Vector3 gravity = Physics.gravity.y * Vector3.up;
 
         if (rb.linearVelocity.y < 0)
         {
-            // Falling down
             rb.linearVelocity += gravity * (fallMultiplier - 1) * Time.fixedDeltaTime;
         }
-        else if (rb.linearVelocity.y > 0 && !Input.GetKey(keyBinds.jumpKey))
-        {
-            // Rising but not holding jump (variable jump height)
-            rb.linearVelocity += gravity * (ascendMultiplier - 1) * Time.fixedDeltaTime;
-        }
+
     }
+
 
     public void ChangeWeaponVelocitySpeed(float speedModifier)
     {

@@ -1,3 +1,4 @@
+
 using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -158,10 +159,19 @@ public class Weapon : MonoBehaviour
 
         aim();
 
-        if (can_shoot && !playerProperties.is_reloading && weaponProperties.mags[^1] > 0)
+        try
         {
-            shoot();
+            if (can_shoot && !playerProperties.is_reloading && weaponProperties.mags[^1] > 0)
+            {
+                shoot();
+            }
+
         }
+        catch (System.Exception)
+        {
+
+        }
+
 
         Reload();
 
@@ -408,7 +418,7 @@ public class Weapon : MonoBehaviour
         }
         else
         {
-            current_spread += weaponProperties.spread_increaser*1.5f;
+            current_spread += weaponProperties.spread_increaser * 1.5f;
         }
 
         current_spread = Mathf.Clamp(current_spread, 0, weaponProperties.max_spread);

@@ -50,6 +50,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     void Update()
     {
+
         if (isCollapsing && can_collapse)
         {
             delay_to_collapse -= Time.deltaTime;
@@ -63,7 +64,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
         if (totalDamage >= dmg_to_collapse && doOnce)
         {
-            Debug.Log("OI");
+
             isCollapsing = true;
             doOnce = false;
 

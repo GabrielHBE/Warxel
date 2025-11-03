@@ -52,7 +52,8 @@ public class KeyBinds : MonoBehaviour
 
 
     [Header("Vehicle")]
-    public KeyCode EnterVehicleKey;
+    public KeyCode enterVehicleKey;
+    public KeyCode freeLookKey;
 
 
     [Header("Jet")]

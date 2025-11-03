@@ -11,7 +11,6 @@ public class JetProperties : MonoBehaviour
     public float lean_value;
     public float maneuverability;
     public bool invertY;
-    public float weight;
     
     [Header("Bullet")]
     public float muzzle_velocity;

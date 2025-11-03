@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -49,18 +48,18 @@ public class Jet : MonoBehaviour
     public GameObject glass;
     public GameObject crash_explosion;
     public AudioSource crash_sound;
+    public Vector3 forwardReference;
+    public JetProperties jetProperties;
+    public Rigidbody rb;
 
     [Header("Sound")]
     public AudioSource tinnitus;
     public AudioListener jet_audio_listener;
     public AudioListener player_audio_listener;
     public AudioDistortionFilter distortion;
-
     [HideInInspector] public float mouseX, mouseY;
-    public JetProperties jetProperties;
-    public Transform forwardReference;
-    private float acceleration; // Velocidade aumenta 1 unidade por segundo
-    public float currentSpeed = 0f;
+    private float acceleration;
+    [HideInInspector] public float currentSpeed = 0f;
     private bool start_engine;
     [HideInInspector] public float moveForward;
     [HideInInspector] public int current_camera;
@@ -70,14 +69,15 @@ public class Jet : MonoBehaviour
     bool overheated;
     float passout_timer;
     bool passout;
-    public Rigidbody rb;
+    
     Quaternion initial_camera_rotation;
     [HideInInspector] public float lean_value;
-
     private float exit_cooldown;
+    private float gravity=10;
 
     void Start()
     {
+        
         TurbineSmoke.SetActive(false);
         jet_audio_listener.enabled = false;
         blackImage.enabled = false;
@@ -88,8 +88,7 @@ public class Jet : MonoBehaviour
 
         current_camera = 1;
         rb = GetComponent<Rigidbody>();
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic; // ESSENCIAL!
-        //jetProperties = GetComponent<JetProperties>();
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
         initial_camera_rotation = inside_camera_position.localRotation;
 
@@ -109,6 +108,7 @@ public class Jet : MonoBehaviour
         {
             zoom_key = KeyCode.Mouse1;
         }
+
     }
 
     IEnumerator IncreasePitch(AudioSource audio, float duration)
@@ -161,10 +161,12 @@ public class Jet : MonoBehaviour
         }
     }
 
+
     void Update()
     {
         if (is_in_jet)
         {
+            forwardReference = - transform.right;
 
             exit_cooldown += Time.deltaTime;
 
@@ -207,9 +209,10 @@ public class Jet : MonoBehaviour
             jetProperties.interior_turbine.Stop();
             jetProperties.interior_turbine.pitch = 0.01f;
 
-            currentSpeed -= acceleration * Time.deltaTime * 1.5f; // Diminui a velocidade com o tempo
+            currentSpeed -= acceleration * Time.deltaTime * 1.5f;
         }
 
+        /*
         if (currentSpeed > 100)
         {
             //rb.isKinematic = true;
@@ -220,9 +223,11 @@ public class Jet : MonoBehaviour
             //rb.isKinematic = false;
             rb.useGravity = true;
         }
-
+        */
         currentSpeed = Math.Clamp(currentSpeed, 0, jetProperties.max_speed);
-        transform.position += forwardReference.forward * currentSpeed * Time.deltaTime;
+        rb.AddForce(forwardReference * currentSpeed * (jetProperties.max_speed/5));
+        
+        //transform.position += forwardReference.forward * currentSpeed * Time.deltaTime;
     }
 
     void FreeLook()
@@ -436,33 +441,38 @@ public class Jet : MonoBehaviour
 
     void Rotate()
     {
-        mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+        mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime * jetProperties.pitch_value;
+        mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime * jetProperties.pitch_value;
 
         if (Input.GetKey(pitch_up_key) && passout == false)
         {
-            mouseY += jetProperties.pitch_value;
+            mouseY += Time.deltaTime * jetProperties.pitch_value;
         }
+
 
         if (Input.GetKey(pitch_down_key) && passout == false)
         {
-            mouseY -= jetProperties.pitch_value;
+            mouseY -= Time.deltaTime * jetProperties.pitch_value;
         }
-
 
         if (jetProperties.invertY)
         {
-            mouseY *= -1;
+            mouseY *= -1 * Time.deltaTime;
         }
 
         mouseX = Math.Clamp(mouseX, -jetProperties.rotation_value, jetProperties.rotation_value);
         mouseY = Math.Clamp(mouseY, -jetProperties.pitch_value, jetProperties.pitch_value);
 
+        /*
         if (currentSpeed >= 30)
         {
             transform.Rotate(Vector3.back * mouseY * currentSpeed / jetProperties.max_speed * jetProperties.pitch_value, Space.Self);
             transform.Rotate(Vector3.right * mouseX * currentSpeed / jetProperties.max_speed * jetProperties.rotation_value, Space.Self);
         }
+        */
+
+        rb.AddTorque(transform.right * mouseX * currentSpeed * jetProperties.max_speed/2);
+        rb.AddTorque(-transform.forward * mouseY * currentSpeed * jetProperties.max_speed/2);
 
 
     }
@@ -486,7 +496,7 @@ public class Jet : MonoBehaviour
 
         lean_value = Math.Clamp(lean_value, -jetProperties.lean_value, jetProperties.lean_value);
 
-        transform.Rotate(Vector3.up * lean_value * currentSpeed / jetProperties.max_speed, Space.Self);
+        transform.Rotate(Vector3.up * lean_value * currentSpeed / jetProperties.max_speed * Time.deltaTime, Space.Self);
 
     }
 
@@ -510,20 +520,18 @@ public class Jet : MonoBehaviour
 
         if (start_engine && moveForward > 0 && passout == false)
         {
-            jetProperties.interior_turbine.pitch += 0.0001f;
-
-            currentSpeed += acceleration * Time.deltaTime; // Aumenta a velocidade com o tempo
-
-
-
+            if (gravity > 0)
+            {
+                gravity -= 2 * Time.deltaTime;
+            }
+            jetProperties.interior_turbine.pitch += 0.1f * Time.deltaTime;
+            currentSpeed += acceleration * Time.deltaTime;
         }
         else if (start_engine && moveForward < 0 && passout == false)
         {
-            jetProperties.interior_turbine.pitch -= 0.0001f;
-
-            currentSpeed -= acceleration * Time.deltaTime * 1.5f; // Diminui a velocidade com o tempo
-
-
+            gravity += 2 * Time.deltaTime;
+            jetProperties.interior_turbine.pitch -= 0.1f * Time.deltaTime;
+            currentSpeed -= acceleration * Time.deltaTime * 1.5f * Time.deltaTime;
         }
 
     }
@@ -531,7 +539,7 @@ public class Jet : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        float explosionForce = currentSpeed /9;
+        float explosionForce = currentSpeed / 9;
 
         if (currentSpeed > 400)
         {
@@ -587,8 +595,6 @@ public class Jet : MonoBehaviour
                 }
                 Mod_DestroyAfterAll mod_DestroyAfterAll = collision.gameObject.GetComponentInParent<Mod_DestroyAfterAll>();
                 mod_DestroyAfterAll?.StartCoroutine(mod_DestroyAfterAll.FallUpperVoxels(explosionForce, contact.point));
-
-
 
                 GameObject obj = Instantiate(crash_explosion, contact.point + contact.normal, Quaternion.LookRotation(contact.normal));
                 obj.transform.localScale *= explosionForce / 10;
@@ -655,11 +661,20 @@ public class Jet : MonoBehaviour
 
         }
     }
+    
+    void OnCollisionStay(Collision collision)
+    {
+        Debug.Log(mouseY);
+        if(LayerMask.LayerToName(collision.gameObject.layer) == "Ground" && mouseY>0 && currentSpeed>30)
+        {
+            rb.AddForce(Vector3.up * rb.linearVelocity.magnitude * 135);
+        }
+    }
 
     void EjectPlayer()
     {
 
-        Quaternion spawnRotation = new Quaternion(0, forwardReference.transform.rotation.y, 0, forwardReference.transform.rotation.w);
+        Quaternion spawnRotation = new Quaternion(0, exit_jet_position.transform.rotation.y, 0,exit_jet_position.transform.rotation.w);
 
         if (currentSpeed < 100)
         {
@@ -673,7 +688,6 @@ public class Jet : MonoBehaviour
             if (playerPrefab != null)
             {
                 Vector3 spawnPosition = new Vector3(inside_camera_position.position.x, glass.transform.position.y + 5, inside_camera_position.position.z);
-                spawnRotation = new Quaternion(0, forwardReference.transform.rotation.y, 0, forwardReference.transform.rotation.w);
 
                 GameObject newPlayer = Instantiate(playerPrefab, spawnPosition, spawnRotation);
                 player = newPlayer;
