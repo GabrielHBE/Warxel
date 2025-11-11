@@ -26,7 +26,7 @@ public class RotateRotationFlaps : MonoBehaviour
 
     void Rotate()
     {
-        float rotationAmount = -jet.mouseX * 30 * Time.deltaTime;
+        float rotationAmount = -jet.mouseX  * Time.deltaTime;
 
         float current_rotation = transform.localRotation.z;
 

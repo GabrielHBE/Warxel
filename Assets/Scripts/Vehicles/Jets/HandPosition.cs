@@ -51,8 +51,8 @@ public class LeverAction : MonoBehaviour
 
     void CenterLever()
     {
-        float rotationAmountY = -jet.mouseY / 2;
-        float rotationAmountX = -jet.mouseX / 2;
+        float rotationAmountY = -jet.mouseY / 40;
+        float rotationAmountX = -jet.mouseX / 40;
 
         Vector3 currentRotation = center_lever.transform.localEulerAngles;
 
@@ -92,8 +92,8 @@ public class LeverAction : MonoBehaviour
 
     void LeftLever()
     {
-        float rotationAmountY = jet.moveForward;
-        float rotationAmountX = -jet.lean_value;
+        float rotationAmountY = jet.moveForward/5;
+        float rotationAmountX = -jet.lean_value/5;
 
         Vector3 currentRotation = left_lever.transform.localEulerAngles;
 

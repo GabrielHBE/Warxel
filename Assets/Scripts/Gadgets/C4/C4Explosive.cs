@@ -8,7 +8,7 @@ using VoxelDestructionPro.VoxelObjects;
 public class C4Explosive : MonoBehaviour
 {
     [SerializeField] private GameObject smokeEffect;
-    [SerializeField] private C4 c4;
+    [SerializeField] private C4Detonator c4;
     [SerializeField] private GameObject throw_hand;
     [SerializeField] private GameObject throw_hand_original_pos;
     [SerializeField] private AudioSource explosion_sound;
@@ -18,6 +18,8 @@ public class C4Explosive : MonoBehaviour
     public float explosionForce = 20f;
 
     public DestructionData.DestructionType destructionType = DestructionData.DestructionType.Sphere;
+
+    
 
     void CreateSound()
     {

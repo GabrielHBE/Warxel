@@ -58,6 +58,7 @@ public class KeyBinds : MonoBehaviour
 
     [Header("Jet")]
     public KeyCode boostKey;
+    public KeyCode landingGearsActivator;
     public KeyCode shootMissileKey;
     public KeyCode shootMachineGunKey;
     public KeyCode shootBombKey;

@@ -25,7 +25,7 @@ public class RotatePitchFlaps : MonoBehaviour
 
     void Rotate()
     {
-        float rotationAmount = jet.mouseY * 100 * Time.deltaTime;
+        float rotationAmount = jet.mouseY * 1000 * Time.deltaTime;
 
         float current_rotation = transform.localRotation.z;
         

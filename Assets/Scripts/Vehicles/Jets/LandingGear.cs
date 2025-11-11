@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 public class LandingGear : MonoBehaviour
@@ -8,6 +7,7 @@ public class LandingGear : MonoBehaviour
     private Jet jet;
     private Quaternion original_rotation;
     private Collider wheel_collider;
+    [SerializeField] private LayerMask targetLayer;
 
     void Start()
     {
@@ -15,14 +15,17 @@ public class LandingGear : MonoBehaviour
         jet = GetComponentInParent<Jet>();
 
         wheel_collider = GetComponent<Collider>();
+        Return();
     }
 
     void Update()
     {
         if (jet.is_in_jet)
         {
-            if (jet.currentSpeed >= 110)
+
+            if (jet.retract_landingGear)
             {
+
                 wheel_collider.enabled = false;
                 Retract();
             }
@@ -33,11 +36,9 @@ public class LandingGear : MonoBehaviour
             }
         }
 
-
     }
 
-
-    void Retract()
+    public void Retract()
     {
         if (retraction_rotation == 'x')
         {
@@ -45,6 +46,8 @@ public class LandingGear : MonoBehaviour
             new Quaternion(rotation, transform.localRotation.y, transform.localRotation.z, transform.localRotation.w),
             Time.deltaTime * 0.1f
             );
+
+            if (transform.localRotation == new Quaternion(rotation, transform.localRotation.y, transform.localRotation.z, transform.localRotation.w)) jet.is_on_ground = false;
         }
         else if (retraction_rotation == 'y')
         {
@@ -52,6 +55,8 @@ public class LandingGear : MonoBehaviour
             new Quaternion(transform.localRotation.x, rotation, transform.localRotation.z, transform.localRotation.w),
             Time.deltaTime * 0.1f
             );
+
+            if (transform.localRotation == new Quaternion(transform.localRotation.x, rotation, transform.localRotation.z, transform.localRotation.w)) jet.is_on_ground = false;
         }
         else
         {
@@ -59,13 +64,16 @@ public class LandingGear : MonoBehaviour
             new Quaternion(transform.localRotation.x, transform.localRotation.y, rotation, transform.localRotation.w),
             Time.deltaTime * 0.1f
             );
+
+            if (transform.localRotation == new Quaternion(transform.localRotation.x, transform.localRotation.y, rotation, transform.localRotation.w)) jet.is_on_ground = false;
         }
 
     }
 
-    void Return()
+    public void Return()
     {
         transform.localRotation = Quaternion.Lerp(transform.localRotation, original_rotation, 5 * Time.deltaTime);
+        if (transform.localRotation == original_rotation) jet.is_on_ground = true;
     }
 
 }

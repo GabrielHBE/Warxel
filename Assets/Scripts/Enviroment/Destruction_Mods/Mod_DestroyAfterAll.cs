@@ -30,7 +30,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
     [HideInInspector] public float totalDamage = 0f;
     private List<Collider> collidersCache = new List<Collider>();
     private WaitForSeconds destructionWait;
-    private int groundLayerMask;
+    private int voxelLayerMask;
     private Collider[] colliderArrayCache = new Collider[50];
     private bool pointsCalculated = false;
 
@@ -42,7 +42,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         targetRotation = new Quaternion(transform.rotation.x + Random.Range(-0.2f, 0.2f), transform.rotation.y, transform.rotation.z + Random.Range(-0.2f, 0.2f), transform.rotation.w);
         childScripts = GetComponentsInChildren<DynamicVoxelObj>();
         destructionWait = new WaitForSeconds(destructionDelay);
-        groundLayerMask = LayerMask.GetMask("Ground");
+        voxelLayerMask = LayerMask.GetMask("Voxel");
 
         Pre_load_collapse();
 
@@ -117,7 +117,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         traversalPoints.Clear();
         visitedCells.Clear();
 
-        Debug.Log($"Encontrados {childScripts.Length} scripts DynamicVoxelObj");
+        //Debug.Log($"Encontrados {childScripts.Length} scripts DynamicVoxelObj");
 
         foreach (DynamicVoxelObj script in childScripts)
         {
@@ -236,7 +236,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     private IEnumerator ApplyDestructionWithDelayOptimized()
     {
-        Debug.Log($"Iniciando destruição em {traversalPoints.Count} pontos");
 
         var pointsCopy = new List<Vector3>(traversalPoints);
 
@@ -257,7 +256,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
             yield return destructionWait;
         }
 
-        Debug.Log("Destruição concluída");
     }
 
     private void ApplyDestructionAtPosition(Vector3 worldPos)
@@ -294,12 +292,15 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
             foreach (Vector3 origin in rayOrigins)
             {
+                Debug.Log(origin);
                 RaycastHit hit;
 
-                if (Physics.Raycast(origin, Vector3.up, out hit, rayDistance, groundLayerMask) && hit.collider != null)
+                Debug.DrawLine(origin, origin + Vector3.up * rayDistance, Color.green, 5f);
+                Debug.DrawRay(origin, Vector3.up * rayDistance, Color.green, 5f);
+
+
+                if (Physics.Raycast(origin, Vector3.up, out hit, rayDistance, voxelLayerMask))
                 {
-                    Debug.DrawLine(origin, hit.point, Color.green, 5f);
-                    Debug.DrawRay(hit.point, hit.normal * 2f, Color.yellow, 5f);
                     yield return ProcessHitOptimized(hit, adjustedRadius, rayDistance);
                 }
             }
@@ -308,7 +309,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     private Vector3[] GenerateRaycastOrigins(Vector3 startPos, float radius)
     {
-        float offset = radius * 10f;
+        float offset = radius/10;
         return new Vector3[]
         {
             startPos,
@@ -353,7 +354,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         Vector3 secondRayOrigin = hit.point + Vector3.up * 0.1f;
         RaycastHit secondHit;
 
-        if (Physics.Raycast(secondRayOrigin, Vector3.down, out secondHit, rayDistance, groundLayerMask) && secondHit.collider != null)
+        if (Physics.Raycast(secondRayOrigin, Vector3.down, out secondHit, rayDistance, voxelLayerMask) && secondHit.collider != null)
         {
             foreach (Collider collider in colliders)
             {

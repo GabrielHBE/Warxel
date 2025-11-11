@@ -199,7 +199,19 @@ public class SwitchWeapon : MonoBehaviour
                             weaponProperties.Restart();
                             weapon.Restart();
                             weapon.can_shoot = false;
-                            sway.Restart();
+                            sway.Restart(
+                                        weaponProperties.weapon.transform,
+                                        weaponProperties.bob_walk_exageration,
+                                        weaponProperties.bob_sprint_exageration,
+                                        weaponProperties.bob_crouch_exageration,
+                                        weaponProperties.bob_aim_exageration,
+                                        weaponProperties.walk_multiplier,
+                                        weaponProperties.sprint_multiplier,
+                                        weaponProperties.aim_multiplier,
+                                        weaponProperties.crouch_multiplier,
+                                        weaponProperties.vector3Values,
+                                        weaponProperties.quaternionValues
+                            );
                             //magCounter.Restart();
                             weapon_animation.Restart();
                             reticle.Restart();
@@ -264,7 +276,20 @@ public class SwitchWeapon : MonoBehaviour
                             }
                             weapon.Restart();
                             weapon.can_shoot = false;
-                            sway.Restart();
+                            sway.Restart(
+                                        weaponProperties.weapon.transform,
+                                        weaponProperties.bob_walk_exageration,
+                                        weaponProperties.bob_sprint_exageration,
+                                        weaponProperties.bob_crouch_exageration,
+                                        weaponProperties.bob_aim_exageration,
+                                        weaponProperties.walk_multiplier,
+                                        weaponProperties.sprint_multiplier,
+                                        weaponProperties.aim_multiplier,
+                                        weaponProperties.crouch_multiplier,
+                                        weaponProperties.vector3Values,
+                                        weaponProperties.quaternionValues
+                            );
+
                             //magCounter.Restart();
                             weapon_animation.Restart();
                             reticle.Restart();
@@ -320,15 +345,43 @@ public class SwitchWeapon : MonoBehaviour
                             }
                             do_once = false;
 
-                            C4 c4 = GetComponentInChildren<C4>();
-                            if (c4 != null)
+                            Gadget gadget = GetComponent<Gadget>();
+                            if (gadget != null)
                             {
-                                c4.is_active = true;
+                                gadget.SetActive(true);
+                                sway.Restart(
+                                    gadget.GetTransform(),
+                                    gadget.GetBobWalkExageration(),
+                                    gadget.GetBobSprintExageration(),
+                                    gadget.GetBobCrouchExageration(),
+                                    gadget.GetBobAimExageration(),
+                                    gadget.GetWalkMultiplier(),
+                                    gadget.GetSprintMultiplier(),
+                                    gadget.GetAimMultiplier(),
+                                    gadget.GetCrouchMultiplier(),
+                                    gadget.GetVector3Values(),
+                                    gadget.GetQuaternionValues()
+                                );
+
                             }
-                            
-                
-
-
+                            else
+                            {
+                                gadget = GetComponentInChildren<Gadget>();
+                                gadget.SetActive(true);
+                                sway.Restart(
+                                    gadget.GetTransform(),
+                                    gadget.GetBobWalkExageration(),
+                                    gadget.GetBobSprintExageration(),
+                                    gadget.GetBobCrouchExageration(),
+                                    gadget.GetBobAimExageration(),
+                                    gadget.GetWalkMultiplier(),
+                                    gadget.GetSprintMultiplier(),
+                                    gadget.GetAimMultiplier(),
+                                    gadget.GetCrouchMultiplier(),
+                                    gadget.GetVector3Values(),
+                                    gadget.GetQuaternionValues()
+                                );
+                            }
                         }
 
                         saving_timer = 0;
@@ -375,27 +428,13 @@ public class SwitchWeapon : MonoBehaviour
                                 gadget2.SetActive(true);
                             }
                             do_once = false;
-                            weaponProperties = GetComponentInChildren<WeaponProperties>();
-                            Shell = GetComponentInChildren<Shell>();
-                            Shell = GetComponentInChildren<Shell>();
-                            if (Shell != null)
+
+                            Gadget gadget = GetComponentInChildren<Gadget>();
+                            if (gadget != null)
                             {
-                                Shell.Restart(weaponProperties);
+                                gadget.SetActive(true);
                             }
-                            weaponProperties.Restart();
-                            weapon.Restart();
-                            weapon.can_shoot = false;
-                            sway.Restart();
-                            //magCounter.Restart();
-                            weapon_animation.Restart();
-                            reticle.Restart();
-                            playerController.ChangeWeaponVelocitySpeed(weaponProperties.speed_change);
-                            weaponHolder = GetComponentInChildren<WeaponHolder>();
-                            weaponHolder.SetHandsToWeapon(0);
-
                         }
-
-
 
                         saving_timer = 0;
                         _return = true;

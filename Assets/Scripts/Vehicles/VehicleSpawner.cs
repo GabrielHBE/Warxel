@@ -4,13 +4,14 @@ public class JetSpawner : MonoBehaviour
 {
 
     [SerializeField] private GameObject vehiclePrefab;
-    [SerializeField] private Transform spawnPoint;
     [SerializeField] private float spawnInterval = 10f;
 
     private GameObject currentVehicle;
+    private Transform spawnPoint;
     
     void Start()
     {
+        spawnPoint = transform;
         currentVehicle = Instantiate(vehiclePrefab, spawnPoint.position, spawnPoint.rotation);
     }
 

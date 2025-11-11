@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class C4 : MonoBehaviour
+public class C4Detonator : MonoBehaviour, Gadget
 {
     public bool is_active;
     [SerializeField] private KeyBinds keyBinds;
@@ -26,6 +26,18 @@ public class C4 : MonoBehaviour
     [Header("Detonation timing (seconds)")]
     [SerializeField] private float initialDetonateDelay;
     [SerializeField] private float perC4Delay;
+
+    [Header("Sway and Bob")]
+    public float bob_walk_exageration;
+    public float bob_sprint_exageration;
+    public float bob_crouch_exageration;
+    public float bob_aim_exageration;
+    public Vector3 walk_multiplier;
+    public Vector3 sprint_multiplier;
+    public Vector3 aim_multiplier;
+    public Vector3 crouch_multiplier;
+    public float[] vector3Values;
+    public float[] quaternionValues;
 
     private bool isDetonating = false;
     private float detonateTimer = 0f;
@@ -52,7 +64,7 @@ public class C4 : MonoBehaviour
         if (Input.GetKeyDown(keyBinds.detonateC4Key) && !isDetonating)
         {
             CleanupDestroyedC4s(); // Limpa C4s destruídos antes de começar
-            
+
             if (c4_list.Count > 0)
             {
                 beepSound?.Play();
@@ -105,7 +117,7 @@ public class C4 : MonoBehaviour
             EndDetonationSequence();
             return;
         }
-        
+
         // Detona o C4 atual
         C4Explosive c4ToDetonate = c4_list[detonateIndex];
         if (c4ToDetonate != null)
@@ -138,13 +150,13 @@ public class C4 : MonoBehaviour
             if (c4 != null)
             {
                 PickUpC4();
-                
+
                 // Remove da lista se estiver nela
                 if (c4_list.Contains(c4))
                 {
                     c4_list.Remove(c4);
                 }
-                
+
                 Destroy(hit.collider.gameObject);
             }
         }
@@ -190,4 +202,65 @@ public class C4 : MonoBehaviour
             Gizmos.DrawLine(throwPoint.position, throwPoint.position + throwPoint.forward * 2f);
         }
     }
+
+    public void SetActive(bool is_active)
+    {
+        this.is_active = is_active;
+    }
+
+    public float GetBobWalkExageration()
+    {
+        return bob_walk_exageration;
+    }
+
+    public float GetBobSprintExageration()
+    {
+        return bob_sprint_exageration;
+    }
+
+    public float GetBobCrouchExageration()
+    {
+        return bob_crouch_exageration;
+    }
+
+    public float GetBobAimExageration()
+    {
+        return bob_aim_exageration;
+    }
+
+    public Vector3 GetWalkMultiplier()
+    {
+        return walk_multiplier;
+    }
+
+    public Vector3 GetSprintMultiplier()
+    {
+        return sprint_multiplier;
+    }
+
+    public Vector3 GetAimMultiplier()
+    {
+        return aim_multiplier;
+    }
+
+    public Vector3 GetCrouchMultiplier()
+    {
+        return crouch_multiplier;
+    }
+
+    public float[] GetVector3Values()
+    {
+        return vector3Values;
+    }
+
+    public float[] GetQuaternionValues()
+    {
+        return quaternionValues;
+    }
+
+    public Transform GetTransform()
+    {
+        return transform;
+    }
+
 }

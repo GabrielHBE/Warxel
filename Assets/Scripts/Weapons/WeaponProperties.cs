@@ -89,9 +89,6 @@ public class WeaponProperties : MonoBehaviour
     public Vector3 aim_multiplier;
     public Vector3 shoot_multiplier;
     public Vector3 crouch_multiplier;
-    public float jump_offset_vector;
-    public float jump_offset_x;
-    public float jump_offset_y;
     public float[] vector3Values = new float[3];
     public float[] quaternionValues = new float[3];
     public Vector3 initial_potiion;
@@ -105,8 +102,7 @@ public class WeaponProperties : MonoBehaviour
 
     void Start()
     {
-        //inicial_rotation = transform.localRotation;
-        //initial_potiion = transform.localPosition;
+
         FillMags();
         Restart();
     }

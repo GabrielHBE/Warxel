@@ -130,13 +130,25 @@ public class PlayerController : MonoBehaviour
         Vector3 origin = cameraTransform.position;
         Vector3 direction = cameraTransform.forward;
         RaycastHit hit;
+
         Debug.DrawRay(origin, direction * intecact_distance, Color.red, 1f);
-        if (Physics.Raycast(origin, direction, out hit, intecact_distance))
+
+        if (Physics.Raycast(origin, direction, out hit, intecact_distance, LayerMask.GetMask("Interactives")))
         {
             ElevatorCallButton button = hit.collider.GetComponent<ElevatorCallButton>();
             if (button != null)
             {
                 button.Interact();
+            }
+        }
+
+        if(Physics.Raycast(origin, direction, out hit, intecact_distance, LayerMask.GetMask("Vehicle")))
+        {
+            Vehicle vehicle = hit.collider.GetComponent<Vehicle>();
+            Debug.Log(vehicle);
+            if (vehicle != null)
+            {
+                vehicle.EnterVehicle(gameObject);
             }
         }
     }
@@ -281,10 +293,8 @@ public class PlayerController : MonoBehaviour
         }
 
         Vector3 rayOrigin = transform.position;
-        int voxel_ground_layer = LayerMask.GetMask("Voxel_Ground");
-        bool isGroundedNow = Physics.Raycast(rayOrigin, Vector3.down, raycastDistance, groundLayer | voxel_ground_layer);
+        bool isGroundedNow = Physics.Raycast(rayOrigin, Vector3.down, raycastDistance, groundLayer | LayerMask.GetMask("Voxel"));
 
-        // Landed event
         if (!wasGroundedLastFrame && isGroundedNow)
         {
             StartCoroutine(cameraShake.JumpCameraShake());

@@ -115,7 +115,7 @@ public class Bullet : MonoBehaviour
                         player.Damage(damage);
 
                     }
-                    else if (collision.gameObject.CompareTag("Voxel"))
+                    else if (collision.gameObject.layer == LayerMask.NameToLayer("Voxel"))
                     {
                         DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
                         if (vox != null)

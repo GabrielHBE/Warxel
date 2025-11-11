@@ -16,7 +16,7 @@ public class JetCameraShake : MonoBehaviour
 
     void Update()
     {
-        if (jet.is_in_jet && (jet.mouseY != 0 && jet.currentSpeed>=100)  && jet.current_camera==1) 
+        if (jet.is_in_jet && (jet.mouseY != 0 && jet.throttle>=100)  && jet.current_camera==1) 
         {
             magnitude += 0.01f;
         }   
@@ -32,8 +32,8 @@ public class JetCameraShake : MonoBehaviour
 
     void Shake()
     {
-        float x = UnityEngine.Random.Range(-0.1f, 0.1f) * magnitude;
-        float y = UnityEngine.Random.Range(-0.1f, 0.1f) * magnitude;
+        float x = UnityEngine.Random.Range(-0.003f, 0.003f) * magnitude * Time.deltaTime;
+        float y = UnityEngine.Random.Range(-0.003f, 0.003f) * magnitude * Time.deltaTime;
 
         transform.localPosition = new Vector3(original_pos.x + x, original_pos.y + y, original_pos.z);
     }
