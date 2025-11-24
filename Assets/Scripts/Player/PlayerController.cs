@@ -145,7 +145,6 @@ public class PlayerController : MonoBehaviour
         if(Physics.Raycast(origin, direction, out hit, intecact_distance, LayerMask.GetMask("Vehicle")))
         {
             Vehicle vehicle = hit.collider.GetComponent<Vehicle>();
-            Debug.Log(vehicle);
             if (vehicle != null)
             {
                 vehicle.EnterVehicle(gameObject);
@@ -293,7 +292,7 @@ public class PlayerController : MonoBehaviour
         }
 
         Vector3 rayOrigin = transform.position;
-        bool isGroundedNow = Physics.Raycast(rayOrigin, Vector3.down, raycastDistance, groundLayer | LayerMask.GetMask("Voxel"));
+        bool isGroundedNow = Physics.Raycast(rayOrigin, Vector3.down, raycastDistance, groundLayer);
 
         if (!wasGroundedLastFrame && isGroundedNow)
         {

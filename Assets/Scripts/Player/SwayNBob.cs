@@ -9,7 +9,6 @@ public class SwayNBobScript : MonoBehaviour
     [HideInInspector]
     public PlayerController mover;
     private PlayerProperties playerProperties;
-    private WeaponProperties weaponProperties;
 
     [Header("Instances")]
     [SerializeField] private Transform reticleTransform;
@@ -124,7 +123,6 @@ public class SwayNBobScript : MonoBehaviour
         switchWeapon = GetComponent<SwitchWeapon>();
         playerController = GetComponentInParent<PlayerController>();
         playerProperties = GetComponentInParent<PlayerProperties>();
-        weaponProperties = GetComponentInChildren<WeaponProperties>();
 
         current_multiplier = this.walk_multiplier;
 

@@ -117,8 +117,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         traversalPoints.Clear();
         visitedCells.Clear();
 
-        //Debug.Log($"Encontrados {childScripts.Length} scripts DynamicVoxelObj");
-
         foreach (DynamicVoxelObj script in childScripts)
         {
             if (script != null && script.transform.childCount > 0)
@@ -126,7 +124,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
                 MeshCollider meshCollider = script.transform.GetChild(0).GetComponent<MeshCollider>();
                 if (meshCollider != null)
                 {
-                    //Debug.Log($"Processando MeshCollider em: {script.name}");
                     CollapseStructureOptimized(meshCollider, distance_step);
                 }
                 else
@@ -138,15 +135,14 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         }
 
         pointsCalculated = traversalPoints.Count > 0;
-        //Debug.Log($"Pontos de destruição calculados: {traversalPoints.Count}");
+
     }
 
     public void CollapseStructureOptimized(MeshCollider mesh, float step)
     {
-        // Usa o bounds do mesh collider em world space
+
         Bounds worldBounds = mesh.bounds;
 
-        // Expande um pouco os bounds para garantir cobertura
         worldBounds.Expand(step * 2f);
 
         float inverseStep = 1f / step;
@@ -154,9 +150,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         Vector3[] sampleOffsets = GenerateSampleOffsets();
         int pointsAdded = 0;
 
-        //Debug.Log($"Processando bounds: {worldBounds.min} to {worldBounds.max}");
-
-        // Amostra pontos dentro dos bounds em world space
         for (float x = worldBounds.min.x; x <= worldBounds.max.x; x += step)
         {
             for (float y = worldBounds.min.y; y <= worldBounds.max.y; y += step)
@@ -167,13 +160,10 @@ public class Mod_DestroyAfterAll : MonoBehaviour
                     {
                         Vector3 worldPoint = new Vector3(x, y, z);
 
-                        // Aplica offset aleatório para melhor distribuição
                         Vector3 samplePoint = worldPoint + sampleOffsets[Random.Range(0, sampleOffsets.Length)] * step * 0.3f;
 
-                        // Verifica se o ponto está dentro do mesh collider
                         if (IsPointInsideMeshCollider(samplePoint, mesh))
                         {
-                            // Converte para coordenadas locais deste GameObject
                             Vector3 localPoint = transform.InverseTransformPoint(samplePoint);
 
                             Vector3Int cell = new Vector3Int(
@@ -193,7 +183,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
             }
         }
 
-        //Debug.Log($"Adicionados {pointsAdded} pontos do mesh collider {mesh.name}");
+
     }
 
     private Vector3[] GenerateSampleOffsets()
@@ -214,11 +204,10 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
     private bool IsPointInsideMeshCollider(Vector3 worldPoint, MeshCollider meshCollider)
     {
-        // Método mais simples e confiável para verificar se está dentro do mesh collider
+
         if (!meshCollider.bounds.Contains(worldPoint))
             return false;
 
-        // Usa raycasting para verificar se o ponto está dentro
         Vector3 direction = Vector3.up;
         float maxDistance = 100f;
 
@@ -227,7 +216,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
         if (meshCollider.Raycast(ray, out hit, maxDistance))
         {
-            // Se o raycast acertar, verifica se estamos perto do ponto de impacto
             return Vector3.Distance(hit.point, worldPoint) < 1f;
         }
 
@@ -250,7 +238,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
         foreach (Vector3 localPos in pointsCopy)
         {
-            // Converte para world space
             Vector3 worldPos = transform.TransformPoint(localPos);
             ApplyDestructionAtPosition(worldPos);
             yield return destructionWait;
@@ -264,8 +251,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
         int count = Physics.OverlapSphereNonAlloc(worldPos, destructionRadius, colliderArrayCache);
 
-        //Debug.Log($"Aplicando destruição em: {worldPos} - Encontrados {count} colliders");
-
         for (int i = 0; i < count; i++)
         {
             if (colliderArrayCache[i] != null)
@@ -274,42 +259,57 @@ public class Mod_DestroyAfterAll : MonoBehaviour
                 if (voxelObj != null)
                 {
                     voxelObj.AddDestruction_Sphere(worldPos, destructionRadius);
-                    //Debug.Log($"Destruição aplicada em voxel: {voxelObj.name}");
+
                 }
             }
         }
     }
 
 
-    public IEnumerator FallUpperVoxels(float radius, Vector3 startPos)
+    public IEnumerator FallUpperVoxels(float radius, Vector3 startPos, bool multiple_raycasts)
     {
+
         if (radius > 2f && radius != 0f)
         {
-            float rayDistance = 100f;
+            float rayDistance = 20;
             float adjustedRadius = radius * 0.9f;
+            RaycastHit hit;
 
-            Vector3[] rayOrigins = GenerateRaycastOrigins(startPos, radius);
-
-            foreach (Vector3 origin in rayOrigins)
+            if (multiple_raycasts)
             {
-                Debug.Log(origin);
-                RaycastHit hit;
+                Vector3[] rayOrigins = GenerateRaycastOrigins(startPos, radius);
 
-                Debug.DrawLine(origin, origin + Vector3.up * rayDistance, Color.green, 5f);
-                Debug.DrawRay(origin, Vector3.up * rayDistance, Color.green, 5f);
+                foreach (Vector3 origin in rayOrigins)
+                {
+
+                    Debug.DrawLine(origin, origin + Vector3.up * rayDistance, Color.green, 2);
+                    Debug.DrawRay(origin, Vector3.up * rayDistance, Color.green, 2);
+
+                    if (Physics.Raycast(origin, Vector3.up, out hit, rayDistance, voxelLayerMask))
+                    {
+                        yield return ProcessHitOptimized(hit, adjustedRadius, rayDistance);
+                    }
+                }
+            }
+            else
+            {
+                Debug.DrawLine(startPos, startPos + Vector3.up * rayDistance, Color.green, 2);
+                Debug.DrawRay(startPos, Vector3.up * rayDistance, Color.green, 2);
 
 
-                if (Physics.Raycast(origin, Vector3.up, out hit, rayDistance, voxelLayerMask))
+                if (Physics.Raycast(startPos, Vector3.up, out hit, rayDistance, voxelLayerMask))
                 {
                     yield return ProcessHitOptimized(hit, adjustedRadius, rayDistance);
                 }
             }
+
+
         }
     }
 
     private Vector3[] GenerateRaycastOrigins(Vector3 startPos, float radius)
     {
-        float offset = radius/10;
+        float offset = radius / 10;
         return new Vector3[]
         {
             startPos,
@@ -328,7 +328,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         collidersCache.Clear();
         int count = Physics.OverlapSphereNonAlloc(checkCenter, radius, colliderArrayCache);
 
-        // Preenche a lista com os colliders válidos
         for (int i = 0; i < count; i++)
         {
             collidersCache.Add(colliderArrayCache[i]);
@@ -344,7 +343,7 @@ public class Mod_DestroyAfterAll : MonoBehaviour
 
             if (radius > 20f)
             {
-                StartCoroutine(FallUpperVoxels(radius, hitPoint));
+                StartCoroutine(FallUpperVoxels(radius, hitPoint, false));
             }
         }
     }
@@ -369,12 +368,6 @@ public class Mod_DestroyAfterAll : MonoBehaviour
         }
     }
 
-
-    //Lines through messhes
-
-
-
-    // Método para debug visual
     void OnDrawGizmosSelected()
     {
         if (traversalPoints != null && traversalPoints.Count > 0)

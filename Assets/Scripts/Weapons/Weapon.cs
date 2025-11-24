@@ -405,11 +405,12 @@ public class Weapon : MonoBehaviour
 
         if (weaponProperties.bullet_hit_effect != null)
         {
-            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.bullet_hit_effect);
+            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.minimum_damage, weaponProperties.headshot_multiplier, weaponProperties.bullet_hit_effect);
         }
         else
         {
-            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force);
+            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.minimum_damage, weaponProperties.headshot_multiplier);
+        
         }
 
         if (playerProperties.is_aiming)

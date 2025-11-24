@@ -56,7 +56,6 @@ public class C4Explosive : MonoBehaviour
 
             if (do_once && player != null)
             {
-                Debug.Log("Colidiu com Player");
                 float distance = Vector3.Distance(transform.position, player.transform.position);
                 float damage = Mathf.Clamp(explosionForce * (1 - (distance / explosionRadius)), 0, explosionForce);
                 player.Damage(damage * 8);
@@ -66,10 +65,6 @@ public class C4Explosive : MonoBehaviour
                 {
 
                     cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage / 10, 1f));
-                }
-                else
-                {
-                    Debug.LogWarning("CameraShake não encontrado!");
                 }
 
                 do_once = false;

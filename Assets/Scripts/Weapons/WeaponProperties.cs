@@ -36,6 +36,7 @@ public class WeaponProperties : MonoBehaviour
 
     [Header("Damage")]
     public float damage;
+    public float minimum_damage;
     public float headshot_multiplier;
     public float damage_dropoff;
     public float damage_dropoff_timer;

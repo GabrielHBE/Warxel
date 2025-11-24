@@ -16,7 +16,7 @@ public class MainCannon : MonoBehaviour
 
     void Update()
     {   
-        if(!jet.is_in_jet) return;
+        if(!jet.is_in_jet || !jet.using_main_cannon) return;
 
         if (Input.GetKey(jet.shoot_key))
         {

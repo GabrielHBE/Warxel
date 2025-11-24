@@ -22,6 +22,7 @@ public class JetProperties : MonoBehaviour
     [Header("Bullet")]
     public float muzzle_velocity;
     public float bullet_drop;
+    public float minimum_damage;
     public GameObject bullet_hit_effect;
 
     [Header("MainCannon")]

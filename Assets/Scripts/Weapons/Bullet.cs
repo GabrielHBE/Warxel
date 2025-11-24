@@ -1,5 +1,3 @@
-using System.Collections;
-using Photon.Realtime;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
 using VoxelDestructionPro.VoxelObjects;
@@ -13,6 +11,8 @@ public class Bullet : MonoBehaviour
     private float damage;
     private float damage_dropoff;
     private float damage_dropoff_timer;
+    private float minimum_damage;
+    private float hs_multiplier;
 
 
     [Header("Sounds")]
@@ -41,7 +41,7 @@ public class Bullet : MonoBehaviour
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
-    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force, GameObject hit_effect = null)
+    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force, float minimum_damage, float hs_multiplier, GameObject hit_effect = null)
     {
         GetComponent<MeshRenderer>().enabled = false;
 
@@ -51,6 +51,8 @@ public class Bullet : MonoBehaviour
         damage_dropoff = dmg_dropoff;
         damage_dropoff_timer = dmg_dropoff_timer;
         custom_hit_effect_instance = hit_effect;
+        this.minimum_damage = minimum_damage;
+        this.hs_multiplier = hs_multiplier; ;
 
         SetDirection(direction, speed, dropMultiplier);
     }
@@ -67,17 +69,24 @@ public class Bullet : MonoBehaviour
     {
         // Simula a queda da bala sem alterar a gravidade global
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
+
+        /*
         if (rb.linearVelocity.magnitude < 10)
         {
             Destroy(gameObject);
         }
-
-        timer += Time.deltaTime;
-        if (timer >= damage_dropoff_timer)
+        */
+        if (damage > minimum_damage)
         {
-            damage -= damage_dropoff;
-            timer = 0;
+            timer += Time.deltaTime;
+            if (timer >= damage_dropoff_timer)
+            {
+                damage -= damage_dropoff;
+                timer = 0;
+            }
         }
+
+
 
         if (timer >= 0.05f)
         {
@@ -86,6 +95,7 @@ public class Bullet : MonoBehaviour
 
 
     }
+
 
     void OnCollisionEnter(Collision collision)
     {
@@ -109,24 +119,28 @@ public class Bullet : MonoBehaviour
                 if (calculated_position > 3)
                 {
 
-                    if (collision.gameObject.CompareTag("Player"))
+                    if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
                     {
                         PlayerProperties player = collision.gameObject.GetComponent<PlayerProperties>();
-                        player.Damage(damage);
+
+                        if (collision.gameObject.CompareTag("PlayerHead"))
+                        {
+                            player.Damage(damage * hs_multiplier);
+                        }
+                        else
+                        {
+                            player.Damage(damage);
+                        }
+
+
 
                     }
                     else if (collision.gameObject.layer == LayerMask.NameToLayer("Voxel"))
                     {
-                        DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
-                        if (vox != null)
-                        {
-                            if (vox.destruction_multiplier > 0)
-                            {
-                                voxCollider.destructionRadius *= vox.destruction_multiplier;
-                            }
-                        }
 
-                        HitEffects(contact.point, contact.normal, vox);
+                        DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
+
+                        HitEffects(contact.point, contact.normal, collision.transform.GetComponentInParent<DynamicVoxelObj>());
 
                         if (voxCollider.destructionRadius > 2)
                         {
@@ -140,7 +154,6 @@ public class Bullet : MonoBehaviour
 
                                 if (do_once && playerProps != null)
                                 {
-                                    Debug.Log("Colidiu com Player");
                                     float distance = Vector3.Distance(transform.position, playerProps.transform.position);
                                     float damage_distance = Mathf.Clamp(voxCollider.destructionRadius * (1 - distance / 10), 0, voxCollider.destructionRadius);
                                     playerProps.Damage(damage * damage_distance);
@@ -149,10 +162,6 @@ public class Bullet : MonoBehaviour
                                     if (cameraShake != null)
                                     {
                                         cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage_distance / 10, 1f));
-                                    }
-                                    else
-                                    {
-                                        Debug.LogWarning("CameraShake não encontrado!");
                                     }
 
                                     do_once = false;
@@ -170,7 +179,6 @@ public class Bullet : MonoBehaviour
                             voxCollider.Collide(collision);
                         }
 
-
                     }
 
                     Destroy(gameObject);
@@ -183,10 +191,7 @@ public class Bullet : MonoBehaviour
 
             }
 
-            Debug.Log(collision.gameObject.name);
-
         }
-
 
     }
 

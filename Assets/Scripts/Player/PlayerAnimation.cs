@@ -1,12 +1,10 @@
 using System.Collections.Generic;
-using Photon.Pun;
 using UnityEngine;
 
 public class PlayerAnimation : MonoBehaviour
 {
     private Animator anim;
     private PlayerController movement;
-    private PhotonView pv;
 
     void Start()
     {
