@@ -1,154 +1,884 @@
 using System;
 using System.Collections;
-using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
-using UnityEngine.UI;
-using VoxelDestructionPro.VoxelObjects;
 
 public class Jet : Vehicle
 {
-    [HideInInspector] public bool is_in_jet;
+    #region Serialized Fields
 
-    [Header("Keycodes")]
-    public KeyCode switch_camera_key;
-    public KeyCode main_cannon_key;
-    public KeyCode upgrade_gun_key;
-    public KeyCode shoot_key;
-    public KeyCode pitch_up_key;
-    public KeyCode pitch_down_key;
-    public KeyCode lean_left_key;
-    public KeyCode lean_right_key;
-    public KeyCode start_engine_key;
-    public KeyCode enter_jet_key;
-    public KeyCode zoom_key;
-    public KeyCode free_look_key;
-    public KeyCode landing_gear_key;
+    [Header("References")]
+    [SerializeField] private Transform eject_position;
+    [SerializeField] private JetHudManager _hudManager;
+    [SerializeField] private Transform _playerPosition;
+    [SerializeField] private GameObject _mainCannon;
+    [SerializeField] private GameObject _trails;
+    [SerializeField] private Transform _core;
+    [SerializeField] private Transform _shootPosition;
+    //[SerializeField] private Image _blackImage;
+    [SerializeField] private GameObject _turbineSmoke;
+    [SerializeField] private JetProperties _properties;
+    [SerializeField] private JetBombsAndMissiles bombsAndMissiles;
 
-    [SerializeField] private Transform foward_camera_position;
-    [SerializeField] private Transform backward_camera_position;
-    [SerializeField] private Transform inside_camera_position;
-
-
-    [Header("HUD")]
-    [SerializeField] private TextMeshProUGUI hud_gravity_controller;
-    [SerializeField] private TextMeshProUGUI hud_Gforce_controller;
-    [SerializeField] private TextMeshProUGUI hud_speed_controller;
-    [SerializeField] private GameObject hud_speed_controller_min_pos;
-    [SerializeField] private GameObject hud_speed_controller_max_pos;
-    [SerializeField] private TextMeshProUGUI hud_altidude_controller;
-    [SerializeField] private GameObject hud_altidude_controller_max_pos;
-    [SerializeField] private GameObject hud_altidude_controller_min_pos;
-
-
-    [Header("Instances")]
-    [SerializeField] private GameObject trails;
-    [SerializeField] private Transform a10_core;
-    [SerializeField] private Transform shoot_position;
-    [SerializeField] private GameObject arms;
-    [SerializeField] private Image blackImage;
-    [SerializeField] private GameObject TurbineSmoke;
-    [SerializeField] private GameObject glass;
-    [SerializeField] private JetProperties jetProperties;
-
-
-    [Header("Public variables")]
-    [HideInInspector] public bool is_on_ground;
-    [HideInInspector] public float mouseX, mouseY;
-    [HideInInspector] public float moveForward;
-    [HideInInspector] public int current_camera;
-    [HideInInspector] public bool retract_landingGear = false;
-    [HideInInspector] public float speed;
-    [HideInInspector] public bool using_main_cannon = true;
-    [HideInInspector] public JetUpgradeController upgrade;
 
     [Header("Sound")]
-    [SerializeField] private AudioSource tinnitus;
+    [SerializeField] private AudioSource _stopShooting;
+    [SerializeField] private AudioSource _tinnitusAudio;
+    [SerializeField] private AudioSource _bulletHitAudio;
 
 
-    [HideInInspector] public float throttle = 0f;
+    #endregion
 
-    private float next_time_to_fire = 0;
-    private float overheat;
-    private bool overheated;
-    private float passout_timer;
-    private bool passout;
-    private float current_speed_modifier;
-    private float totalThrottle;
-    private Vignette vignette;
+    #region Public Fields
 
+    [Header("State")]
+    [HideInInspector] public bool isNearGround;
+    [HideInInspector] public float mouseX, mouseY;
+    [HideInInspector] public float moveForward;
+    [HideInInspector] public int currentCameraIndex;
+    [HideInInspector] public bool retractLandingGear = false;
+    [HideInInspector] public float speed;
+    [HideInInspector] public bool usingMainCannon = true;
+    [HideInInspector] public bool isWheelTouchingGround = true;
 
-    private Quaternion initial_camera_rotation;
-    [HideInInspector] public float lean_value;
-    private float exit_cooldown;
-    private Volume volume;
-    private float current_gravity = 0;
-    private float downwardComponent;
-    private float G_force;
-    float max_speed = 500;
+    [HideInInspector] public float _overheatAmount;
+    [HideInInspector] public float leanValue;
 
+    #endregion
 
+    #region Private Fields
 
-    void Start()
+    private float _nextFireTime = 0;
+
+    private bool _isOverheated;
+    private float _passoutTimer;
+    private bool _isPassingOut;
+    private float _diveSpeedModifier;
+    private float _afterburnerSpeedModifier;
+    private float _totalThrottle;
+    private float _exitCooldown;
+    private Volume _volume;
+    private float _currentGravity = 0;
+    private float _downwardComponent;
+    private float _gForce;
+    private float _maxSpeed = 500;
+    private float _mainCannonRotationValue = 0;
+    private float _shootDelayTimer = 0;
+
+    #endregion
+
+    #region Unity Lifecycle
+
+    public override void Spawn()
     {
-        base.VehicleStart();
+        base.Spawn();
+        minFov = video.jet_fov;
 
-        hp = jetProperties.hp;
-        resistance = jetProperties.resistance;
+        if (bombsAndMissiles.missile != null) _hudManager.SetImages(_properties.hud_icon, bombsAndMissiles.missile.image_hud, countermeasures.image_icon_hud);
+        if (bombsAndMissiles.bombs != null) _hudManager.SetImages(_properties.hud_icon, bombsAndMissiles.bombs.image_hud, countermeasures.image_icon_hud);
 
-        MeshRenderer rend = hud.GetComponent<MeshRenderer>();
-        if (rend != null)
+        rb.mass = _properties.mass;
+        SetHpProperties(_properties.hp, _properties.resistance);
+
+        _turbineSmoke.SetActive(false);
+        _volume = GetGlobalVolume();
+        currentCameraIndex = 1;
+        acceleration = _properties.aceleration;
+    }
+
+    protected override void FixedUpdate()
+    {
+        if (!vehicle_destroyed)
         {
-            hud_material = rend.material;
-            hud_material.color = hud__color;
-            hud_material.SetColor("_EmissionColor", hud__color);
-            hud_material.EnableKeyword("_EMISSION");
+            if (is_in_vehicle)
+            {
+                if (start_engine && !settings.is_menu_settings_active)
+                {
+                    Move();
+                    Rotate();
+                }
+                ApplyDiveSpeedBoost();
+            }
 
-            rend.shadowCastingMode = ShadowCastingMode.Off;
-            rend.receiveShadows = false;
+            ApplyGravityModifier();
+            rb.AddForce(Physics.gravity * _currentGravity, ForceMode.Acceleration);
+
+            if (speed < _maxSpeed)
+            {
+                _totalThrottle = throttle + _diveSpeedModifier + _afterburnerSpeedModifier;
+                rb.AddForce(forwardReference * _totalThrottle * _properties.max_throttle);
+            }
+        }
+        else
+        {
+            DestroyAnimation();
+        }
+    }
+
+    protected override void Update()
+    {
+        speed = rb.linearVelocity.magnitude;
+
+        if (is_in_vehicle && !settings.is_menu_settings_active)
+        {
+            if (Input.GetKeyDown(KeyCode.P))
+            {
+                Damage(100);
+            }
+
+            UpdateHUD();
+            PilotBehaviour();
+
+        }
+        else
+        {
+            SlowDownEngine();
 
         }
 
-        Color visibleColor = new Color(hud__color.r, hud__color.g, hud__color.b, 1f);
-        hud_material.color = visibleColor;
-        hud_material.SetColor("_EmissionColor", visibleColor);
-        hud_altidude_controller.color = visibleColor;
-        hud_speed_controller.color = visibleColor;
-
-
-        TurbineSmoke.SetActive(false);
-        vehicle_audio_listener.enabled = false;
-        blackImage.enabled = false;
-        volume = GetVolume();
-        volume.profile.TryGet(out vignette);
-
-        is_in_jet = false;
-
-        current_camera = 1;
-
-        initial_camera_rotation = inside_camera_position.localRotation;
-
-        vehicle_camera.transform.localPosition = inside_camera_position.transform.position;
-        vehicle_camera.enabled = false;
-
-
-        acceleration = jetProperties.aceleration;
-
+        UpdateEngineSound();
     }
 
-    Volume GetVolume()
+    protected void OnCollisionStay(Collision collision)
     {
-
-        GameObject globalVolumeObj = GameObject.FindGameObjectWithTag("GlobalVolume");
-        if (globalVolumeObj != null)
+        if (vehicle_destroyed && IsInLayerMask(collision.gameObject.layer, collisionLayers))
         {
-            return globalVolumeObj.GetComponent<Volume>();
+            ContactPoint contact = collision.contacts[0]; // Primeiro ponto de contato
+            Vector3 contactPoint = contact.point; // Ponto da colisão
+            Vector3 contactNormal = contact.normal; // Normal da colisão
+
+            Explode(contactPoint, contactNormal, collision.gameObject.layer, 12);
+        }
+    }
+
+    protected override void OnCollisionEnter(Collision collision)
+    {
+        if (isWheelTouchingGround || collision.gameObject.GetComponent<Missiles>() != null) return;
+
+        if (vehicle_destroyed || hp <= 0)
+        {
+            if (playerController != null) playerController.Damage(100);
+            ExitVehicle();
         }
 
-        return null;
+        if (speed < 100)
+        {
+            base.OnCollisionEnter(collision);
+        }
+        else
+        {
+            if (playerController != null) playerController.Damage(100);
+            ExitVehicle();
+
+            HandleCollision(collision, 50);
+            Explode(collision.contacts[0].point, transform.localEulerAngles.normalized, LayerMask.NameToLayer("Voxel"), 1);
+        }
+
+
 
     }
+
+    #endregion
+
+    #region Engine & Movement
+
+    protected void PilotBehaviour()
+    {
+        moveForward = Input.GetAxisRaw("Vertical");
+        forwardReference = -transform.right;
+        _exitCooldown += Time.deltaTime;
+
+
+        CameraController();
+        FreeLook();
+        CalculateGForce();
+
+        if (_properties.can_afterburner)
+            AfterBurner();
+
+        HandleExitInput();
+
+        if (!vehicle_destroyed)
+        {
+            Start_Stop_Engine();
+            Shoot();
+            Switch_weapon();
+
+        }
+
+        if (start_engine)
+        {
+
+            if (!vehicle_destroyed) Lean();
+            HandlePassout();
+
+            //_properties.interior_turbine.pitch = Math.Clamp(_properties.interior_turbine.pitch, 0.15f, 2);
+            _turbineSmoke.SetActive(true);
+            UpdateLandingGear();
+        }
+        else
+        {
+            _turbineSmoke.SetActive(false);
+            SlowDownEngine();
+        }
+    }
+
+    protected void SlowDownEngine()
+    {
+        ResetSpeedModifiers();
+        //_properties.interior_turbine.pitch = Math.Clamp(_properties.interior_turbine.pitch, 0.01f, 2);
+        throttle = Mathf.Lerp(throttle, 0, Time.deltaTime / 2);
+    }
+
+
+    protected override void Move()
+    {
+        float deltaTime = Time.fixedDeltaTime;
+
+        if (isNearGround && mouseY > 0 && speed > 50)
+        {
+            rb.AddForce(Vector3.up * rb.mass * 20);
+        }
+
+        HandleThrottleControl(deltaTime);
+    }
+
+    protected void HandleThrottleControl(float deltaTime)
+    {
+        if (moveForward > 0 && !_isPassingOut)
+        {
+            IncreaseThrottle(deltaTime);
+        }
+        else if (moveForward < 0 && !_isPassingOut)
+        {
+            DecreaseThrottle(deltaTime);
+        }
+        else
+        {
+            Decelerate(deltaTime);
+        }
+    }
+
+    protected void IncreaseThrottle(float deltaTime)
+    {
+        //_properties.interior_turbine.pitch = Mathf.MoveTowards( _properties.interior_turbine.pitch, 2f, 0.1f * deltaTime);
+
+        throttle += acceleration * deltaTime;
+        throttle = Mathf.Min(throttle, _properties.max_throttle);
+    }
+
+    protected void DecreaseThrottle(float deltaTime)
+    {
+        if (isNearGround)
+        {
+            if (throttle > -30)
+            {
+                //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.1f * deltaTime);
+                throttle -= acceleration * deltaTime * 2;
+            }
+        }
+        else
+        {
+            if (throttle > 100)
+            {
+                //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.1f * deltaTime);
+                throttle -= acceleration * deltaTime;
+            }
+        }
+    }
+
+    protected void Decelerate(float deltaTime)
+    {
+        if (isNearGround)
+        {
+            float decelerationRate = acceleration * 0.8f;
+            throttle = Mathf.MoveTowards(throttle, 0, decelerationRate * deltaTime);
+
+            //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.1f * deltaTime);
+        }
+        else
+        {
+            float decelerationRate = acceleration * 0.1f;
+            throttle = Mathf.MoveTowards(throttle, 0, decelerationRate * deltaTime);
+
+            //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.005f * deltaTime);
+        }
+
+        //_properties.interior_turbine.pitch = Mathf.Clamp(_properties.interior_turbine.pitch, 0.15f, 2f);
+    }
+
+    protected void Rotate()
+    {
+        if (_isPassingOut) return;
+
+        float deltaTime = Time.fixedDeltaTime;
+
+        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * controls.jet_sensibility,
+                           -_properties.max_rotation_value, _properties.max_rotation_value);
+        mouseY = Math.Clamp(Input.GetAxis("Mouse Y") * controls.jet_sensibility,
+                           -_properties.max_pitch_value, _properties.max_pitch_value);
+
+        HandlePitchKeys();
+
+        if (_properties.invertY)
+            mouseY *= -1;
+
+        if (Math.Abs(mouseY) > 1 && throttle > 0 && !isNearGround)
+        {
+            throttle -= Math.Abs(mouseY) * deltaTime * 10;
+        }
+
+        UpdateTrails();
+        ApplyRotationTorque();
+    }
+
+    protected void HandlePitchKeys()
+    {
+        if (Input.GetKey(keyBinds.JET_pitchUpKey))
+            mouseY = _properties.max_pitch_value;
+        if (Input.GetKey(keyBinds.JET_pitchDownKey))
+            mouseY = -_properties.max_pitch_value;
+    }
+
+    protected void UpdateTrails()
+    {
+        foreach (TrailRenderer trail in _trails.GetComponentsInChildren<TrailRenderer>())
+        {
+            bool shouldEmit = (mouseX > 10 || mouseX < 10 || mouseY > 10 || mouseY < 10)
+                           && (mouseX != 0 || mouseY != 0) && speed > 100;
+
+            if (shouldEmit && !trail.emitting)
+            {
+                trail.Clear();
+                trail.emitting = true;
+            }
+            else if (!shouldEmit)
+            {
+                trail.emitting = false;
+            }
+        }
+    }
+
+    protected void ApplyRotationTorque()
+    {
+        rb.AddTorque(transform.right * mouseX * speed * _properties.rotation_value * 20);
+        rb.AddTorque(-transform.forward * mouseY * speed * _properties.pitch_value * 7);
+    }
+
+    protected void Lean()
+    {
+        if (_isPassingOut) return;
+
+        HandleLeanInput();
+
+        float speedFactor = Mathf.Clamp01(speed / _properties.max_throttle);
+        float rotationAmount = isNearGround && (throttle >= 20 || throttle < -10) && throttle <= 50
+            ? leanValue * Time.deltaTime
+            : leanValue * speedFactor * Time.deltaTime;
+
+        if (throttle < 0)
+            rotationAmount *= -1;
+
+        rotationAmount = Mathf.Clamp(rotationAmount, -_properties.max_lean_value, _properties.max_lean_value);
+        transform.Rotate(Vector3.up * rotationAmount, Space.Self);
+    }
+
+    protected void HandleLeanInput()
+    {
+        if (Input.GetKey(keyBinds.JET_yawLeftKey))
+        {
+            leanValue -= _properties.lean_value * Time.deltaTime;
+        }
+        else if (Input.GetKey(keyBinds.JET_yawRightKey))
+        {
+            leanValue += _properties.lean_value * Time.deltaTime;
+        }
+        else
+        {
+            leanValue = Mathf.MoveTowards(leanValue, 0f, 25 * Time.deltaTime);
+        }
+    }
+
+    #endregion
+
+    #region Speed & Physics Modifiers
+
+    protected void ApplyDiveSpeedBoost()
+    {
+        Vector3 jetForward = -transform.right;
+        _downwardComponent = -jetForward.y;
+
+        if (_downwardComponent > 0.3f) // Down
+        {
+            ApplyDiveBoost();
+        }
+        else if (_downwardComponent < -0.3f) // Up
+        {
+            ApplyClimbPenalty();
+        }
+        else
+        {
+            _diveSpeedModifier = Mathf.Lerp(_diveSpeedModifier, 0, 2 * Time.fixedDeltaTime);
+        }
+    }
+
+    protected void ApplyDiveBoost()
+    {
+        float gravityBoost = _downwardComponent * Physics.gravity.magnitude * 0.5f;
+        float aerodynamicBoost = _downwardComponent * _properties.dive_speed_boost;
+        float totalBoost = (gravityBoost + aerodynamicBoost) * Time.fixedDeltaTime;
+
+        totalBoost = Mathf.Clamp(totalBoost, 0, _properties.max_throttle * 1.2f);
+        _diveSpeedModifier = totalBoost * 400 * Time.fixedDeltaTime;
+    }
+
+    protected void ApplyClimbPenalty()
+    {
+        float upwardIntensity = -_downwardComponent;
+        float airResistance = upwardIntensity * Physics.gravity.magnitude * 0.3f;
+        float gravityPenalty = upwardIntensity * _properties.dive_speed_boost * 0.5f;
+        float totalPenalty = (airResistance + gravityPenalty) * Time.fixedDeltaTime;
+
+        totalPenalty = Mathf.Clamp(totalPenalty, 0, _properties.max_throttle * 0.7f);
+        _diveSpeedModifier = -totalPenalty * 400 * Time.fixedDeltaTime;
+    }
+
+    protected void ApplyGravityModifier()
+    {
+        if (isNearGround)
+        {
+            _currentGravity = 0;
+            return;
+        }
+
+        float targetGravity = 1f;
+
+        if (_downwardComponent > 0.3f) // Down
+        {
+            targetGravity = moveForward > 0
+                ? (_properties.max_throttle / (speed * 2)) * -_downwardComponent
+                : (_properties.max_throttle / speed) * -_downwardComponent;
+        }
+        else if (_downwardComponent < -0.3f) // Up
+        {
+            targetGravity = moveForward > 0
+                ? 1.5f * -_downwardComponent
+                : (_properties.max_throttle / speed) * -_downwardComponent;
+        }
+        else
+        {
+            if (moveForward > 0)
+            {
+                targetGravity = 0;
+            }
+            else if (throttle < 100)
+            {
+                targetGravity = _properties.max_throttle / (speed * 10);
+            }
+        }
+
+        _currentGravity = Mathf.Lerp(_currentGravity, targetGravity, Time.fixedDeltaTime);
+        _currentGravity = Mathf.Clamp(_currentGravity, 0f, 5f);
+    }
+
+    protected void CalculateGForce()
+    {
+        float deltaTime = Time.deltaTime;
+
+        if (mouseY != 0)
+        {
+            _gForce = (deltaTime / 3) * speed * mouseY;
+        }
+        else
+        {
+            _gForce = Mathf.MoveTowards(_gForce, 0f, deltaTime * 5);
+        }
+
+        _gForce = Math.Clamp(_gForce, -10, 10);
+    }
+
+    #endregion
+
+    #region Combat
+
+    private bool _hasPlayedShootSound = false;
+
+    protected virtual void Shoot()
+    {
+        float delayToShoot = 0.05f;
+        float deltaTime = Time.deltaTime;
+
+        bool isShooting = Input.GetKey(keyBinds.JET_shootVehicleKey);
+        bool canShootMain = usingMainCannon && !_isOverheated && isShooting;
+
+        HandleShootDelay(canShootMain, deltaTime);
+
+        bool readyToShoot = canShootMain && _shootDelayTimer >= delayToShoot;
+
+        if (readyToShoot)
+        {
+            FireMainCannon(deltaTime);
+        }
+        else
+        {
+            CoolDownCannon(deltaTime);
+            // Reseta a flag quando não está atirando
+            if (_hasPlayedShootSound)
+            {
+                _properties.shoot_sound.Stop();
+                _stopShooting.PlayOneShot(_stopShooting.clip);
+                _hasPlayedShootSound = false;
+            }
+
+
+        }
+
+        _nextFireTime -= deltaTime;
+        HandleSecondaryWeapon();
+        RotateMainCannon(deltaTime);
+    }
+
+    protected void HandleShootDelay(bool canShoot, float deltaTime)
+    {
+        if (canShoot)
+        {
+            _shootDelayTimer += deltaTime;
+        }
+        else
+        {
+            _shootDelayTimer = 0;
+        }
+    }
+
+    protected void FireMainCannon(float deltaTime)
+    {
+        // Toca o som apenas no primeiro frame
+        if (!_hasPlayedShootSound)
+        {
+            _properties.shoot_sound.PlayOneShot(_properties.shoot_sound.clip);
+            _hasPlayedShootSound = true;
+        }
+
+        if (_nextFireTime <= 0f)
+        {
+            Transform bulletObj = Instantiate(
+                _properties.bullefPref,
+                _shootPosition.position,
+                _shootPosition.rotation
+            );
+
+            bulletObj.GetComponent<Bullet>().CreateBullet(
+                _shootPosition.forward,
+                _properties.muzzle_velocity,
+                _properties.bullet_drop,
+                _properties.damage,
+                _properties.damage_dropoff,
+                _properties.damage_dropoff_timer,
+                _properties.destruction_force,
+                _properties.minimum_damage,
+                2, 2, 0, true,
+                _properties.damage,
+                _properties.bullet_hit_effect,
+                _bulletHitAudio
+            );
+
+            Destroy(bulletObj.gameObject, 10f);
+            _nextFireTime = _properties.interval;
+        }
+
+        _overheatAmount += deltaTime;
+        _mainCannonRotationValue = _properties.fire_rate;
+
+        if (_overheatAmount >= _properties.overheat_time)
+            _isOverheated = true;
+    }
+
+
+    protected void CoolDownCannon(float deltaTime)
+    {
+        _mainCannonRotationValue = Mathf.Lerp(_mainCannonRotationValue, 0f, deltaTime * 3f);
+        float coolSpeed = _isOverheated ? (deltaTime / 2f) : deltaTime;
+        _overheatAmount = Mathf.MoveTowards(_overheatAmount, 0f, coolSpeed);
+        if (_overheatAmount <= 0)
+        {
+            _isOverheated = false;
+        }
+    }
+
+    protected void HandleSecondaryWeapon()
+    {
+
+        if (!usingMainCannon && bombsAndMissiles != null)
+        {
+
+            if (bombsAndMissiles.missile != null) bombsAndMissiles.missile.Shoot(keyBinds.JET_shootVehicleKey);
+            if (bombsAndMissiles.bombs != null) bombsAndMissiles.bombs.Shoot(keyBinds.JET_shootVehicleKey);
+
+
+        }
+
+    }
+
+    protected void RotateMainCannon(float deltaTime)
+    {
+        _mainCannon.transform.Rotate(Vector3.left * _mainCannonRotationValue * deltaTime);
+    }
+
+    protected override void Switch_weapon()
+    {
+
+        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon1))
+        {
+            usingMainCannon = true;
+
+            if (bombsAndMissiles.missile != null) bombsAndMissiles.missile.SetActive(false);
+            if (bombsAndMissiles.bombs != null) bombsAndMissiles.bombs.SetActive(false);
+
+        }
+
+        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon2))
+        {
+
+            usingMainCannon = false;
+            if (bombsAndMissiles.missile != null) bombsAndMissiles.missile.SetActive(true);
+            if (bombsAndMissiles.bombs != null) bombsAndMissiles.bombs.SetActive(true);
+        }
+
+    }
+
+    #endregion
+
+    #region Player Interaction
+
+    public override void EnterVehicle(GameObject _player)
+    {
+        base.EnterVehicle(_player);
+        _exitCooldown = 0;
+
+        player.transform.SetParent(_playerPosition);
+        player.transform.localPosition = Vector3.zero;
+        player.transform.localRotation = Quaternion.identity;
+
+
+        _turbineSmoke.SetActive(start_engine);
+    }
+
+    protected void HandleExitInput()
+    {
+        if (Input.GetKeyDown(keyBinds.PLAYER_interactKey) && _exitCooldown > 0.1f)
+        {
+            _turbineSmoke.SetActive(false);
+
+            if (throttle > 10)
+            {
+                EjectPlayer();
+            }
+            else
+            {
+                ExitVehicle();
+            }
+        }
+    }
+
+    protected void EjectPlayer()
+    {
+
+        if (!is_in_vehicle) return;
+
+        if (!player.activeSelf) player.SetActive(true);
+
+        if (vehicleHudManager != null) vehicleHudManager.gameObject.SetActive(false);
+
+        if (playerProperties != null)
+        {
+            playerProperties.is_in_vehicle = false;
+            playerProperties = null;
+        }
+
+        if (playerController != null)
+        {
+
+            playerController.HideOwnerItems(true);
+            playerController = null;
+        }
+
+        if (player != null)
+        {
+            player.transform.position = eject_position.position;
+            player.transform.SetParent(null);
+            player = null;
+        }
+
+
+        if (player_rb != null)
+        {
+
+            player_rb.isKinematic = false;
+            player_rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+            Vector3 ejectDirection = transform.up;
+
+            player_rb.AddForce(ejectDirection * 2 * player_rb.mass, ForceMode.Impulse);
+            player_rb.AddForce(forwardReference * player_rb.mass * speed, ForceMode.Impulse);
+
+        }
+
+
+        is_in_vehicle = false;
+
+    }
+
+    #endregion
+
+    #region Systems
+
+    protected void AfterBurner()
+    {
+        float maxAfterburnerSpeed = 100;
+
+        if (Input.GetKey(keyBinds.JET_boostKey) && moveForward > 0)
+        {
+            _afterburnerSpeedModifier += Time.deltaTime * 50;
+        }
+        else
+        {
+            _afterburnerSpeedModifier -= Time.deltaTime * 50;
+        }
+
+        _afterburnerSpeedModifier = Math.Clamp(_afterburnerSpeedModifier, 0, maxAfterburnerSpeed);
+    }
+
+    protected void FreeLook()
+    {
+        if (Input.GetKey(keyBinds.VEHICLE_freeLookKey))
+        {
+            float mouseYFreeLook = Input.GetAxis("Mouse Y") * -controls.helicopter_sensibility;
+            float mouseXFreeLook = Input.GetAxis("Mouse X") * controls.helicopter_sensibility;
+
+            Vector3 currentEuler = vehicle_camera.transform.localEulerAngles;
+
+            float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
+            float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
+
+            currentX += mouseYFreeLook;
+            currentY += mouseXFreeLook;
+
+            currentX = Mathf.Clamp(currentX, -80f, 20f);
+            currentY = Mathf.Clamp(currentY, -90f, 90f);
+
+            vehicle_camera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+        }
+        else
+        {
+            vehicle_camera.transform.localRotation = Quaternion.Lerp(
+                vehicle_camera.transform.localRotation,
+                Quaternion.identity,
+                Time.deltaTime * 3
+            );
+        }
+    }
+
+    protected void Zoom()
+    {
+        if (!vehicle_camera.enabled) return;
+
+        if (Input.GetKey(keyBinds.HELICOPTER_zoom_key))
+        {
+
+            float targetFov = minFov / _properties.zoom;
+            vehicle_camera.fieldOfView = Mathf.Lerp(vehicle_camera.fieldOfView, targetFov, 4 * Time.deltaTime);
+
+        }
+        else
+        {
+            vehicle_camera.fieldOfView = Mathf.Lerp(
+                vehicle_camera.fieldOfView,
+                minFov,
+                4 * Time.deltaTime);
+
+        }
+    }
+
+    protected void UpdateLandingGear()
+    {
+        retractLandingGear = !Physics.Raycast(_core.position, Vector3.down, 10,
+            LayerMask.GetMask("Ground") | LayerMask.GetMask("Voxel"));
+    }
+
+    protected void ResetSpeedModifiers()
+    {
+        _diveSpeedModifier = 0;
+        _afterburnerSpeedModifier = 0;
+    }
+
+    #endregion
+
+    #region Visual & Audio
+
+
+    protected override void Start_Stop_Engine()
+    {
+        if (Input.GetKeyDown(keyBinds.VEHICLE_startEngineKey))
+        {
+            start_engine = !start_engine;
+
+            if (start_engine)
+            {
+                _properties.interior_turbine.Play();
+                //StartCoroutine(IncreasePitch(_properties.interior_turbine, 2));
+            }
+            else
+            {
+                //StartCoroutine(DecreasePitch(_properties.interior_turbine, 2));
+            }
+        }
+    }
+
+    private bool _wasEnginePlaying = false;
+
+    private void UpdateEngineSound()
+    {
+        if (vehicle_destroyed) return;
+
+        // Mapeia o throttle (0 a _properties.max_throttle) para o pitch (0.01 a 2)
+        float t = throttle / _properties.max_throttle;
+
+        float targetPitch;
+
+        if (start_engine)
+        {
+            targetPitch = Mathf.Lerp(0.4f, 2f, t);
+        }
+        else
+        {
+            targetPitch = Mathf.Lerp(0.01f, 2f, t);
+        }
+
+        // Suaviza a transição do pitch
+        _properties.interior_turbine.pitch = Mathf.Lerp(
+            _properties.interior_turbine.pitch,
+            targetPitch,
+            Time.deltaTime * 2
+        );
+
+        // Verifica se deve parar o som
+        bool shouldBePlaying = _properties.interior_turbine.pitch > 0.01f;
+
+        // Só chama Stop() se estava tocando e agora não deve mais tocar
+        if (_wasEnginePlaying && !shouldBePlaying)
+        {
+            _properties.interior_turbine.Stop();
+        }
+        // Só chama Play() se não estava tocando e agora deve tocar
+        else if (!_wasEnginePlaying && shouldBePlaying)
+        {
+            _properties.interior_turbine.Play();
+        }
+
+        _wasEnginePlaying = shouldBePlaying;
+    }
+
+    /*
 
     IEnumerator IncreasePitch(AudioSource audio, float duration)
     {
@@ -175,855 +905,81 @@ public class Jet : Vehicle
 
         audio.Stop();
     }
+    */
 
+    #endregion
 
-    void FixedUpdate()
-    {
-        if (is_in_jet)
-        {
-            if (start_engine)
-            {
-                Move();
-
-                Rotate();
-
-            }
-
-            ApplyDiveSpeedBoost();
-        }
-
-        GravityModifier();
-        rb.AddForce(Physics.gravity * current_gravity, ForceMode.Acceleration);
-        if (speed < max_speed)
-        {
-            totalThrottle = throttle + current_speed_modifier;
-            rb.AddForce(forwardReference * totalThrottle * jetProperties.max_throttle);
-        }
-
-
-    }
-
-    void Update()
-    {
-        speed = rb.linearVelocity.magnitude;
-        if (is_in_jet)
-        {
-            UpdateHUD();
-
-            moveForward = Input.GetAxisRaw("Vertical");
-
-            forwardReference = -transform.right;
-
-            exit_cooldown += Time.deltaTime;
-
-            Quaternion targetRotation = Quaternion.Euler(glass.transform.localEulerAngles.x, glass.transform.localEulerAngles.y, 0);
-            glass.transform.localRotation = Quaternion.RotateTowards(glass.transform.localRotation, targetRotation, 30 * Time.deltaTime);
-
-            Start_Stop_Engine();
-            CameraController();
-            FreeLook();
-            CalculateGForce();
-
-            if (Input.GetKeyDown(enter_jet_key) && exit_cooldown > 0.1f)
-            {
-                hud.SetActive(false);
-                player.SetActive(true);
-                vehicle_camera.enabled = false;
-                vehicle_audio_listener.enabled = false;
-                TurbineSmoke.SetActive(false);
-                arms.SetActive(false);
-                vignette.intensity.value = 0;
-                is_in_jet = false;
-
-                if (throttle > 10)
-                {
-                    EjectPlayer();
-                }
-                else
-                {
-                    ExitHevicle();
-                }
-
-            }
-
-            if (start_engine)
-            {
-                Lean();
-                Shoot();
-                Passout();
-                Switch_weapon();
-
-                jetProperties.interior_turbine.pitch = Math.Clamp(jetProperties.interior_turbine.pitch, 0.15f, 2);
-                TurbineSmoke.SetActive(true);
-
-                if (Physics.Raycast(a10_core.position, Vector3.down, 6, LayerMask.GetMask("Ground") | LayerMask.GetMask("Voxel")))
-                {
-                    retract_landingGear = false;
-                }
-                else
-                {
-                    retract_landingGear = true;
-                }
-
-            }
-            else
-            {
-
-                jetProperties.interior_turbine.pitch = Math.Clamp(jetProperties.interior_turbine.pitch, 0.01f, 2);
-                TurbineSmoke.SetActive(false);
-                if (throttle > 0)
-                {
-                    throttle -= acceleration * Time.deltaTime * 1.5f;
-                }
-
-            }
-
-        }
-        else
-        {
-            if (vignette.intensity.value > 0)
-            {
-                vignette.intensity.value -= Time.deltaTime;
-            }
-
-            Quaternion targetRotation = Quaternion.Euler(glass.transform.localEulerAngles.x, glass.transform.localEulerAngles.y, -90);
-            glass.transform.localRotation = Quaternion.RotateTowards(glass.transform.localRotation, targetRotation, 30 * Time.deltaTime);
-
-            jetProperties.interior_turbine.Stop();
-            jetProperties.interior_turbine.pitch = 0.01f;
-
-            if (throttle > 0)
-            {
-                throttle -= acceleration * Time.deltaTime * 1.5f;
-            }
-        }
-    }
-
-
-    void FreeLook()
-    {
-        if (Input.GetKey(free_look_key))
-        {
-            float mouseY_freelook = Input.GetAxis("Mouse Y") * -mouseSensitivity;
-            float mouseX_freelook = Input.GetAxis("Mouse X") * mouseSensitivity;
-
-            Vector3 currentEuler = inside_camera_position.localEulerAngles;
-
-            float currentX = (currentEuler.x > 100) ? currentEuler.x - 360 : currentEuler.x;
-            float currentY = (currentEuler.y > 100) ? currentEuler.y - 360 : currentEuler.y;
-
-            currentX += mouseY_freelook;
-            currentY += mouseX_freelook;
-
-            currentX = Mathf.Clamp(currentX, -80f, 10f);
-            currentY = Mathf.Clamp(currentY, -180f, 0f);
-
-            inside_camera_position.localRotation = Quaternion.Euler(currentX, currentY, 0f);
-        }
-        else
-        {
-            inside_camera_position.localRotation = Quaternion.Lerp(
-                inside_camera_position.localRotation,
-                initial_camera_rotation,
-                Time.deltaTime * 3
-            );
-        }
-    }
-
-    void Zoom()
-    {
-        if (Input.GetKey(zoom_key))
-        {
-
-            if (using_main_cannon)
-            {
-                float targetFov = minFov / jetProperties.zoom;
-                vehicle_camera.fieldOfView = Mathf.Lerp(vehicle_camera.fieldOfView, targetFov, 2 * Time.deltaTime);
-
-                if (upgrade != null)
-                {
-                    upgrade.UseCamera(false);
-                }
-
-            }
-            else
-            {
-                if (upgrade != null)
-                {
-                    upgrade.UseCamera(true);
-                }
-
-            }
-
-        }
-        else
-        {
-            vehicle_camera.enabled = true;
-            vehicle_audio_listener.enabled = true;
-
-            if (upgrade != null)
-            {
-                upgrade.UseCamera(false);
-            }
-
-            vehicle_camera.fieldOfView = Mathf.Lerp(
-            vehicle_camera.fieldOfView,
-            minFov,
-            2 * Time.deltaTime);
-        }
-    }
-
-    void Shoot()
-    {
-        if (using_main_cannon)
-        {
-            if (Input.GetKey(shoot_key) && overheated == false)
-            {
-
-
-                if (next_time_to_fire <= 0f)
-                {
-                    jetProperties.shoot_sound.PlayOneShot(jetProperties.shoot_sound.clip);
-                    Transform bulletObj = Instantiate(jetProperties.bullefPref, shoot_position.position, shoot_position.rotation);
-
-                    Destroy(bulletObj.gameObject, 10f);
-
-                    bulletObj.GetComponent<Bullet>().CreateBullet(shoot_position.forward, jetProperties.muzzle_velocity, jetProperties.bullet_drop, jetProperties.damage, jetProperties.damage_dropoff, jetProperties.damage_dropoff_timer, jetProperties.destruction_force, jetProperties.minimum_damage, 2, jetProperties.bullet_hit_effect);
-                    next_time_to_fire = jetProperties.interval;
-
-                }
-                overheat += Time.deltaTime;
-
-            }
-            else
-            {
-                if (overheated == true)
-                {
-                    overheat -= Time.deltaTime / 2;
-                }
-                else
-                {
-                    overheat -= Time.deltaTime;
-                }
-            }
-
-            if (overheat >= jetProperties.overheat_time || overheated == true)
-            {
-                overheated = true;
-            }
-
-            if (overheat <= 0.02)
-            {
-                overheated = false;
-            }
-
-            overheat = Math.Clamp(overheat, 0, jetProperties.overheat_time);
-
-            next_time_to_fire -= Time.deltaTime;
-
-
-        }
-        else if (upgrade != null)
-        {
-            if (Input.GetKeyDown(shoot_key) && upgrade.CanShoot())
-            {
-                upgrade.Shoot();
-            }
-        }
-
-
-
-    }
-
-    void Passout()
-    {
-
-        if (totalThrottle >= 100)
-        {
-            if (!passout)
-            {
-                if (G_force > 0)
-                {
-                    float deltaTime = (G_force / 100) * Time.deltaTime;
-                    vignette.color.value = Color.Lerp(vignette.color.value, Color.black, deltaTime * 3);
-                    vignette.intensity.value += deltaTime;
-                }
-                else if (G_force < 0)
-                {
-                    float deltaTime = (-G_force / 100) * Time.deltaTime;
-                    vignette.color.value = Color.Lerp(vignette.color.value, Color.darkRed, deltaTime * 3);
-                    vignette.intensity.value += deltaTime;
-                }
-                else if (vignette.intensity.value > 0)
-                {
-                    vignette.intensity.value -= Time.deltaTime;
-                }
-
-                vignette.intensity.value = Mathf.Clamp(vignette.intensity.value, 0, 1);
-
-                if (vignette.intensity.value >= 1f)
-                {
-                    passout_timer += Time.deltaTime;
-                    if (passout_timer >= 3f)
-                    {
-                        passout = true;
-                        blackImage.enabled = true;
-                        passout_timer = 3f;
-                    }
-                }
-            }
-            else
-            {
-                passout_timer -= Time.deltaTime;
-
-                if (passout_timer <= 0f)
-                {
-                    passout = false;
-                    vignette.intensity.value = 0f;
-                    blackImage.enabled = false;
-                    passout_timer = 0f;
-
-                    vignette.color.value = Color.black;
-                }
-            }
-        }
-
-        if (blackImage.enabled && !tinnitus.isPlaying)
-        {
-            tinnitus.Play();
-            jetProperties.interior_turbine.Stop();
-        }
-        else if (!blackImage.enabled && !jetProperties.interior_turbine.isPlaying)
-        {
-            tinnitus.Stop();
-            jetProperties.interior_turbine.Play();
-        }
-    }
-
-
-    void Rotate()
-    {
-        if (passout)
-            return;
-
-        float deltaTime = Time.fixedDeltaTime;
-
-        float rawMouseX = Input.GetAxis("Mouse X") * mouseSensitivity * jetProperties.pitch_value;
-        float rawMouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * jetProperties.pitch_value;
-
-        float keyboardPitch = 0f;
-
-        if (Input.GetKey(pitch_up_key))
-            keyboardPitch += 1f;
-        if (Input.GetKey(pitch_down_key))
-            keyboardPitch -= 1f;
-
-        keyboardPitch = Mathf.Clamp(keyboardPitch, -1f, 1f);
-
-        rawMouseY += keyboardPitch * jetProperties.pitch_value * mouseSensitivity;
-
-        if (jetProperties.invertY)
-            rawMouseY *= -1;
-
-        mouseX = Mathf.Clamp(rawMouseX, -jetProperties.max_rotation_value, jetProperties.max_rotation_value);
-        mouseY = Mathf.Clamp(rawMouseY, -jetProperties.max_pitch_value, jetProperties.max_pitch_value);
-
-        if (Math.Abs(mouseY) > 1)
-        {
-            throttle -= (Math.Abs(mouseY) * deltaTime * speed) / 70;
-        }
-
-
-        foreach (TrailRenderer trail in trails.GetComponentsInChildren<TrailRenderer>())
-        {
-            if ((mouseX > 10 || mouseX < 10 || mouseY > 10 || mouseY < 10) && (mouseX != 0 || mouseY != 0) && speed > 100)
-            {
-                if (!trail.emitting)
-                {
-
-                    trail.Clear();
-                    trail.emitting = true;
-                }
-            }
-            else
-            {
-                trail.emitting = false;
-            }
-        }
-
-        rb.AddTorque(transform.right * mouseX * speed * jetProperties.max_throttle / 2 * rb.mass * deltaTime);
-        rb.AddTorque(-transform.forward * mouseY * speed * jetProperties.max_throttle / 2 * rb.mass * deltaTime);
-    }
-
-
-    void CalculateGForce()
-    {
-        float deltaTime = Time.deltaTime;
-
-        if (mouseY != 0)
-        {
-            G_force = (deltaTime / 3) * speed * mouseY;
-
-        }
-        else
-        {
-            G_force = Mathf.MoveTowards(G_force, 0f, deltaTime * 5);
-        }
-
-        G_force = Math.Clamp(G_force, -10, 10);
-
-    }
-
-
-
-    void Lean()
-    {
-        if (passout) return;
-
-        float leanInput = 0f;
-
-        if (Input.GetKey(lean_left_key))
-        {
-            leanInput -= 1f;
-            lean_value += leanInput * jetProperties.lean_value * Time.deltaTime;
-        }
-        else if (Input.GetKey(lean_right_key))
-        {
-            leanInput += 1f;
-            lean_value += leanInput * jetProperties.lean_value * Time.deltaTime;
-        }
-        else
-        {
-            lean_value = Mathf.MoveTowards(lean_value, 0f, 25 * Time.deltaTime);
-        }
-
-        float speedFactor = Mathf.Clamp01(speed / jetProperties.max_throttle);
-
-        float rotationAmount = is_on_ground && (throttle >= 20 || throttle < -10) && throttle <= 50 ? lean_value * Time.deltaTime : lean_value * speedFactor * Time.deltaTime;
-
-        if (throttle < 0)
-        {
-            rotationAmount *= -1;
-        }
-
-        rotationAmount = Mathf.Clamp(rotationAmount, -jetProperties.max_lean_value, jetProperties.max_lean_value);
-        transform.Rotate(Vector3.up * rotationAmount, Space.Self);
-    }
-
-    void Move()
-    {
-        float deltaTime = Time.fixedDeltaTime;
-
-        if (is_on_ground && mouseY > 0 && speed > 50)
-        {
-            rb.AddForce(Vector3.up * rb.mass * 20);
-        }
-
-        if (moveForward > 0 && passout == false)
-        {
-            jetProperties.interior_turbine.pitch = Mathf.MoveTowards(
-                jetProperties.interior_turbine.pitch,
-                2f,
-                0.1f * deltaTime
-            );
-
-            throttle += acceleration * deltaTime;
-            if (throttle > jetProperties.max_throttle)
-            {
-                throttle = jetProperties.max_throttle;
-            }
-        }
-        else if (moveForward < 0 && passout == false)
-        {
-            if (is_on_ground)
-            {
-                if (throttle > -30)
-                {
-                    Debug.Log("OI");
-                    jetProperties.interior_turbine.pitch = Mathf.MoveTowards(
-                        jetProperties.interior_turbine.pitch,
-                        0.15f,
-                        0.1f * deltaTime
-                    );
-                    throttle -= acceleration * deltaTime * 2;
-                }
-
-            }
-            else
-            {
-                if (throttle > 100)
-                {
-
-                    jetProperties.interior_turbine.pitch = Mathf.MoveTowards(
-                        jetProperties.interior_turbine.pitch,
-                        0.15f,
-                        0.1f * deltaTime
-                    );
-                    throttle -= acceleration * deltaTime;
-                }
-            }
-        }
-        else
-        {
-
-            if (is_on_ground)
-            {
-                float decelerationRate = acceleration * 0.8f;
-                throttle = Mathf.MoveTowards(throttle, 0, decelerationRate * deltaTime);
-
-                jetProperties.interior_turbine.pitch = Mathf.MoveTowards(
-                    jetProperties.interior_turbine.pitch,
-                    0.15f,
-                    0.1f * deltaTime
-                );
-
-                jetProperties.interior_turbine.pitch = Mathf.Clamp(jetProperties.interior_turbine.pitch, 0.15f, 2f);
-            }
-            else
-            {
-                float decelerationRate = acceleration * 0.1f;
-                throttle = Mathf.MoveTowards(throttle, 0, decelerationRate * deltaTime);
-
-                jetProperties.interior_turbine.pitch = Mathf.MoveTowards(
-                    jetProperties.interior_turbine.pitch,
-                    0.15f,
-                    0.005f * deltaTime
-                );
-
-                jetProperties.interior_turbine.pitch = Mathf.Clamp(jetProperties.interior_turbine.pitch, 0.15f, 2f);
-            }
-
-        }
-
-    }
-
-
-    void ApplyDiveSpeedBoost()
-    {
-        Vector3 jetForward = -transform.right;
-
-        downwardComponent = -jetForward.y;
-
-        if (downwardComponent > 0.3f) // Down
-        {
-            float gravityBoost = downwardComponent * Physics.gravity.magnitude * 0.5f;
-            float aerodynamicBoost = downwardComponent * jetProperties.dive_speed_boost;
-
-            float totalBoost = (gravityBoost + aerodynamicBoost) * Time.fixedDeltaTime;
-
-            totalBoost = Mathf.Clamp(totalBoost, 0, jetProperties.max_throttle * 1.2f);
-
-            current_speed_modifier = totalBoost * 400 * Time.fixedDeltaTime;
-
-        }
-        else if (downwardComponent < -0.3f) // Up
-        {
-            float upwardIntensity = -downwardComponent;
-
-            float airResistance = upwardIntensity * Physics.gravity.magnitude * 0.3f;
-            float gravityPenalty = upwardIntensity * jetProperties.dive_speed_boost * 0.5f;
-
-            float totalPenalty = (airResistance + gravityPenalty) * Time.fixedDeltaTime;
-
-            totalPenalty = Mathf.Clamp(totalPenalty, 0, jetProperties.max_throttle * 0.7f);
-
-            current_speed_modifier = -totalPenalty * 400 * Time.fixedDeltaTime;
-        }
-        else
-        {
-            current_speed_modifier = Mathf.Lerp(current_speed_modifier, 0, 2 * Time.fixedDeltaTime);
-        }
-
-    }
-
-    void GravityModifier()
-    {
-        if (is_on_ground)
-        {
-            current_gravity = 0;
-            return;
-        }
-
-        float targetGravity = 1f;
-
-
-        if (downwardComponent > 0.3f) //Down
-        {
-            if (moveForward > 0)
-            {
-                targetGravity = (jetProperties.max_throttle / (speed * 2)) * -downwardComponent;
-            }
-            else
-            {
-                targetGravity = (jetProperties.max_throttle / speed) * -downwardComponent;
-            }
-        }
-        else if (downwardComponent < -0.3f) //Up
-        {
-
-            if (moveForward > 0)
-            {
-                targetGravity = 1.5f * -downwardComponent;
-            }
-            else
-            {
-                targetGravity = (jetProperties.max_throttle / speed) * -downwardComponent;
-            }
-        }
-        else
-        {
-            if (moveForward > 0)
-            {
-                targetGravity = 0;
-            }
-            else
-            {
-                if (throttle < 100)
-                {
-                    targetGravity = jetProperties.max_throttle / (speed * 3);
-                }
-
-            }
-        }
-
-        current_gravity = Mathf.Lerp(current_gravity, targetGravity, Time.fixedDeltaTime);
-
-        current_gravity = Mathf.Clamp(current_gravity, 0f, 5f);
-    }
-
-
-    void OnCollisionEnter(Collision collision)
-    {
-
-        if (collision.gameObject.GetComponent<JetUpgrades>() != null)
-            return;
-
-
-        float explosionForce = throttle / 9;
-
-        if (throttle > 400)
-        {
-            explosionForce = 400 / 9;
-        }
-
-
-        ContactPoint contact = collision.contacts[0];
-
-        bool do_once = true;
-        Collider[] colliders = Physics.OverlapSphere(contact.point, explosionForce);
-
-
-        if (throttle > 100 && crash_explosion != null && !is_on_ground)
-        {
-
-            Explode(colliders, contact, collision, explosionForce);
-
-        }
-        else if (collision.gameObject.layer == LayerMask.NameToLayer("Voxel"))
-        {
-            for (int i = 0; i < colliders.Length; i++)
-            {
-                PlayerProperties playerProps = colliders[i].GetComponentInParent<PlayerProperties>();
-
-                if (do_once && playerProps != null)
-                {
-                    Debug.Log("Colidiu com Player");
-                    float distance = Vector3.Distance(transform.position, playerProps.transform.position);
-                    float damage = Mathf.Clamp(explosionForce * (1 - distance / 10), 0, explosionForce);
-                    playerProps.Damage(damage * 2);
-
-                    CameraShake cameraShake = playerProps.GetComponentInChildren<CameraShake>();
-                    if (cameraShake != null)
-                    {
-                        cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage / 10, 1f));
-                    }
-                    else
-                    {
-                        Debug.LogWarning("CameraShake não encontrado!");
-                    }
-
-                    do_once = false;
-                }
-
-                DynamicVoxelObj vox = colliders[i].GetComponentInParent<DynamicVoxelObj>();
-
-                if (vox == null)
-                    continue;
-
-
-                vox.AddDestruction_Line(contact.point, contact.normal, explosionForce);
-            }
-
-            Damage(explosionForce);
-
-        }
-
-    }
-
-    void EjectPlayer()
-    {
-
-        Quaternion spawnRotation = new Quaternion(0, exit_vehicle_position.transform.rotation.y, 0, exit_vehicle_position.transform.rotation.w);
-        Vector3 spawnPosition = new Vector3(inside_camera_position.position.x, glass.transform.position.y + 5, inside_camera_position.position.z);
-
-
-        player.transform.position = spawnPosition;
-        player.transform.rotation = spawnRotation;
-
-
-        // Aplica força ao novo player
-        Rigidbody player_rb = player.GetComponent<Rigidbody>();
-        if (player_rb != null)
-        {
-
-            Vector3 ejectDirection = Vector3.up;
-
-            // Intensidade da ejeção
-            float ejectForce = player_rb.mass * (throttle / 2);
-
-            player_rb.AddForce(ejectDirection * 25, ForceMode.Impulse);
-            player_rb.AddForce(forwardReference * ejectForce, ForceMode.Impulse);
-
-            Vector3 randomTorque = new Vector3(
-                UnityEngine.Random.Range(-200f, 200f),
-                UnityEngine.Random.Range(-100f, 100f),
-                UnityEngine.Random.Range(-200f, 200f)
-            );
-            player_rb.AddTorque(randomTorque, ForceMode.Impulse);
-        }
-
-    }
+    #region HUD & UI
 
     protected override void UpdateHUD()
     {
-
-        hud_speed_controller.text = speed.ToString("F0");
-        hud_altidude_controller.text = (transform.position.y / 2).ToString("F0");
-        hud_gravity_controller.text = current_gravity.ToString("F1") + " ↓";
-        hud_Gforce_controller.text = G_force.ToString("F0");
-
-        Vector3 speed_currentPosition = Vector3.Lerp(hud_speed_controller_min_pos.transform.localPosition, hud_speed_controller_max_pos.transform.localPosition, Mathf.Clamp01(speed / max_speed));
-        hud_speed_controller.transform.localPosition = speed_currentPosition;
-
-        Vector3 altitude_currentPosition = Vector3.Lerp(
-            hud_altidude_controller_min_pos.transform.localPosition,
-            hud_altidude_controller_max_pos.transform.localPosition,
-            Mathf.Clamp01(transform.position.y / 2 / 400)
-        );
-
-        hud_altidude_controller.transform.localPosition = altitude_currentPosition;
-
-    }
-
-
-    public override void EnterVehicle(GameObject _player)
-    {
-        exit_cooldown = 0;
-
-        is_in_jet = !is_in_jet;
-        player = _player;
-
-        if (is_in_jet)
+        _hudManager.UpdateSpeed(speed);
+        _hudManager.UpdateAltitude(transform.position.y / 3);
+        _hudManager.UpdateGravity(_currentGravity);
+        _hudManager.UpdateGforce(_gForce);
+        _hudManager.UpdateHeat(_overheatAmount);
+        _hudManager.ChangeHeatIndicatorActive(usingMainCannon);
+        if (countermeasures != null)
         {
-            player.SetActive(false);
-            vehicle_audio_listener.enabled = true;
-            minFov = vehicle_camera.fieldOfView;
-            vehicle_camera.enabled = true;
-            TurbineSmoke.SetActive(start_engine);
-            vehicle_camera.transform.position = new Vector3(_player.transform.position.x, _player.transform.position.y + 3, _player.transform.position.z);
-            vehicle_camera.transform.rotation = _player.transform.rotation;
-            arms.SetActive(true);
-            hud.SetActive(true);
-        }
-
-    }
-
-    protected override void Start_Stop_Engine()
-    {
-        if (Input.GetKeyDown(start_engine_key))
-        {
-            start_engine = !start_engine;
-
-            if (start_engine)
+            if (countermeasures.is_active)
             {
-                jetProperties.interior_turbine.Play();
-                StartCoroutine(IncreasePitch(jetProperties.interior_turbine, 2));
+                _hudManager.UpdateCountermeasuresStatus("Active");
             }
-            else
+            else if (!countermeasures.is_active && countermeasures.is_reloading)
             {
-                StartCoroutine(DecreasePitch(jetProperties.interior_turbine, 2));
+                _hudManager.UpdateCountermeasuresStatus("Reloading... [" + countermeasures.reload_countermeasures_duration.ToString("F0") + "]");
+            }
+            else if (!countermeasures.is_active && !countermeasures.is_reloading)
+            {
+                _hudManager.UpdateCountermeasuresStatus("Ready");
             }
         }
     }
 
+    #endregion
+
+    #region Helper Methods
+
+    private Volume GetGlobalVolume()
+    {
+        GameObject globalVolumeObj = GameObject.FindGameObjectWithTag("GlobalVolume");
+        if (globalVolumeObj != null)
+        {
+            return globalVolumeObj.GetComponent<Volume>();
+        }
+        return null;
+    }
+
+    private void HandlePassout()
+    {
+        // Implementação comentada para revisão futura
+    }
 
     protected override void CameraController()
     {
         Zoom();
-
-        Transform target = null;
-        float targetDistortion = 0f;
-        float targetBlend = 0f;
-        float change_camera_speed = 0;
-
-        if (Input.GetKeyDown(switch_camera_key))
-        {
-            current_camera += 1;
-            if (current_camera > 3)
-            {
-                current_camera = 1;
-            }
-        }
-
-        if (current_camera == 1)
-        {
-            target = inside_camera_position.transform;
-            targetDistortion = 0f;
-            targetBlend = 0f;
-            vehicle_camera.transform.SetParent(target);
-            change_camera_speed = 3;
-        }
-        else if (current_camera == 2)
-        {
-            target = foward_camera_position.transform;
-            targetDistortion = 0.1f;
-            targetBlend = 1f;
-            vehicle_camera.transform.SetParent(transform);
-            change_camera_speed = 3;
-        }
-        else
-        {
-            target = backward_camera_position.transform;
-            targetDistortion = 0.1f;
-            targetBlend = 1f;
-            vehicle_camera.transform.SetParent(transform);
-            change_camera_speed = 3;
-        }
-
-        vehicle_camera.transform.position = Vector3.Lerp(vehicle_camera.transform.position, target.position, change_camera_speed * Time.deltaTime);
-        vehicle_camera.transform.rotation = Quaternion.Lerp(vehicle_camera.transform.rotation, target.rotation, change_camera_speed * Time.deltaTime);
-
-        distortion.distortionLevel = targetDistortion;
-        jetProperties.interior_turbine.spatialBlend = targetBlend;
-
+        // Implementação de troca de câmera comentada
     }
 
 
-    protected override void Switch_weapon()
+    bool DestroyAnimation_do_once = true;
+    float deltaTime = 0;
+    protected override void DestroyAnimation()
     {
-
-        if (Input.GetKeyDown(main_cannon_key))
+        deltaTime += Time.fixedDeltaTime;
+        if (deltaTime >= 10)
         {
-            using_main_cannon = true;
-            upgrade.SetActive(!using_main_cannon);
+            Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
+        }
+        if (DestroyAnimation_do_once)
+        {
+            fire_effects_parent.SetActive(true);
+            DestroyAnimation_do_once = false;
         }
 
-        if (Input.GetKeyDown(upgrade_gun_key) && upgrade != null)
-        {
-            using_main_cannon = false;
-            upgrade.SetActive(!using_main_cannon);
-        }
-
+        rb.AddForce(forwardReference * _totalThrottle * _properties.max_throttle);
+        rb.AddTorque(transform.right * 400 * rb.mass);
     }
 
+    #endregion
 }

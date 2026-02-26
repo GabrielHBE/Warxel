@@ -1,10 +1,9 @@
 using System;
 using UnityEngine;
 
-public class Sight : MonoBehaviour
+public class Sight : Attatchment
 {
-    public int id;
-    public string attatchment_name;
+    [Header("Changes")]
     public Vector3 change_ads_position;
     public float zoom_change;
     public float ads_speed_change;

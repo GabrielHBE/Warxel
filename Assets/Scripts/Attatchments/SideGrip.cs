@@ -1,43 +1,51 @@
 using System.Collections;
 using UnityEngine;
 
-public class SideGrip : MonoBehaviour
+public class SideGrip : Attatchment
 {
-    [Header("KeyCode")]
-    public KeyCode activate;
+    [Header("Changes")]
+    private KeyBinds keyBinds;
 
-    [Header("Object")]
-    public GameObject Object;
+    [Header("Configurations")]
+    [SerializeField] private GameObject Object;
+    [SerializeField] private bool show_in_third_person;
+    
+
 
     bool state = true;
-
+    private Weapon weapon;
     private CameraShake cameraShake;
-
-    private WeaponProperties weaponProperties;
 
     void Start()
     {
+        weapon = GetComponentInParent<Weapon>();
+        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
+        weaponProperties = GetComponentInParent<WeaponProperties>();
         cameraShake = GetComponentInParent<CameraShake>();
-        Object.SetActive(state);
+        if(Object!=null) Object.SetActive(state);
     }
 
     void Update()
     {
-        if (Input.GetKeyDown(activate))
+        if (!gameObject.activeSelf) return;
+
+        if (Input.GetKeyDown(keyBinds.WEAPON_activateSideGrip))
         {
-            weaponProperties = GetComponentInParent<WeaponProperties>();
-            StartCoroutine(Shake(weaponProperties.weapon.transform));
-            StartCoroutine(cameraShake.SideGripActivateShake());
+            if (weaponProperties != null) StartCoroutine(Shake(weaponProperties.weapon.transform));
+            if (cameraShake != null) cameraShake.RequestShake(CameraShake.ShakeType.SideGrip, 0.5f);
             state = !state;
+
             Object.SetActive(state);
         }
+
+        if (weapon != null) weapon.is_side_grip_activated = state;
     }
-    
+
     public IEnumerator Shake(Transform weapon)
     {
         Quaternion originalRot = weapon.transform.localRotation;
 
-        Quaternion upRot = originalRot * Quaternion.Euler(Random.Range(-0.5f,0.5f), Random.Range(-0.5f,0.5f), Random.Range(-0.5f,0.5f)); 
+        Quaternion upRot = originalRot * Quaternion.Euler(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
 
         float duration = 0.05f;
         float elapsed = 0f;

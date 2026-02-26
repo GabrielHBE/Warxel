@@ -2,8 +2,9 @@ using UnityEngine;
 
 public class APS : Countermeasures
 {
-    void Update()
+    protected override void  Update()
     {
+        base.Update();
         if (reload_countermeasures_duration < 0) return;
 
         if (vehicle.ignore_damage == false)
@@ -33,8 +34,4 @@ public class APS : Countermeasures
         reload_countermeasures_duration = reload_countermeasures_original_duration;
     }
 
-    public override void SetVehicle(Vehicle vehicle)
-    {
-        this.vehicle = vehicle;
-    }
 }

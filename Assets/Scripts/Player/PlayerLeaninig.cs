@@ -3,53 +3,91 @@ using UnityEngine;
 public class PlayerLeaninig : MonoBehaviour
 {
 
-    public GameObject spine;
-    public KeyCode lean_left_key;
-    public KeyCode lean_right_key;
-    public float rotation_value;
+    [SerializeField] private GameObject spine;
+    private KeyBinds keyBinds;
+    [SerializeField] private float rotation_value;
     private Quaternion rotation_left_total;
     private Quaternion rotation_right_total;
     private Quaternion original_rotation;
     private bool is_leaning_left = false;
     private bool is_leaning_right = false;
-    public float lean_timer;
+    [SerializeField] private float lean_timer;
     private float elapsed_timer;
-
     PlayerProperties playerProperties;
+
+    // Adicione estas variáveis
+    [SerializeField] private Animator animator;
+    private int leanLayerIndex;
+    [SerializeField] private float leanLayerWeight = 1f; // Peso total para sobrescrever
 
     void Start()
     {
+        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
         playerProperties = GetComponent<PlayerProperties>();
 
-        rotation_left_total = new Quaternion(spine.transform.localRotation.x,
-        spine.transform.localRotation.y,
-        spine.transform.localRotation.z + rotation_value,
-        spine.transform.localRotation.w);
+        // Obter o Animator
+        //animator = GetComponent<Animator>();
+        if (animator != null)
+        {
+            // Criar uma layer específica para o lean
+            for (int i = 0; i < animator.layerCount; i++)
+            {
+                if (animator.GetLayerName(i) == "Lean Layer")
+                {
+                    leanLayerIndex = i;
+                    break;
+                }
+            }
 
-        rotation_right_total = new Quaternion(spine.transform.localRotation.x,
-        spine.transform.localRotation.y,
-        spine.transform.localRotation.z - rotation_value,
-        spine.transform.localRotation.w);
+            // Se não existir, você precisa criar no Animator Controller
+        }
 
+        rotation_left_total = Quaternion.Euler(
+            spine.transform.localRotation.eulerAngles.x,
+            spine.transform.localRotation.eulerAngles.y,
+            spine.transform.localRotation.eulerAngles.z + rotation_value
+        );
+
+        rotation_right_total = Quaternion.Euler(
+            spine.transform.localRotation.eulerAngles.x,
+            spine.transform.localRotation.eulerAngles.y,
+            spine.transform.localRotation.eulerAngles.z - rotation_value
+        );
+
+        original_rotation = spine.transform.localRotation;
         original_rotation = spine.transform.localRotation;
     }
 
     void Update()
     {
-        if (Input.GetKeyDown(lean_left_key))
+        // Seu código de input existente...
+        if (Input.GetKeyDown(keyBinds.PLAYER_leanLeftKey))
         {
             elapsed_timer = 0;
             is_leaning_left = !is_leaning_left;
             is_leaning_right = false;
         }
 
-        if (Input.GetKeyDown(lean_right_key))
+        if (Input.GetKeyDown(keyBinds.PLAYER_leanRightKey))
         {
             elapsed_timer = 0;
             is_leaning_right = !is_leaning_right;
             is_leaning_left = false;
         }
 
+        if (playerProperties.sprinting)
+        {
+            is_leaning_left = false;
+            is_leaning_right = false;
+        }
+
+        // Aplicar o peso da layer de lean
+        if (animator != null && leanLayerIndex > 0)
+        {
+            animator.SetLayerWeight(leanLayerIndex, leanLayerWeight);
+        }
+
+        // Executar leaning
         if (is_leaning_left)
         {
             is_leaning_right = false;
@@ -64,7 +102,6 @@ public class PlayerLeaninig : MonoBehaviour
         {
             ResetLeaning();
         }
-
     }
 
     void ResetLeaning()
@@ -81,10 +118,12 @@ public class PlayerLeaninig : MonoBehaviour
         }
         else
         {
+            /*
             spine.transform.localRotation = new Quaternion(spine.transform.localRotation.x,
                                                         spine.transform.localRotation.y,
                                                         original_rotation.z,
                                                         spine.transform.localRotation.w);
+                                                        */
         }
 
     }

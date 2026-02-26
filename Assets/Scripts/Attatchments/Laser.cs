@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class Laser : MonoBehaviour
 {
-    public float distance = 100f;
+    public float distance = 10f;
     private LineRenderer line;
 
     [SerializeField] private Color color;

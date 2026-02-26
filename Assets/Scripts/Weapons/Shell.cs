@@ -37,6 +37,7 @@ public class Shell : MonoBehaviour
 
     void Start()
     {
+        playerProperties = GetComponentInParent<PlayerProperties>();
         hand_to_shell = true;
 
         original_weapon_pos = weapon.localPosition;
@@ -86,6 +87,8 @@ public class Shell : MonoBehaviour
 
     void Update()
     {
+        if(playerProperties==null) return;
+        
         if (!playerProperties.is_reloading)
         {
             weapon.transform.localPosition = Vector3.Lerp(weapon.transform.localPosition, original_weapon_pos, Time.deltaTime * 2);

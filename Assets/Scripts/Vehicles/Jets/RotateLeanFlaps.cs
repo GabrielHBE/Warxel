@@ -15,7 +15,7 @@ public class RotateLeanFlaps : MonoBehaviour
     void Update()
     {
 
-        if (!jet.is_in_jet) return;
+        if (!jet.is_in_vehicle) return;
 
         Rotate();
 
@@ -23,13 +23,13 @@ public class RotateLeanFlaps : MonoBehaviour
 
     void Rotate()
     {
-        float rotationAmount = -jet.lean_value * 600 * Time.deltaTime;
+        float rotationAmount = -jet.leanValue * 600 * Time.deltaTime;
 
         float current_rotation = transform.localRotation.y;
         
-        if (jet.lean_value != 0)
+        if (jet.leanValue != 0)
         {
-            if (current_rotation > -0.15 && current_rotation < 0.15)
+            if (current_rotation >= -0.15 && current_rotation <= 0.15)
             {
                 transform.Rotate(0, rotationAmount, 0, Space.Self);
             }

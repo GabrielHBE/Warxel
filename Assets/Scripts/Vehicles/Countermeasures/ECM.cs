@@ -2,8 +2,10 @@ using UnityEngine;
 
 public class ECM : Countermeasures
 {
-    void Update()
+    protected override void  Update()
     {
+        base.Update();
+        
         if (reload_countermeasures_duration < 0) return;
 
         if (vehicle.used_locking_countermeasure == false)
@@ -33,8 +35,4 @@ public class ECM : Countermeasures
         reload_countermeasures_duration = reload_countermeasures_original_duration;
     }
 
-    public override void SetVehicle(Vehicle vehicle)
-    {
-        this.vehicle = vehicle;
-    }
 }

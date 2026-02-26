@@ -1,81 +1,153 @@
-
+using System;
 using System.Collections;
-using Unity.VisualScripting;
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 
 public class Weapon : MonoBehaviour
 {
+    [Header("State")]
     [HideInInspector] public bool is_active;
+    [HideInInspector] public bool is_side_grip_activated;
+
+    [Header("HUD")]
+    [SerializeField] private SoldierHudManager soldierHudManager;
+    private Settings settings;
+
+    [Header("Muzzle Flashes")]
+    [SerializeField] private List<GameObject> muzzle_flashes = new List<GameObject>();
 
     [Header("Instances")]
-    [SerializeField] private GameObject left_hand;
-    [SerializeField] private GameObject right_hand;
+    [SerializeField] private ThirdPersonWeapon thirdPersonWeapon;
+    [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private KeyBinds keyBinds;
+    [SerializeField] private Controls controls;
+    [SerializeField] private Video video;
     [SerializeField] private Camera player_camera;
-    [SerializeField] private GameObject ads_position;
-    [SerializeField] private GameObject screen_center;
+    public GameObject ads_position;
     [SerializeField] private SwitchWeapon switchWeapon;
 
     [Header("Sounds")]
     public AudioSource switch_fire_mode_sound;
 
-    //variables
+    [Header("Variables")]
     [HideInInspector] public bool can_aim = true;
     [HideInInspector] public bool can_shoot = true;
-    bool can_reload;
-    float reload_cooldown;
-    float next_time_to_fire = 0f;
+
+    private bool can_reload;
+    private float reload_cooldown;
+    private float next_time_to_fire = 0f;
     [HideInInspector] public bool did_shoot = false;
+
     private Vector3 attatchment_change_ads_position;
     private float minFov;
     private int current_fire_mode = 0;
-    float burst_timer = 0f;
-    int bullets_shot_in_current_burst = 0;
-    bool is_bursting;
-    bool is_last_bullet;
-    bool is_first_shot;
-    int recoil_position_in_array = 0;
-    Vector3 original_ads_position;
+
+    private float burst_timer = 0f;
+    private int bullets_shot_in_current_burst = 0;
+    private bool is_bursting;
+    private bool is_last_bullet;
+    private bool is_first_shot;
+    private int recoil_position_in_array = 0;
+
+    private Vector3 original_ads_position;
     private WeaponSounds weaponSounds;
-    private WeaponProperties weaponProperties;
-    private AudioSource shoot_sound;
+    [HideInInspector] public WeaponProperties weaponProperties;
     private PlayerController playerController;
-    private PlayerProperties playerProperties;
-    private WeaponAnimation weaponAnimation;
+
+    [HideInInspector] public WeaponAnimation weaponAnimation;
     private Sight sight_attatchment;
     private Shell Shell;
-    float current_spread;
-    [HideInInspector] public bool dot_position;
-    bool restarted;
 
-    Vector3 original_barrel_pos;
+    private float current_spread;
+    [HideInInspector] public bool dot_position;
+    private bool restarted;
+    private int reserve_ammo;
+    private float crouch_recoil_multiplier = 0.8f;
+
+    private float time_to_contatenate = 0;
+    private GameObject current_muzzle_flash;
+    private bool is_aiming;
+    private GeneralHudAlertMessages generalHudAlertMessages;
+    private bool moved_mouse_while_firing;
+    private bool was_firing_previous_frame;
+
+    #region Unity Lifecycle Methods
 
     void Awake()
     {
-        SetHandsOnWeapon();
+        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
+        generalHudAlertMessages = settings.GetComponent<GeneralHudAlertMessages>();
+        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
+        controls = keyBinds.GetComponent<Controls>();
+        video = keyBinds.GetComponent<Video>();
+
+        minFov = video.infantary_fov;
         restarted = false;
     }
 
+    void Update()
+    {
+        if (weaponProperties != null)
+            Reload();
+
+        if (!restarted || !is_active || settings.is_menu_settings_active || playerProperties.is_in_vehicle)
+        {
+            playerProperties.is_firing = false;
+            DeleteMuzzle();
+            return;
+        }
+
+        ConcatenateBullets();
+
+        if (Input.GetKeyDown(keyBinds.WEAPON_reloadKey))
+        {
+            HandleReload();
+        }
+
+        if (soldierHudManager.mag_counter_hud != null && weaponProperties != null)
+            soldierHudManager.mag_counter_hud.UpdateMagCount(0, weaponProperties.mags);
+
+        aim();
+
+        if (can_shoot && !playerProperties.is_reloading)
+        {
+            shoot();
+        }
+
+        if (Input.GetKeyDown(keyBinds.WEAPON_switchFireModeKey))
+        {
+            HandleFireModeSwitch();
+        }
+
+        if (!playerProperties.is_firing)
+        {
+            moved_mouse_while_firing = false;
+        }
+
+        // Atualiza o estado do frame atual para o próximo frame
+        was_firing_previous_frame = playerProperties.is_firing;
+    }
+
+
+    #endregion
+
+    #region Initialization
+
     public void Restart()
     {
-
         weaponProperties = GetComponentInChildren<WeaponProperties>();
-        weaponProperties.weapon.transform.localPosition = weaponProperties.initial_potiion;
-        weaponProperties.weapon.transform.localRotation = weaponProperties.inicial_rotation;
         weaponAnimation = GetComponent<WeaponAnimation>();
         playerController = GetComponentInParent<PlayerController>();
-        playerProperties = transform.root.GetComponent<PlayerProperties>();
         sight_attatchment = GetComponentInChildren<Sight>();
         Shell = GetComponentInChildren<Shell>();
-
         weaponSounds = GetComponentInChildren<WeaponSounds>();
-        shoot_sound = weaponSounds.shoot_sound;
-        minFov = player_camera.fieldOfView;
 
-        weaponProperties.muzzle_lightinig.enabled = false;
+        time_to_contatenate = weaponProperties.time_to_transfer_bullets;
+
         if (sight_attatchment == null)
         {
-            attatchment_change_ads_position = new Vector3(0f, 0f, 0f);
+            attatchment_change_ads_position = Vector3.zero;
         }
         else
         {
@@ -83,121 +155,25 @@ public class Weapon : MonoBehaviour
         }
 
         current_fire_mode = 0;
-
         next_time_to_fire = 0f;
-
-        if (keyBinds.aimKey == KeyCode.Alpha1)
-        {
-            keyBinds.aimKey = KeyCode.Mouse1;
-        }
-        if (keyBinds.shootKey == KeyCode.Alpha0)
-        {
-            keyBinds.shootKey = KeyCode.Mouse0;
-        }
-
-        original_barrel_pos = weaponProperties.barrel.transform.localPosition;
-
-        weaponProperties.weapon.transform.localRotation = weaponProperties.inicial_rotation;
         can_reload = true;
+
         playerProperties.is_reloading = false;
         restarted = true;
 
+        weaponProperties.weapon.transform.localPosition = weaponProperties.initial_potiion;
+        weaponProperties.weapon.transform.localRotation = weaponProperties.inicial_rotation;
+
+        SwitchFireMode();
     }
 
-    void Update()
+    #endregion
+
+    #region Fire Mode
+
+    private void HandleFireModeSwitch()
     {
-
-
-        if (!restarted || !is_active)
-        {
-            return;
-        }
-
-        if (Input.GetKeyDown(keyBinds.reloadKey))
-        {
-            weaponAnimation.StartReloadAnimation();
-
-            int mags_empty = 0;
-
-            for (int i = 0; i < weaponProperties.mag_count; i++)
-            {
-                if (weaponProperties.mags[i] == 0)
-                {
-                    mags_empty += 1;
-                }
-            }
-
-            if (mags_empty == weaponProperties.mag_count)
-            {
-                can_reload = false;
-            }
-            else
-            {
-                if (weaponAnimation.fireClip != null)
-                {
-                    if (!weaponAnimation.is_in_fire_animation)
-                    {
-                        reload_cooldown = weaponAnimation.reload_animation_timer / weaponProperties.reload_time;
-                        playerProperties.is_reloading = true;
-                        can_reload = true;
-
-                    }
-                }
-                else
-                {
-
-                    reload_cooldown = weaponAnimation.reload_animation_timer / weaponProperties.reload_time;
-                    playerProperties.is_reloading = true;
-                    can_reload = true;
-
-                }
-
-            }
-
-        }
-
-
-        aim();
-
-        try
-        {
-            if (can_shoot && !playerProperties.is_reloading && weaponProperties.mags[^1] > 0)
-            {
-                shoot();
-            }
-
-        }
-        catch (System.Exception)
-        {
-
-        }
-
-
-        Reload();
-
-        if (Input.GetKeyDown(keyBinds.switchFireModeKey))
-        {
-            SwitchFireMode();
-        }
-
-
-    }
-
-    void SetHandsOnWeapon()
-    {
-        WeaponHolder[] weaponHolders = GetComponentsInChildren<WeaponHolder>(true);
-        foreach (WeaponHolder holder in weaponHolders)
-        {
-
-            holder.leftHand_origin = left_hand;
-            holder.rightHand_origin = right_hand;
-        }
-    }
-
-
-
-    void SwitchFireMode()
-    {
+        if (weaponProperties.fire_modes.Count == 1) return;
 
         switch_fire_mode_sound.Play();
 
@@ -210,182 +186,370 @@ public class Weapon : MonoBehaviour
             current_fire_mode = 0;
         }
 
-        //current_fire_mode = (current_fire_mode + 1) % weaponProperties.fire_modes.Count;
+        SwitchFireMode();
+    }
 
-        //weaponProperties.can_hold_trigger = (weaponProperties.fire_modes[current_fire_mode] == "auto");
+    void SwitchFireMode()
+    {
+        string currentMode = weaponProperties.fire_modes[current_fire_mode];
 
-        if (weaponProperties.fire_modes[current_fire_mode] == "auto")
+        if (currentMode == "auto")
         {
+            soldierHudManager.fire_mode_hud.SetFireMode("Auto");
             weaponProperties.can_hold_trigger = true;
             weaponProperties.CalculateRecoilSpeed(false);
         }
-        else if (weaponProperties.fire_modes[current_fire_mode] == "burst")
+        else if (currentMode == "burst")
         {
+            soldierHudManager.fire_mode_hud.SetFireMode("Burst");
             weaponProperties.can_hold_trigger = false;
             weaponProperties.CalculateRecoilSpeed(true);
         }
         else
         {
+            soldierHudManager.fire_mode_hud.SetFireMode("Single");
             weaponProperties.can_hold_trigger = false;
             weaponProperties.CalculateRecoilSpeed(false);
         }
-
-
     }
 
+    #endregion
+
+    #region Reload
+
+    void HandleReload()
+    {
+        if (playerProperties.is_firing || playerProperties.is_reloading || playerProperties.roll || reserve_ammo == 0)
+        {
+            if (reserve_ammo == 0)
+                generalHudAlertMessages.CreateMessage("Cant reload", 2);
+            return;
+        }
+
+        weaponAnimation.StartReloadAnimation();
+
+        if (weaponAnimation.fireClip != null)
+        {
+            if (!weaponAnimation.is_in_fire_animation)
+            {
+                reload_cooldown = weaponAnimation.reload_animation_timer / weaponProperties.reload_time;
+                playerProperties.is_reloading = true;
+                can_reload = true;
+            }
+        }
+        else
+        {
+            reload_cooldown = weaponAnimation.reload_animation_timer / weaponProperties.reload_time;
+            playerProperties.is_reloading = true;
+            can_reload = true;
+        }
+    }
 
     void Reload()
     {
+        CalculateReserveAmmo();
+
+        if (reserve_ammo == 0 || !playerProperties.is_reloading)
+        {
+            can_reload = false;
+            return;
+        }
 
         if (!weaponProperties.single_reload)
         {
-
-            if (playerProperties.is_reloading && can_reload)
-            {
-                is_bursting = false;
-
-                if (reload_cooldown >= 0)
-                {
-                    reload_cooldown -= Time.deltaTime;
-                    can_shoot = false;
-                    playerProperties.is_reloading = true;
-                }
-                else
-                {
-                    int max = 0;
-                    int index = 0;
-                    for (int i = 0; i < weaponProperties.mag_count; i++)
-                    {
-                        if (weaponProperties.mags[i] > max)
-                        {   //a   //b
-                            max = weaponProperties.mags[i];
-                            index = i;
-                        }
-                    }
-
-                    if (weaponProperties.mags[^1] == 0)
-                    {
-                        is_last_bullet = true;
-                    }
-                    else
-                    {
-                        is_last_bullet = false;
-                    }
-
-                    int temp = weaponProperties.mags[^1];
-                    weaponProperties.mags[^1] = max; //Ultima posição
-                    if (!is_last_bullet)
-                    {
-                        weaponProperties.mags[^1]++;
-
-                    }
-                    weaponProperties.mags[index] = temp;
-                    can_shoot = true;
-                    playerProperties.is_reloading = false;
-                    reload_cooldown = 0;
-
-                    weaponAnimation.FinishReloadAnimation();
-
-                }
-
-            }
+            HandleStandardReload();
         }
         else
         {
-
-            if (playerProperties.is_reloading == true && can_reload == true && weaponProperties.mags[^1] != weaponProperties.bullets_per_mag && !playerProperties.is_firing && weaponProperties.shells > 0)
-            {
-                Shell.Reload(weaponProperties);
-                //shotgun_shells = -1;
-
-            }
-            else
-            {
-                Shell.ReturnHand();
-                playerProperties.is_reloading = false;
-            }
-
+            HandleSingleReload();
         }
-
     }
 
-    IEnumerator ApplyVisualRecoilOffset()
+    private void CalculateReserveAmmo()
     {
-
-        float vr = weaponProperties.vertical_recoil[recoil_position_in_array];
-        float hr = weaponProperties.horizontal_recoil[recoil_position_in_array];
-
-        if (is_first_shot == false || weaponProperties.mags[^1] == 1)
+        reserve_ammo = 0;
+        for (int i = 0; i < weaponProperties.mags.Count - 1; i++)
         {
-            playerController.ApplyCameraRecoil(vr * weaponProperties.first_shoot_increaser, hr * weaponProperties.first_shoot_increaser);
-            is_first_shot = true;
+            reserve_ammo += weaponProperties.mags[i];
         }
-        else
-        {
-            playerController.ApplyCameraRecoil(vr, hr);
-        }
-
-        if (hr < 0)
-        {
-            hr = Random.Range(hr, hr * -1);
-        }
-        else
-        {
-            hr = Random.Range(-hr, hr);
-        }
-        vr = Random.Range(0, vr);
-
-        Vector3 recoilOffset = playerProperties.is_aiming == false ? new Vector3(0f, 0f, weaponProperties.visual_recoil.z) : new Vector3(0f, 0f, weaponProperties.visual_recoil.z / 2);
-        //Vector3 start = weaponProperties.ads_position;
-        Vector3 start = weaponProperties.initial_potiion;
-        Vector3 target = start + recoilOffset;
-
-        Quaternion weaponRotation = new Quaternion(weaponProperties.weapon.transform.localRotation.x + Random.Range(-0.02f, 0.02f),
-                                                   weaponProperties.weapon.transform.localRotation.y + Random.Range(-0.02f, 0.02f),
-                                                   weaponProperties.weapon.transform.localRotation.z + Random.Range(-0.02f, 0.02f),
-                                                   weaponProperties.weapon.transform.localRotation.w);
-
-
-
-        if (playerProperties.is_aiming)
-        {
-
-            weaponRotation = new Quaternion(weaponProperties.weapon.transform.localRotation.x + Random.Range(hr / -weaponProperties.weapon_stability, 0),
-                                            weaponProperties.weapon.transform.localRotation.y + Random.Range(vr / -weaponProperties.weapon_stability, vr / weaponProperties.weapon_stability),
-                                            weaponProperties.weapon.transform.localRotation.z + Random.Range((weaponProperties.horizontal_recoil_media / 50 + weaponProperties.vertical_recoil_media / 50) / -2, 0),
-                                            weaponProperties.weapon.transform.localRotation.w);
-        }
-
-
-        float elapsed = 0f;
-
-        while (elapsed < weaponProperties.apply_recoil_speed)
-        {
-            elapsed += Time.deltaTime;
-            weaponProperties.weapon.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.apply_recoil_speed);
-            weaponProperties.weapon.transform.localRotation = Quaternion.Lerp(weaponProperties.weapon.transform.localRotation, weaponRotation, elapsed / weaponProperties.apply_recoil_speed);
-
-            yield return null;
-        }
-
-        elapsed = 0f;
-        Vector3 backTarget = start;
-
-        while (elapsed < weaponProperties.reset_recoil_speed)
-        {
-            elapsed += Time.deltaTime;
-            weaponProperties.weapon.transform.localPosition = Vector3.Lerp(target, backTarget, elapsed / weaponProperties.apply_recoil_speed);
-            weaponProperties.weapon.transform.localRotation = Quaternion.Lerp(weaponRotation, weaponProperties.inicial_rotation, elapsed / weaponProperties.reset_recoil_speed);
-            yield return null;
-        }
-
-        weaponProperties.weapon.transform.localPosition = start;
     }
 
+    private void HandleStandardReload()
+    {
+        is_bursting = false;
+
+        if (reload_cooldown >= 0)
+        {
+            reload_cooldown -= Time.deltaTime;
+            can_shoot = false;
+            playerProperties.is_reloading = true;
+        }
+        else
+        {
+            TransferMagazineAmmo();
+            can_shoot = true;
+            playerProperties.is_reloading = false;
+            reload_cooldown = 0;
+
+            weaponAnimation.FinishReloadAnimation();
+        }
+    }
+
+    private void TransferMagazineAmmo()
+    {
+        int max = 0;
+        int index = 0;
+
+        for (int i = 0; i < weaponProperties.mag_count; i++)
+        {
+            if (weaponProperties.mags[i] > max)
+            {
+                max = weaponProperties.mags[i];
+                index = i;
+            }
+        }
+
+        is_last_bullet = weaponProperties.mags[^1] == 0;
+
+        int temp = weaponProperties.mags[^1];
+        weaponProperties.mags[^1] = max;
+
+        if (!is_last_bullet)
+        {
+            weaponProperties.mags[^1]++;
+        }
+
+        weaponProperties.mags[index] = temp;
+    }
+
+    private void HandleSingleReload()
+    {
+        if (playerProperties.is_reloading &&
+            can_reload &&
+            weaponProperties.mags[^1] != weaponProperties.bullets_per_mag &&
+            !playerProperties.is_firing &&
+            weaponProperties.shells > 0)
+        {
+            Shell.Reload(weaponProperties);
+        }
+        else
+        {
+            Shell.ReturnHand();
+            playerProperties.is_reloading = false;
+        }
+    }
+
+    #endregion
+
+    #region Shooting
+
+    void shoot()
+    {
+        bool hold_shoot = Input.GetKey(keyBinds.WEAPON_shootKey);
+        bool press_shoot = Input.GetKeyDown(keyBinds.WEAPON_shootKey);
+
+
+        if (ShouldBlockShooting())
+        {
+            if (Input.GetKeyDown(keyBinds.WEAPON_shootKey) && weaponProperties.mags[^1] == 0)
+            {
+                generalHudAlertMessages.CreateMessage("Not enought ammo", 2);
+            }
+            DeleteMuzzle();
+            return;
+        }
+
+        did_shoot = false;
+        string currentMode = weaponProperties.fire_modes[current_fire_mode];
+
+        switch (currentMode)
+        {
+            case "auto":
+                HandleAutoFire(hold_shoot);
+                break;
+            case "single":
+                HandleSingleFire(press_shoot);
+                break;
+            case "burst":
+                HandleBurstFire(press_shoot);
+                break;
+        }
+
+        if (weaponProperties.mags[^1] <= 0)
+        {
+            DeleteMuzzle();
+            playerProperties.is_firing = false;
+        }
+    }
+
+    private bool ShouldBlockShooting()
+    {
+        return playerProperties.is_reloading ||
+               playerProperties.roll ||
+               playerProperties.is_dead ||
+               weaponProperties.mags[^1] == 0;
+    }
+
+    private void HandleAutoFire(bool hold_shoot)
+    {
+        if (hold_shoot)
+        {
+            PrepareForShot();
+
+            if (next_time_to_fire <= 0f)
+            {
+                ExecuteShot();
+                next_time_to_fire = weaponProperties.interval;
+            }
+        }
+        else
+        {
+            ResetShotState();
+        }
+
+        next_time_to_fire -= Time.deltaTime;
+    }
+
+    private void HandleSingleFire(bool press_shoot)
+    {
+        if (press_shoot)
+        {
+            playerProperties.is_firing = true;
+            playerProperties.sprinting = false;
+
+            if (next_time_to_fire <= 0f)
+            {
+                PrepareForShot();
+                ExecuteShot();
+                next_time_to_fire = weaponProperties.interval;
+            }
+        }
+        else
+        {
+            ResetShotState();
+        }
+
+        next_time_to_fire -= Time.deltaTime;
+    }
+
+    private void HandleBurstFire(bool press_shoot)
+    {
+        if (!is_bursting && press_shoot && next_time_to_fire <= 0f)
+        {
+            StartBurst();
+        }
+        else if (!is_bursting)
+        {
+            ResetShotState();
+        }
+
+        if (is_bursting)
+        {
+            UpdateBurst();
+        }
+
+        next_time_to_fire -= Time.deltaTime;
+    }
+
+    private void PrepareForShot()
+    {
+        weaponAnimation.StartFireAnimation();
+        playerProperties.sprinting = false;
+        playerProperties.is_firing = true;
+    }
+
+    private void ExecuteShot()
+    {
+        did_shoot = true;
+
+        if (weaponAnimation.fireClip == null)
+        {
+            weaponProperties.CreateBulletExtractor();
+        }
+
+        CreateBullet();
+        StartCoroutine(ApplyVisualRecoilOffset());
+        weaponProperties.mags[^1] -= 1;
+    }
+
+    private void ResetShotState()
+    {
+        DeleteMuzzle();
+        recoil_position_in_array = 0;
+        playerProperties.is_firing = false;
+        is_first_shot = false;
+        current_spread = 0;
+    }
+
+    private void StartBurst()
+    {
+        weaponAnimation.StartFireAnimation();
+        playerProperties.is_firing = true;
+        playerProperties.sprinting = false;
+
+        is_bursting = true;
+        bullets_shot_in_current_burst = 0;
+        burst_timer = 0f;
+    }
+
+    private void UpdateBurst()
+    {
+        burst_timer -= Time.deltaTime;
+
+        if (burst_timer <= 0f && bullets_shot_in_current_burst < weaponProperties.bullets_per_tap)
+        {
+            if (weaponProperties.mags[^1] > 0)
+            {
+                ExecuteBurstShot();
+            }
+        }
+
+        if (bullets_shot_in_current_burst >= weaponProperties.bullets_per_tap)
+        {
+            EndBurst();
+        }
+    }
+
+    private void ExecuteBurstShot()
+    {
+        did_shoot = true;
+        weaponProperties.mags[^1] -= 1;
+        bullets_shot_in_current_burst++;
+        burst_timer = weaponProperties.time_between_shots_in_burst;
+
+        if (weaponAnimation.fireClip == null)
+        {
+            weaponProperties.CreateBulletExtractor();
+        }
+
+        CreateBullet();
+        StartCoroutine(ApplyVisualRecoilOffset());
+    }
+
+    private void EndBurst()
+    {
+        is_bursting = false;
+        next_time_to_fire = weaponProperties.time_between_bursts;
+    }
 
     void CreateBullet()
     {
+        CreateMuzzle();
 
+        for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
+        {
+            UpdateRecoilPosition();
+            UpdateBarrelSpread();
+            SpawnBullet();
+            UpdateSpread();
+        }
+
+        if (weaponSounds != null)
+            weaponSounds.ShootSound();
+    }
+
+    private void UpdateRecoilPosition()
+    {
         if (recoil_position_in_array >= weaponProperties.horizontal_recoil.Length - 1)
         {
             recoil_position_in_array = 0;
@@ -394,25 +558,73 @@ public class Weapon : MonoBehaviour
         {
             recoil_position_in_array += 1;
         }
+    }
 
-        weaponProperties.barrel.transform.localRotation = new Quaternion(Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, weaponProperties.barrel.transform.localRotation.w);
+    private void UpdateBarrelSpread()
+    {
+        weaponProperties.barrel.transform.localRotation = new Quaternion(
+            UnityEngine.Random.Range(-current_spread, current_spread) / 1000,
+            UnityEngine.Random.Range(-current_spread, current_spread) / 1000,
+            UnityEngine.Random.Range(-current_spread, current_spread) / 1000,
+            weaponProperties.barrel.transform.localRotation.w
+        );
+    }
 
-
-        Transform bulletObj = Instantiate(weaponProperties.bulletPref, weaponProperties.barrel.transform.position, weaponProperties.barrel.transform.rotation);
+    private void SpawnBullet()
+    {
+        Transform bulletObj = Instantiate(
+            weaponProperties.bulletPref,
+            weaponProperties.barrel.transform.position,
+            weaponProperties.barrel.transform.rotation
+        );
 
         Destroy(bulletObj.gameObject, 10f);
 
+        Bullet bullet = bulletObj.GetComponent<Bullet>();
 
         if (weaponProperties.bullet_hit_effect != null)
         {
-            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.minimum_damage, weaponProperties.headshot_multiplier, weaponProperties.bullet_hit_effect);
+            bullet.CreateBullet(
+                weaponProperties.barrel.transform.forward,
+                weaponProperties.muzzle_velocity,
+                weaponProperties.bullet_drop,
+                weaponProperties.damage,
+                weaponProperties.damage_dropoff,
+                weaponProperties.damage_dropoff_timer,
+                weaponProperties.destruction_force,
+                weaponProperties.minimum_damage,
+                weaponProperties.headshot_multiplier,
+                weaponProperties.bullet_size,
+                0.05f,
+                weaponProperties.can_damage_vehicles,
+                weaponProperties.vehicle_damage,
+                weaponProperties.bullet_hit_effect,
+                weaponProperties: weaponProperties
+            );
         }
         else
         {
-            bulletObj.GetComponent<Bullet>().CreateBullet(weaponProperties.barrel.transform.forward, weaponProperties.muzzle_velocity, weaponProperties.bullet_drop, weaponProperties.damage, weaponProperties.damage_dropoff, weaponProperties.damage_dropoff_timer, weaponProperties.destruction_force, weaponProperties.minimum_damage, weaponProperties.headshot_multiplier);
-        
+            bullet.CreateBullet(
+                weaponProperties.barrel.transform.forward,
+                weaponProperties.muzzle_velocity,
+                weaponProperties.bullet_drop,
+                weaponProperties.damage,
+                weaponProperties.damage_dropoff,
+                weaponProperties.damage_dropoff_timer,
+                weaponProperties.destruction_force,
+                weaponProperties.minimum_damage,
+                weaponProperties.headshot_multiplier,
+                weaponProperties.bullet_size,
+                0.05f,
+                weaponProperties.can_damage_vehicles,
+                weaponProperties.vehicle_damage,
+                weaponProperties: weaponProperties
+            );
         }
+    }
 
+    private void UpdateSpread()
+    {
         if (playerProperties.is_aiming)
         {
             current_spread += weaponProperties.spread_increaser;
@@ -423,275 +635,425 @@ public class Weapon : MonoBehaviour
         }
 
         current_spread = Mathf.Clamp(current_spread, 0, weaponProperties.max_spread);
-
-
     }
 
-
-    void shoot()
+    IEnumerator ApplyVisualRecoilOffset()
     {
+        float vr = weaponProperties.vertical_recoil[recoil_position_in_array];
+        float hr = weaponProperties.horizontal_recoil[recoil_position_in_array];
 
+        ApplyRecoilToCamera(vr, hr);
 
-        did_shoot = false; // reset
+        float randomizedHr = RandomizeHorizontalRecoil(hr);
+        float randomizedVr = UnityEngine.Random.Range(0, vr);
 
-        if (weaponProperties.fire_modes[current_fire_mode] == "auto")
+        Vector3 recoilOffset = GetRecoilOffset();
+        Vector3 start = weaponProperties.initial_potiion;
+        Vector3 target = start + recoilOffset;
+
+        Quaternion weaponRotation = CalculateWeaponRotation(randomizedHr, randomizedVr);
+
+        yield return StartCoroutine(ApplyRecoilAnimation(start, target, weaponRotation));
+    }
+
+    private void ApplyRecoilToCamera(float vr, float hr)
+    {
+        if (!is_first_shot || weaponProperties.mags[^1] == 1)
         {
-
-            if (Input.GetKey(keyBinds.shootKey))
+            if (playerProperties.crouched || playerProperties.is_proned)
             {
-
-                weaponAnimation.StartFireAnimation();
-
-                playerProperties.sprinting = false;
-                playerProperties.is_firing = true;
-
-
-                if (next_time_to_fire <= 0f)
-                {
-
-
-                    did_shoot = true;
-
-                    if (weaponAnimation.fireClip == null)
-                    {
-                        weaponProperties.CreateBulletExtractor();
-                    }
-
-                    for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
-                    {
-                        CreateBullet();
-
-                    }
-
-                    StartCoroutine(ApplyVisualRecoilOffset());
-
-                    weaponProperties.muzzle_lightinig.enabled = true;
-                    if (shoot_sound != null)
-                    {
-                        shoot_sound.PlayOneShot(shoot_sound.clip);
-
-                    }
-
-                    weaponProperties.mags[^1] -= 1;
-                    next_time_to_fire = weaponProperties.interval;
-                }
-                else
-                {
-                    weaponProperties.muzzle_lightinig.enabled = false;
-
-                }
+                playerController.ApplyCameraRecoil(
+                    (vr * weaponProperties.first_shoot_increaser) * crouch_recoil_multiplier,
+                    (hr * weaponProperties.first_shoot_increaser) / 1.3f
+                );
             }
             else
             {
-
-                recoil_position_in_array = 0;
-                weaponProperties.muzzle_lightinig.enabled = false;
-                playerProperties.is_firing = false;
-                is_first_shot = false;
-                current_spread = 0;
+                playerController.ApplyCameraRecoil(
+                    vr * weaponProperties.first_shoot_increaser,
+                    hr * weaponProperties.first_shoot_increaser
+                );
             }
-
-            next_time_to_fire -= Time.deltaTime;
-        }
-        else if (weaponProperties.fire_modes[current_fire_mode] == "single")
-        {
-
-            if (Input.GetKeyDown(keyBinds.shootKey))
-            {
-
-                playerProperties.is_firing = true;
-                playerProperties.sprinting = false;
-
-
-                if (next_time_to_fire <= 0f)
-                {
-
-                    weaponAnimation.StartFireAnimation();
-
-                    did_shoot = true;
-
-                    if (weaponAnimation.fireClip == null)
-                    {
-                        weaponProperties.CreateBulletExtractor();
-                    }
-                    for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
-                    {
-                        CreateBullet();
-                    }
-
-                    StartCoroutine(ApplyVisualRecoilOffset());
-
-                    weaponProperties.muzzle_lightinig.enabled = true;
-                    if (shoot_sound != null)
-                    {
-                        shoot_sound.PlayOneShot(shoot_sound.clip);
-
-                    }
-
-                    weaponProperties.mags[^1] -= 1;
-                    next_time_to_fire = weaponProperties.interval;
-                }
-            }
-            else
-            {
-
-
-                current_spread = 0;
-                recoil_position_in_array = 0;
-                weaponProperties.muzzle_lightinig.enabled = false;
-                playerProperties.is_firing = false;
-                is_first_shot = false;
-
-            }
-            next_time_to_fire -= Time.deltaTime;
-
-        }
-        else if (weaponProperties.fire_modes[current_fire_mode] == "burst")
-        {
-            if (!is_bursting)
-            {
-
-                if (Input.GetKeyDown(keyBinds.shootKey))
-                {
-
-                    if (next_time_to_fire <= 0f)
-                    {
-                        weaponAnimation.StartFireAnimation();
-
-                        playerProperties.is_firing = true;
-                        playerProperties.sprinting = false;
-
-                        is_bursting = true;
-                        bullets_shot_in_current_burst = 0;
-                        burst_timer = 0f;
-                    }
-                }
-                else
-                {
-
-
-                    recoil_position_in_array = 0;
-                    weaponProperties.muzzle_lightinig.enabled = false;
-                    playerProperties.is_firing = false;
-                    is_first_shot = false;
-                    current_spread = 0;
-                }
-            }
-
-            if (is_bursting)
-            {
-                burst_timer -= Time.deltaTime;
-
-                if (burst_timer <= 0f && bullets_shot_in_current_burst < weaponProperties.bullets_per_tap)
-                {
-                    if (weaponProperties.mags[^1] > 0)
-                    {
-                        did_shoot = true;
-
-                        weaponProperties.muzzle_lightinig.enabled = true;
-
-                        weaponProperties.mags[^1] -= 1;
-                        bullets_shot_in_current_burst++;
-
-                        // Reseta o tempo até o próximo disparo da rajada
-                        burst_timer = weaponProperties.time_between_shots_in_burst;
-
-                        if (shoot_sound != null)
-                        {
-                            shoot_sound.PlayOneShot(shoot_sound.clip);
-                        }
-
-                        if (weaponAnimation.fireClip == null)
-                        {
-                            weaponProperties.CreateBulletExtractor();
-                        }
-                        for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
-                        {
-                            CreateBullet();
-                        }
-
-                        StartCoroutine(ApplyVisualRecoilOffset());
-
-                    }
-                }
-                else
-                {
-                    weaponProperties.muzzle_lightinig.enabled = false;
-                }
-
-                // Finaliza a rajada após disparar todos os tiros
-                if (bullets_shot_in_current_burst >= weaponProperties.bullets_per_tap)
-                {
-                    is_bursting = false;
-                    next_time_to_fire = weaponProperties.time_between_bursts; // Tempo até poder iniciar nova rajada
-                }
-
-            }
-
-            // Tempo geral para atirar novamente
-            next_time_to_fire -= Time.deltaTime;
-
-        }
-
-
-        if (weaponProperties.mags[^1] <= 0)
-        {
-            weaponProperties.muzzle_lightinig.enabled = false;
-            playerProperties.is_firing = false;
-        }
-
-
-    }
-
-
-    void aim()
-    {
-
-        if (Input.GetKey(keyBinds.aimKey) && !playerProperties.is_reloading && !switchWeapon._switch)
-        {
-
-            // AIMING
-            playerProperties.sprinting = false;
-            playerProperties.is_aiming = true;
-
-            float targetFov = minFov / weaponProperties.zoom;
-
-            // POSIÇÃO
-            ads_position.transform.localPosition = Vector3.MoveTowards(
-                                                            ads_position.transform.localPosition,
-                                                            weaponProperties.ads_position + attatchment_change_ads_position,
-                                                            weaponProperties.ads_speed * Time.deltaTime
-                                                            );
-
-            if (ads_position.transform.localPosition == weaponProperties.ads_position + attatchment_change_ads_position)
-            {
-                weaponProperties.barrel.transform.position = screen_center.transform.position;
-                dot_position = true;
-            }
-
-            player_camera.fieldOfView = Mathf.Lerp(player_camera.fieldOfView, targetFov, 10 * Time.deltaTime);
-
+            is_first_shot = true;
         }
         else
         {
-            weaponProperties.barrel.transform.localPosition = original_barrel_pos;
-
-            dot_position = false;
-            player_camera.fieldOfView = Mathf.Lerp(
-            player_camera.fieldOfView,
-            minFov,
-            10 * Time.deltaTime);
-
-            playerProperties.is_aiming = false;
-
-            ads_position.transform.localPosition = Vector3.Lerp(
-                ads_position.transform.localPosition,
-                original_ads_position,
-                5 * Time.deltaTime
-            );
-
+            if (playerProperties.crouched || playerProperties.is_proned)
+            {
+                playerController.ApplyCameraRecoil(vr * crouch_recoil_multiplier, hr * crouch_recoil_multiplier);
+            }
+            else
+            {
+                playerController.ApplyCameraRecoil(vr, hr);
+            }
         }
-
     }
 
+    private float RandomizeHorizontalRecoil(float hr)
+    {
+        if (hr < 0)
+        {
+            return UnityEngine.Random.Range(hr, hr * -1);
+        }
+        else
+        {
+            return UnityEngine.Random.Range(-hr, hr);
+        }
+    }
+
+    private Vector3 GetRecoilOffset()
+    {
+        return playerProperties.is_aiming == false
+            ? weaponProperties.visual_recoil
+            : new Vector3(
+                weaponProperties.visual_recoil.x / 2,
+                weaponProperties.visual_recoil.y / 2,
+                weaponProperties.visual_recoil.z / 2
+            );
+    }
+
+    private Quaternion CalculateWeaponRotation(float hr, float vr)
+    {
+        if (playerProperties.is_aiming)
+        {
+            return new Quaternion(
+                weaponProperties.weapon.transform.localRotation.x + UnityEngine.Random.Range(hr / -weaponProperties.weapon_stability, 0),
+                weaponProperties.weapon.transform.localRotation.y + UnityEngine.Random.Range(vr / -weaponProperties.weapon_stability, vr / weaponProperties.weapon_stability),
+                weaponProperties.weapon.transform.localRotation.z + UnityEngine.Random.Range((weaponProperties.horizontal_recoil_media / 40 + weaponProperties.vertical_recoil_media / 40) / -2, 0),
+                weaponProperties.weapon.transform.localRotation.w
+            );
+        }
+
+        return new Quaternion(
+            weaponProperties.weapon.transform.localRotation.x + UnityEngine.Random.Range(-0.02f, 0.02f),
+            weaponProperties.weapon.transform.localRotation.y + UnityEngine.Random.Range(-0.02f, 0.02f),
+            weaponProperties.weapon.transform.localRotation.z + UnityEngine.Random.Range(-0.02f, 0.02f),
+            weaponProperties.weapon.transform.localRotation.w
+        );
+    }
+
+    private IEnumerator ApplyRecoilAnimation(Vector3 start, Vector3 target, Quaternion weaponRotation)
+    {
+        float elapsed = 0f;
+
+        while (elapsed < weaponProperties.weapon_apply_recoil_speed)
+        {
+            elapsed += Time.deltaTime;
+            weaponProperties.weapon.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.weapon_apply_recoil_speed);
+            weaponProperties.weapon.transform.localRotation = Quaternion.Lerp(
+                weaponProperties.weapon.transform.localRotation,
+                weaponRotation,
+                elapsed / weaponProperties.weapon_apply_recoil_speed
+            );
+            yield return null;
+        }
+
+        elapsed = 0f;
+
+        while (elapsed < weaponProperties.weapon_reset_recoil_speed)
+        {
+            elapsed += Time.deltaTime;
+            weaponProperties.weapon.transform.localPosition = Vector3.Lerp(
+                weaponProperties.weapon.transform.localPosition,
+                start,
+                elapsed / weaponProperties.weapon_apply_recoil_speed
+            );
+            weaponProperties.weapon.transform.localRotation = Quaternion.Lerp(
+                weaponProperties.weapon.transform.localRotation,
+                weaponProperties.inicial_rotation,
+                elapsed / weaponProperties.weapon_reset_recoil_speed
+            );
+            yield return null;
+        }
+    }
+
+    #endregion
+
+    #region Aiming
+
+    void aim()
+    {
+        if (controls.is_aim_on_hold)
+        {
+            AimWithHoldLogic();
+        }
+        else
+        {
+            AimWithToggleLogic();
+        }
+    }
+
+    void AimWithHoldLogic()
+    {
+        bool canAim = CanAim();
+
+        if (canAim && Input.GetKey(keyBinds.WEAPON_aimKey))
+        {
+            StartAiming();
+        }
+        else
+        {
+            StopAiming();
+        }
+    }
+
+    void AimWithToggleLogic()
+    {
+        bool canAim = CanAim();
+
+        if (Input.GetKeyDown(keyBinds.WEAPON_aimKey))
+        {
+            is_aiming = !is_aiming;
+        }
+
+        if (!canAim)
+            is_aiming = false;
+
+        if (is_aiming)
+        {
+            StartAiming();
+        }
+        else
+        {
+            StopAiming();
+        }
+    }
+
+    bool CanAim()
+    {
+        return !playerProperties.is_reloading &&
+               !switchWeapon._switch &&
+               !playerProperties.isProneTransition &&
+               !playerProperties.roll &&
+               !playerProperties.is_dead;
+    }
+
+    void StartAiming()
+    {
+        playerProperties.sprinting = false;
+        playerProperties.is_aiming = true;
+
+        float targetFov = minFov / weaponProperties.zoom;
+
+        UpdateAimPosition();
+        UpdateCameraFov(targetFov);
+        CheckAimPositionComplete();
+    }
+
+    void StopAiming()
+    {
+        playerProperties.is_aiming = false;
+        dot_position = false;
+        RestoreAimPosition();
+    }
+
+    void UpdateAimPosition()
+    {
+        Vector3 targetPosition = weaponProperties.ads_position + attatchment_change_ads_position;
+        float moveSpeed = weaponProperties.ads_speed * Time.deltaTime;
+
+        ads_position.transform.localPosition = Vector3.MoveTowards(
+            ads_position.transform.localPosition,
+            targetPosition,
+            moveSpeed
+        );
+    }
+
+    void RestoreAimPosition()
+    {
+        float lerpSpeed = 5f * Time.deltaTime;
+
+        ads_position.transform.localPosition = Vector3.Lerp(
+            ads_position.transform.localPosition,
+            original_ads_position,
+            lerpSpeed
+        );
+    }
+
+    void UpdateCameraFov(float targetFov)
+    {
+        float lerpSpeed = 10f * Time.deltaTime;
+        player_camera.fieldOfView = Mathf.Lerp(
+            player_camera.fieldOfView,
+            targetFov,
+            lerpSpeed
+        );
+    }
+
+    void CheckAimPositionComplete()
+    {
+        Vector3 targetPosition = weaponProperties.ads_position + attatchment_change_ads_position;
+
+        if (ads_position.transform.localPosition == targetPosition)
+        {
+            dot_position = true;
+        }
+    }
+
+    #endregion
+
+    #region Muzzle Effects
+
+    private void CreateMuzzle()
+    {
+        if (current_muzzle_flash == null)
+        {
+            int randomIndex = UnityEngine.Random.Range(0, muzzle_flashes.Count);
+            current_muzzle_flash = Instantiate(muzzle_flashes[randomIndex], weaponProperties.barrel.transform);
+            thirdPersonWeapon.CreateMuzzle(current_muzzle_flash);
+        }
+    }
+
+    private void DeleteMuzzle()
+    {
+        if (current_muzzle_flash != null)
+        {
+            Destroy(current_muzzle_flash);
+            thirdPersonWeapon.DeleteMuzzle();
+        }
+    }
+
+    #endregion
+
+    #region Bullet Concatenation
+
+    private void ConcatenateBullets()
+    {
+        if (weaponProperties.mags == null || weaponProperties.mags.Count == 0)
+        {
+            return;
+        }
+
+        if (Input.GetKey(keyBinds.WEAPON_composeBulletsKey) &&
+            !playerProperties.is_firing &&
+            !playerProperties.is_reloading)
+        {
+            ProcessBulletConcatenation();
+        }
+        else
+        {
+            ResetConcatenation();
+        }
+    }
+
+    private void ProcessBulletConcatenation()
+    {
+        playerProperties.is_composing_bullets = true;
+        time_to_contatenate -= Time.deltaTime;
+
+        if (time_to_contatenate <= 0)
+        {
+            TransferBulletsBetweenMags();
+            time_to_contatenate = weaponProperties.time_to_transfer_bullets;
+        }
+    }
+
+    private void TransferBulletsBetweenMags()
+    {
+        int minPosition = FindMinMagazinePosition();
+        int maxPosition = FindMaxMagazinePosition();
+
+        if (minPosition == -1 || maxPosition == -1 || minPosition == maxPosition)
+        {
+            Debug.Log("Não é possível transferir munição");
+            time_to_contatenate = 2;
+            return;
+        }
+
+        int min = weaponProperties.mags[minPosition];
+        int max = weaponProperties.mags[maxPosition];
+
+        int transfer_amount = Mathf.Min(
+            min,
+            weaponProperties.bullets_per_mag - max
+        );
+
+        if (transfer_amount > 0)
+        {
+            ExecuteBulletTransfer(minPosition, maxPosition, transfer_amount);
+        }
+        else
+        {
+            Debug.Log("Nada para transferir");
+        }
+    }
+
+    private int FindMinMagazinePosition()
+    {
+        int min = weaponProperties.mags[0];
+        int min_position = 0;
+
+        for (int i = 1; i < weaponProperties.mags.Count; i++)
+        {
+            if (weaponProperties.mags[i] < min)
+            {
+                min = weaponProperties.mags[i];
+                min_position = i;
+            }
+        }
+
+        if (min == 0)
+        {
+            min = int.MaxValue;
+            min_position = -1;
+
+            for (int i = 0; i < weaponProperties.mags.Count; i++)
+            {
+                int mag = weaponProperties.mags[i];
+                if (mag > 0 && mag < min)
+                {
+                    min = mag;
+                    min_position = i;
+                }
+            }
+
+            if (min_position == -1)
+            {
+                Debug.Log("Todos os magazines estão vazios!");
+                time_to_contatenate = 2;
+                return -1;
+            }
+        }
+
+        return min_position;
+    }
+
+    private int FindMaxMagazinePosition()
+    {
+        int max = weaponProperties.mags[0];
+        int max_position = 0;
+
+        for (int i = 1; i < weaponProperties.mags.Count; i++)
+        {
+            int mag = weaponProperties.mags[i];
+            if (mag > max && mag < weaponProperties.bullets_per_mag)
+            {
+                max = mag;
+                max_position = i;
+            }
+        }
+
+        return max >= weaponProperties.bullets_per_mag ? -1 : max_position;
+    }
+
+    private void ExecuteBulletTransfer(int fromPosition, int toPosition, int amount)
+    {
+        int old_from_value = weaponProperties.mags[fromPosition];
+        int old_to_value = weaponProperties.mags[toPosition];
+
+        weaponProperties.mags[fromPosition] -= amount;
+        weaponProperties.mags[toPosition] += amount;
+
+        Debug.Log($"Transferido {amount} munições " +
+                 $"do magazine {fromPosition} ({old_from_value} → {weaponProperties.mags[fromPosition]}) " +
+                 $"para magazine {toPosition} ({old_to_value} → {weaponProperties.mags[toPosition]})");
+    }
+
+    private void ResetConcatenation()
+    {
+        playerProperties.is_composing_bullets = false;
+        time_to_contatenate = weaponProperties.time_to_transfer_bullets;
+    }
+
+    #endregion
 }

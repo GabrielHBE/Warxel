@@ -1,7 +1,8 @@
 using UnityEngine;
 
-public class Barrel : MonoBehaviour
+public class Barrel : Attatchment
 {
+
     [Header("Changes")]
     public float horizontal_recoil_change;
     public float vertical_recoil_change;

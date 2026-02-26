@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class JetSpawner : MonoBehaviour
+public class VehicleSpawner : MonoBehaviour
 {
 
     [SerializeField] private GameObject vehiclePrefab;
@@ -8,11 +8,15 @@ public class JetSpawner : MonoBehaviour
 
     private GameObject currentVehicle;
     private Transform spawnPoint;
+
+    private float original_spawn_interval;
     
     void Start()
     {
+        original_spawn_interval = spawnInterval;
         spawnPoint = transform;
         currentVehicle = Instantiate(vehiclePrefab, spawnPoint.position, spawnPoint.rotation);
+        currentVehicle.GetComponent<Vehicle>().Spawn();
     }
 
     void Update()
@@ -27,7 +31,8 @@ public class JetSpawner : MonoBehaviour
         if (spawnInterval <= 0f)
         {
             currentVehicle = Instantiate(vehiclePrefab, spawnPoint.position, spawnPoint.rotation);
-            spawnInterval = 10f;
+            currentVehicle.GetComponent<Vehicle>().Spawn();
+            spawnInterval = original_spawn_interval;
         }
 
     }

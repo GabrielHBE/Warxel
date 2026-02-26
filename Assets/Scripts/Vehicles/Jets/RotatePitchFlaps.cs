@@ -16,7 +16,7 @@ public class RotatePitchFlaps : MonoBehaviour
 
     void Update()
     {
-        if (jet.is_in_jet)
+        if (jet.is_in_vehicle)
         {
             Rotate();
         }

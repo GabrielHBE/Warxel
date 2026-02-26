@@ -1,29 +1,29 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class LandingGear : MonoBehaviour
 {
     public char retraction_rotation;
     public float rotation;
-    private Jet jet;
+    [SerializeField] private Jet jet;
     private Quaternion original_rotation;
-    private Collider wheel_collider;
+    [SerializeField] private Collider wheel_collider;
     [SerializeField] private LayerMask targetLayer;
 
     void Start()
     {
         original_rotation = transform.localRotation;
-        jet = GetComponentInParent<Jet>();
-
-        wheel_collider = GetComponent<Collider>();
-        Return();
+        //jet = GetComponentInParent<Jet>();
+        //Return();
     }
 
     void Update()
     {
-        if (jet.is_in_jet)
+
+        if (jet.is_in_vehicle)
         {
 
-            if (jet.retract_landingGear)
+            if (jet.retractLandingGear)
             {
 
                 wheel_collider.enabled = false;
@@ -47,7 +47,7 @@ public class LandingGear : MonoBehaviour
             Time.deltaTime * 0.1f
             );
 
-            if (transform.localRotation == new Quaternion(rotation, transform.localRotation.y, transform.localRotation.z, transform.localRotation.w)) jet.is_on_ground = false;
+            if (transform.localRotation == new Quaternion(rotation, transform.localRotation.y, transform.localRotation.z, transform.localRotation.w)) jet.isNearGround = false;
         }
         else if (retraction_rotation == 'y')
         {
@@ -56,7 +56,7 @@ public class LandingGear : MonoBehaviour
             Time.deltaTime * 0.1f
             );
 
-            if (transform.localRotation == new Quaternion(transform.localRotation.x, rotation, transform.localRotation.z, transform.localRotation.w)) jet.is_on_ground = false;
+            if (transform.localRotation == new Quaternion(transform.localRotation.x, rotation, transform.localRotation.z, transform.localRotation.w)) jet.isNearGround = false;
         }
         else
         {
@@ -65,15 +65,29 @@ public class LandingGear : MonoBehaviour
             Time.deltaTime * 0.1f
             );
 
-            if (transform.localRotation == new Quaternion(transform.localRotation.x, transform.localRotation.y, rotation, transform.localRotation.w)) jet.is_on_ground = false;
+            if (transform.localRotation == new Quaternion(transform.localRotation.x, transform.localRotation.y, rotation, transform.localRotation.w)) jet.isNearGround = false;
         }
+
+        jet.isWheelTouchingGround = false;
 
     }
 
     public void Return()
     {
-        transform.localRotation = Quaternion.Lerp(transform.localRotation, original_rotation, 5 * Time.deltaTime);
-        if (transform.localRotation == original_rotation) jet.is_on_ground = true;
+        
+        transform.localRotation = Quaternion.Lerp(transform.localRotation, original_rotation, 7 * Time.deltaTime);
+        if (transform.localRotation == original_rotation) jet.isNearGround = true;
     }
+
+    void OnCollisionStay(Collision collision)
+    {
+
+        if (collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
+        {
+            jet.isWheelTouchingGround = true;
+        }
+
+    }
+
 
 }

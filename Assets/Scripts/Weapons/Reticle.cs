@@ -4,6 +4,7 @@ public class Reticle : MonoBehaviour
 {
     [Header("Instances")]
     public Weapon weapon;
+    [SerializeField] private Transform parent;
     public SwayNBobScript swayNBob;
     private Sight active_sight;
     private PlayerProperties playerProperties;
@@ -12,18 +13,14 @@ public class Reticle : MonoBehaviour
     private MeshRenderer mesh;
     [SerializeField] private SwitchWeapon switchWeapon;
 
-
-    [Header("Customization")]
-    public float reticle_size;
-    public Color sight_color;
-
-
     Vector3 original_pos;
-    float magnitude = 0.05f;
+    float magnitude = 0.02f;
+
+    private Gameplay gameplay;
 
     void Start()
     {
-        transform.localScale = new Vector3(reticle_size, reticle_size, reticle_size);
+        gameplay = GameObject.FindGameObjectWithTag("Settings").GetComponent<Gameplay>();
         playerProperties = GetComponentInParent<PlayerProperties>();
 
     }
@@ -31,9 +28,15 @@ public class Reticle : MonoBehaviour
     public void Restart()
     {
 
-        active_sight = transform.root.GetComponentInChildren<Sight>();
+        active_sight = parent.GetComponentInChildren<Sight>();
 
-        if (active_sight == null || active_sight.reticle == "")
+        if (active_sight == null)
+        {
+            reticle = null;
+            return;
+        }
+
+        if (active_sight.reticle == "")
         {
             reticle = null;
             return;
@@ -51,8 +54,8 @@ public class Reticle : MonoBehaviour
                 if (rend != null)
                 {
                     material = rend.material;
-                    material.color = sight_color;
-                    material.SetColor("_EmissionColor", sight_color);
+                    material.color = gameplay.sight_reticle_collor;
+                    material.SetColor("_EmissionColor", gameplay.sight_reticle_collor);
                     material.EnableKeyword("_EMISSION");
 
                     rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -70,33 +73,35 @@ public class Reticle : MonoBehaviour
     void Update()
     {
 
-        if (reticle != null)
+        if (reticle == null || active_sight == null) return;
+
+
+
+        if (weapon.dot_position && !playerProperties.is_reloading && !switchWeapon._switch)
         {
-
-            if (weapon.dot_position && playerProperties.isGrounded && !playerProperties.is_reloading && !switchWeapon._switch)
+            if (active_sight != null)
             {
-                if (active_sight != null)
+                if (playerProperties.is_firing)
                 {
-                    if (playerProperties.is_firing)
-                    {
-                        Shake();
-                    }
-                    else
-                    {
-                        reticle.transform.localPosition = original_pos;
-                    }
-                    mesh.enabled = true;
+                    Shake();
                 }
-
+                else
+                {
+                    reticle.transform.localPosition = original_pos;
+                }
+                transform.localScale = new Vector3(gameplay.sight_reticle_size, gameplay.sight_reticle_size, gameplay.sight_reticle_size);
+                mesh.enabled = true;
             }
-            else
+
+        }
+        else
+        {
+            if (active_sight != null)
             {
-                if (active_sight != null)
-                {
-                    mesh.enabled = false;
-                }
+                mesh.enabled = false;
             }
         }
+
 
     }
 

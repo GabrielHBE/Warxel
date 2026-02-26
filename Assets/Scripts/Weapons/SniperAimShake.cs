@@ -25,7 +25,7 @@ public class SniperAimShake : MonoBehaviour
 
             if (elapsed == 0)
             {
-                StartCoroutine(cameraShake.SniperShake(tension, duration / 2));
+                cameraShake.RequestShake(CameraShake.ShakeType.Explosion, tension, duration / 2);
             }
 
             if (elapsed < duration)

@@ -2,68 +2,48 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class C4Detonator : MonoBehaviour, Gadget
+public class C4Detonator : Gadget
 {
-    public bool is_active;
-    [SerializeField] private KeyBinds keyBinds;
     [SerializeField] private C4Explosive c4Explosive;
     [SerializeField] private int c4_qtd;
     [SerializeField] private float throw_c4_force;
-    [SerializeField] private Transform throwPoint;
-    [SerializeField] private Transform hand;
     [SerializeField] private float pick_up_c4_distance;
-    [SerializeField] private GameObject right_hand;
     [SerializeField] private GameObject right_hand_pos;
     [SerializeField] private AudioSource beepSound;
+    private List<C4Explosive> c4_list = new List<C4Explosive>();
+    [SerializeField] private Transform detonator_position;
 
-    private List<C4Explosive> c4_list = new List<C4Explosive>(); // Mudança: lista de componentes em vez de GameObjects
-
-    [Header("KeyCodes")]
-    public KeyCode pick_up_c4_key;
-    public KeyCode throw_c4_key;
-    public KeyCode detonate_c4_key;
 
     [Header("Detonation timing (seconds)")]
     [SerializeField] private float initialDetonateDelay;
     [SerializeField] private float perC4Delay;
 
-    [Header("Sway and Bob")]
-    public float bob_walk_exageration;
-    public float bob_sprint_exageration;
-    public float bob_crouch_exageration;
-    public float bob_aim_exageration;
-    public Vector3 walk_multiplier;
-    public Vector3 sprint_multiplier;
-    public Vector3 aim_multiplier;
-    public Vector3 crouch_multiplier;
-    public float[] vector3Values;
-    public float[] quaternionValues;
-
     private bool isDetonating = false;
     private float detonateTimer = 0f;
     private int detonateIndex = 0;
 
+
     void Update()
     {
-        if (!is_active) return;
-
-        hand.transform.position = transform.position;
-        right_hand.transform.position = right_hand_pos.transform.position;
-
-        if (c4_qtd > 0 && Input.GetKeyDown(keyBinds.throwC4Key))
-        {
-            Throw_C4();
-        }
-
-        if (Input.GetKeyDown(keyBinds.interactKey))
+        if (Input.GetKeyDown(gadgetComponents.keyBinds.PLAYER_interactKey))
         {
             TryPickUpC4();
         }
 
-        // Iniciar detonação se houver C4s ativos
-        if (Input.GetKeyDown(keyBinds.detonateC4Key) && !isDetonating)
+        if (!is_active) return;
+        if (gadgetComponents.soldierHudManager.mag_counter_hud != null) gadgetComponents.soldierHudManager.mag_counter_hud.UpdateMagCount(c4_qtd);
+
+        gadgetComponents.left_hand.transform.position = detonator_position.position;
+        gadgetComponents.right_hand.transform.position = right_hand_pos.transform.position;
+
+        if (c4_qtd > 0 && Input.GetKeyDown(gadgetComponents.keyBinds.GADGET_throwC4Key))
         {
-            CleanupDestroyedC4s(); // Limpa C4s destruídos antes de começar
+            Throw_C4();
+        }
+
+        if (Input.GetKeyDown(gadgetComponents.keyBinds.GADGET_detonateC4Key) && !isDetonating)
+        {
+            CleanupDestroyedC4s();
 
             if (c4_list.Count > 0)
             {
@@ -72,19 +52,18 @@ public class C4Detonator : MonoBehaviour, Gadget
             }
         }
 
-        // Processar detonação sequencial
         if (isDetonating)
         {
             detonateTimer += Time.deltaTime;
 
-            if (detonateIndex == 0) // Primeira detonação
+            if (detonateIndex == 0)
             {
                 if (detonateTimer >= initialDetonateDelay)
                 {
                     DetonateNextC4();
                 }
             }
-            else // Demais detonações
+            else
             {
                 if (detonateTimer >= perC4Delay)
                 {
@@ -106,19 +85,17 @@ public class C4Detonator : MonoBehaviour, Gadget
         isDetonating = false;
         detonateTimer = 0f;
         detonateIndex = 0;
-        CleanupDestroyedC4s(); // Limpa a lista após terminar
+        CleanupDestroyedC4s();
     }
 
     private void DetonateNextC4()
     {
-        // Verifica se ainda há C4s para detonar
         if (detonateIndex >= c4_list.Count || c4_list[detonateIndex] == null)
         {
             EndDetonationSequence();
             return;
         }
 
-        // Detona o C4 atual
         C4Explosive c4ToDetonate = c4_list[detonateIndex];
         if (c4ToDetonate != null)
         {
@@ -128,7 +105,6 @@ public class C4Detonator : MonoBehaviour, Gadget
         detonateIndex++;
         detonateTimer = 0f;
 
-        // Verifica se é o último C4
         if (detonateIndex >= c4_list.Count)
         {
             EndDetonationSequence();
@@ -137,21 +113,20 @@ public class C4Detonator : MonoBehaviour, Gadget
 
     private void CleanupDestroyedC4s()
     {
-        // Remove C4s que foram destruídos manualmente
         c4_list.RemoveAll(c4 => c4 == null || c4.gameObject == null);
     }
 
-    private void TryPickUpC4()
+    public void TryPickUpC4()
     {
         RaycastHit hit;
-        if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit, pick_up_c4_distance))
+
+        if (Physics.Raycast(gadgetComponents.player_camera.transform.position, gadgetComponents.player_camera.transform.forward, out hit, pick_up_c4_distance))
         {
             C4Explosive c4 = hit.collider.GetComponent<C4Explosive>();
             if (c4 != null)
             {
                 PickUpC4();
 
-                // Remove da lista se estiver nela
                 if (c4_list.Contains(c4))
                 {
                     c4_list.Remove(c4);
@@ -171,96 +146,27 @@ public class C4Detonator : MonoBehaviour, Gadget
     {
         c4_qtd -= 1;
 
-        // Instanciar o C4
-        GameObject c4Instance = Instantiate(c4Explosive.gameObject, throwPoint.position, throwPoint.rotation);
+        GameObject c4Instance = Instantiate(c4Explosive.gameObject, gadgetComponents.player_camera.transform.position, gadgetComponents.player_camera.transform.rotation);
         C4Explosive newC4 = c4Instance.GetComponent<C4Explosive>();
-        c4_list.Add(newC4); // Adiciona o componente à lista
+        c4_list.Add(newC4);
 
-        // Garantir que está ativo
         c4Instance.SetActive(true);
 
-        // Configurar Rigidbody
         Rigidbody rb = c4Instance.GetComponent<Rigidbody>();
-        if (rb == null)
-        {
-            rb = c4Instance.AddComponent<Rigidbody>();
-        }
 
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-
-        // Aplicar força
-        rb.AddForce(throwPoint.forward * throw_c4_force, ForceMode.Impulse);
+        rb.AddForce(gadgetComponents.player_camera.transform.forward * throw_c4_force, ForceMode.Impulse);
 
     }
 
+    /*
     private void OnDrawGizmos()
     {
-        if (throwPoint != null)
+        if (gadgetComponents.player_camera.transform != null)
         {
             Gizmos.color = Color.red;
-            Gizmos.DrawSphere(throwPoint.position, 0.1f);
-            Gizmos.DrawLine(throwPoint.position, throwPoint.position + throwPoint.forward * 2f);
+            Gizmos.DrawSphere(gadgetComponents.player_camera.transform.position, 0.1f);
+            Gizmos.DrawLine(gadgetComponents.player_camera.transform.position, gadgetComponents.player_camera.transform.position + gadgetComponents.player_camera.transform.forward * 2f);
         }
     }
-
-    public void SetActive(bool is_active)
-    {
-        this.is_active = is_active;
-    }
-
-    public float GetBobWalkExageration()
-    {
-        return bob_walk_exageration;
-    }
-
-    public float GetBobSprintExageration()
-    {
-        return bob_sprint_exageration;
-    }
-
-    public float GetBobCrouchExageration()
-    {
-        return bob_crouch_exageration;
-    }
-
-    public float GetBobAimExageration()
-    {
-        return bob_aim_exageration;
-    }
-
-    public Vector3 GetWalkMultiplier()
-    {
-        return walk_multiplier;
-    }
-
-    public Vector3 GetSprintMultiplier()
-    {
-        return sprint_multiplier;
-    }
-
-    public Vector3 GetAimMultiplier()
-    {
-        return aim_multiplier;
-    }
-
-    public Vector3 GetCrouchMultiplier()
-    {
-        return crouch_multiplier;
-    }
-
-    public float[] GetVector3Values()
-    {
-        return vector3Values;
-    }
-
-    public float[] GetQuaternionValues()
-    {
-        return quaternionValues;
-    }
-
-    public Transform GetTransform()
-    {
-        return transform;
-    }
-
+    */
 }

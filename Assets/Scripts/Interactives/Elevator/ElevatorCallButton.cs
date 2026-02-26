@@ -1,13 +1,11 @@
 using UnityEngine;
 
-public class ElevatorCallButton : MonoBehaviour
+public class ElevatorCallButton : MonoBehaviour, Button
 {
     public int floor;
     [SerializeField] private GameObject door;
     [SerializeField] private Elevator elevator;
     [SerializeField] private Vector3 elevatorPosition;
-    [SerializeField] private KeyCode Key_callbutton = KeyCode.E;
-    [SerializeField] private float button_distance = 10f;
 
     bool can_move_door = false;
     

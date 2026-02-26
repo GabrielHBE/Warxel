@@ -11,7 +11,7 @@ public class BulletExtractor : MonoBehaviour
     public void CreateBullet()
     {
         float random = Random.Range(1f,10f);
-        StartCoroutine(FireBulletWithDrop(gameObject.transform.position, gameObject.transform.right *random, 5, 20));
+        StartCoroutine(FireBulletWithDrop(gameObject.transform.position, gameObject.transform.right *random, 2, 20));
     }
 
 
@@ -31,7 +31,7 @@ public class BulletExtractor : MonoBehaviour
         float CurrentTime = 0;//this variable holds how much time has passed
         do
         {
-            Debug.DrawLine(StartPos, EndPos,Color.blue,500);//this is just for displaying the path of the bullet on the scene, you can remove it if you want
+            //Debug.DrawLine(StartPos, EndPos,Color.blue,500);//this is just for displaying the path of the bullet on the scene, you can remove it if you want
             bulletInstance.transform.position = StartPos;
 
             /*

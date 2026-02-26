@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class WeaponAnimation : MonoBehaviour
 {
+
+    [Header("Hand Positions")]
+    [SerializeField] private GameObject left_hand;
+    [SerializeField] private GameObject right_hand;
     [HideInInspector] public AnimationClip fireClip;
     private AnimationClip reloadClip;
 
@@ -20,6 +24,19 @@ public class WeaponAnimation : MonoBehaviour
     void Start()
     {
         restarted = false;
+        SetHandsOnWeapon();
+    }
+
+    void SetHandsOnWeapon()
+    {
+        WeaponHolder[] weaponHolders = GetComponentsInChildren<WeaponHolder>(true);
+        foreach (WeaponHolder holder in weaponHolders)
+        {
+
+            holder.leftHand_origin = left_hand;
+            holder.rightHand_origin = right_hand;
+            //holder.prone_transition_position = prone_posiion;
+        }
     }
 
     void Update()
@@ -110,45 +127,9 @@ public class WeaponAnimation : MonoBehaviour
         anim.SetBool("Is_reloading", true);
     }
 
+
     public void FinishReloadAnimation()
     {
-        if (anim != null)
-        {
-            if (weaponProperties.mags[^1] != 0)
-            {
-                foreach (AnimationClip clip in rac.animationClips)
-                {
-                    if (clip.name == "Reload")
-                    {
-                        reloadClip = clip;
-                        reload_animation_timer = reloadClip.length;
-                        anim.SetBool("Last_bullet", false);
-                        break;
-                    }
-                    else
-                    {
-                        reloadClip = null;
-                    }
-                }
-            }
-            else
-            {
-                foreach (AnimationClip clip in rac.animationClips)
-                {
-                    if (clip.name == "Reload2")
-                    {
-                        reloadClip = clip;
-                        reload_animation_timer = reloadClip.length;
-                        anim.SetBool("Last_bullet", true);
-                        break;
-                    }
-                    else
-                    {
-                        reloadClip = null;
-                    }
-                }
-            }
-        }
 
         anim.SetBool("Is_reloading", false);
     }

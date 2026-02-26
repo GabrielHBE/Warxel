@@ -1,14 +1,10 @@
 using UnityEngine;
 
-public class Grip : MonoBehaviour
+public class Grip : Attatchment
 {
-    [Header("Instances")]
-    public string grip_name;
-    public int grip_id;
+    [Header("Changes")]
     public GameObject left_hand_holder;
     public GameObject grip_holder;
-
-    [Header("Changes")]
     public float vertical_recoil_change;
     public float horizontal_recoil_change;
     public float first_shoot_change;
@@ -20,8 +16,12 @@ public class Grip : MonoBehaviour
 
     void Update()
     {
-        left_hand_holder.transform.position = grip_holder.transform.position;
-        left_hand_holder.transform.rotation = grip_holder.transform.rotation;
+        if (left_hand_holder != null)
+        {
+            left_hand_holder.transform.position = grip_holder.transform.position;
+            left_hand_holder.transform.rotation = grip_holder.transform.rotation;
+        }
+
     }
 
 }

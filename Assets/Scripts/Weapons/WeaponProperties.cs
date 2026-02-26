@@ -1,12 +1,20 @@
 using System.Collections.Generic;
+using UnityEngine.UI;
 using Unity.VisualScripting;
 using UnityEngine;
 
 public class WeaponProperties : MonoBehaviour
 {
-    public int level_to_unlock;
+    [Header("Progression / Category")]
+    public ClassManager.Class[] class_weapon;
+    public int weapon_level;
+    public float points_to_up_level;
+    public float weapon_level_progression;
+    public float current_attachment_points;
+    public string category;
 
     [Header("Weapon properties")]
+    public bool can_damage_vehicles;
     public bool manual_calculate_recoil;
     public bool is_shotgun;
     public bool single_reload;
@@ -16,26 +24,33 @@ public class WeaponProperties : MonoBehaviour
     public float ads_speed;
     public float speed_change;
     public float zoom;
-    public Light muzzle_lightinig;
+    public float time_to_transfer_bullets;
+
     public Vector3 ads_position;
     public List<string> fire_modes = new List<string>();
+
+    [Header("HUD")]
+    public Sprite icon_hud;
+
 
     [Header("Destruction")]
     public float destruction_force;
 
     [Header("Bullet")]
+    [SerializeField] public float bullet_size = 1; // ✅ Agora aparecerá no Inspector
     public int bullets_per_shot;
     public Transform bulletPref;
     public float muzzle_velocity;
     public float bullet_drop;
     public GameObject bullet_hit_effect;
-    
+
 
     [Header("Shotgun")]
     public int shells;
 
     [Header("Damage")]
     public float damage;
+    public float vehicle_damage;
     public float minimum_damage;
     public float headshot_multiplier;
     public float damage_dropoff;
@@ -58,8 +73,9 @@ public class WeaponProperties : MonoBehaviour
     public float[] horizontal_recoil = new float[10];
     public float first_shoot_increaser;
     public float weapon_stability;
-    public float reset_recoil_speed;
-    public float apply_recoil_speed;
+    public float screen_reset_recoil_speed;
+    public float weapon_reset_recoil_speed;
+    public float weapon_apply_recoil_speed;
     [HideInInspector] public float interval;
     public Vector3 visual_recoil;
     public float horizontal_recoil_media;
@@ -70,13 +86,12 @@ public class WeaponProperties : MonoBehaviour
     public int mag_count;
     public int bullets_per_mag;
     [HideInInspector] public List<int> mags = new List<int>();
-    public Vector3 weapon_reload_position;
-    public Quaternion weapon_reload_rotation;
 
     [Header("Shoot")]
     public float delay_to_shoot_animation;
 
     [Header("Objects")]
+    public WeaponSounds weapon_sound;
     public GameObject barrel;
     public GameObject weapon;
 
@@ -94,41 +109,25 @@ public class WeaponProperties : MonoBehaviour
     public float[] quaternionValues = new float[3];
     public Vector3 initial_potiion;
     public Quaternion inicial_rotation;
-    private Sight sight;
-    private Grip grip;
-    private Mag mag;
-    private Barrel _barrel;
-    bool do_once = true;
     private BulletExtractor bulletExtractor;
 
-    void Start()
+    void Awake()
     {
-
+        bulletExtractor = GetComponentInChildren<BulletExtractor>();
         FillMags();
         Restart();
     }
 
     public void Restart()
     {
-        bulletExtractor = GetComponentInChildren<BulletExtractor>();
-        if (do_once)
-        {
-            MagAttatchment();
-            GripAttatchment();
-            SightAttatchment();
-            BarrelAttatchment();
-            do_once = false;
-
-        }
-
 
         CalculateMedia();
         interval = 60f / rate_of_fire;
 
         if (!manual_calculate_recoil)
         {
-            reset_recoil_speed = interval / 2;
-            apply_recoil_speed = interval / 2;
+            weapon_reset_recoil_speed = interval / 2;
+            weapon_apply_recoil_speed = interval / 2;
         }
 
         //if (reset_recoil_speed == 0) auto_reset_recoil_speed = interval / 2;
@@ -165,11 +164,10 @@ public class WeaponProperties : MonoBehaviour
         }
         */
 
-
     }
 
 
-    void CalculateMedia()
+    public void CalculateMedia()
     {
         float media = 0;
 
@@ -193,78 +191,21 @@ public class WeaponProperties : MonoBehaviour
 
     }
 
-    void SightAttatchment()
-    {
-        sight = GetComponentInChildren<Sight>();
-        if (sight == null)
-        {
-            return;
-        }
-
-        zoom += sight.zoom_change;
-        ads_speed += sight.ads_speed_change;
-    }
-
-    void GripAttatchment()
-    {
-        grip = GetComponentInChildren<Grip>();
-        if (grip == null)
-        {
-            return;
-        }
-
-
-        for (int i = 0; i < vertical_recoil.Length; i++)
-        {
-            vertical_recoil[i] += grip.vertical_recoil_change;
-            horizontal_recoil[i] += grip.horizontal_recoil_change;
-        }
-
-        first_shoot_increaser += grip.first_shoot_change;
-        reload_time += grip.reload_speed_change;
-        ads_speed += grip.ads_speed_change;
-        weapon_stability += grip.weapon_stability_change;
-    }
-
-
-    void MagAttatchment()
-    {
-        mag = GetComponentInChildren<Mag>();
-        if (mag == null)
-        {
-            return;
-        }
-
-        ads_speed += mag.ads_speed_change;
-        bullets_per_mag += mag.bullet_counter_change;
-        weapon_stability += mag.stability_change;
-
-        reload_time += mag.reload_speed_changer;
-    }
-
-
-    void BarrelAttatchment()
-    {
-
-        WeaponSounds weapon_sound = GetComponent<WeaponSounds>();
-        _barrel = GetComponentInChildren<Barrel>();
-        if (_barrel == null)
-        {
-            return;
-        }
-
-        first_shoot_increaser += _barrel.first_shoot_recoil_change;
-        muzzle_velocity += _barrel.muzzle_velocity_change;
-        muzzle_lightinig.intensity += _barrel.muzzle_lightning_change;
-
-        weapon_sound.shoot_sound.pitch += _barrel.shoot_pith_change;
-        weapon_sound.shoot_sound.volume += _barrel.volume_changer;
-        spread_increaser += _barrel.spread_change;
-    }
-
     public void CreateBulletExtractor()
     {
         bulletExtractor.CreateBullet();
+    }
+
+    public void UpgradeWeaponLevel(float points)
+    {
+        weapon_level_progression += points;
+
+        if (weapon_level_progression >= points_to_up_level)
+        {
+            weapon_level += 1;
+            weapon_level_progression = 0;
+        }
+
     }
 
 }

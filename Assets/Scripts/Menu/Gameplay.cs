@@ -3,13 +3,14 @@ using UnityEngine;
 public class Gameplay : MonoBehaviour
 {
     [Header("HitMarkers")]
-    public bool show_hit_marker;
-    public Color body_shot_marker_colour;
-    public Color head_shot_marker_colour;
+    public bool show_hit_marker = true;
+    public Color body_shot_marker_colour = Color.white;
+    public Color head_shot_marker_colour = Color.red;
+    public Color vehicle_marker_colour = Color.gray;
     [Range(0f, 1f)]
-    public float hit_marker_opacity;
-    [Range(0.1f, 2f)]
-    public float hit_marker_size;
+    public float hit_marker_opacity = 1;
+    [Range(0.1f, 1f)]
+    public float hit_marker_size = 1;
 
     [Header("User Interface")]
     public bool show_fps;

@@ -23,13 +23,13 @@ public class Video : MonoBehaviour
     public List<string> screen_mode = new List<string> { "Full Screen Window", "Maximized Window", "Windowed" };
 
     [Header("Camera")]
-    [Range(50f, 120f)]
+    [Range(40f, 120f)]
     public float infantary_fov;
-    [Range(50f, 120f)]
+    [Range(40f, 120f)]
     public float jet_fov;
-    [Range(50f, 120f)]
+    [Range(40f, 120f)]
     public float tank_fov;
-    [Range(50f, 120f)]
+    [Range(40f, 120f)]
     public float helicopter_fov;
     [Range(0.5f, 2f)]
     public float camera_shake_intensity;

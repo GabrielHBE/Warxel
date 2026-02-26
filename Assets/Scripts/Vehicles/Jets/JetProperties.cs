@@ -8,6 +8,8 @@ public class JetProperties : MonoBehaviour
     public float resistance;
 
     [Header("Movement")]
+    public bool can_afterburner;
+    public float mass;
     public float aceleration;
     public float max_throttle;
     public float rotation_value;
@@ -26,8 +28,8 @@ public class JetProperties : MonoBehaviour
     public GameObject bullet_hit_effect;
 
     [Header("MainCannon")]
+    public Sprite hud_icon;
     public Transform bullefPref;
-    public GameObject barrel;
     public float fire_rate;
     public float interval;
     public float zoom;

@@ -1,24 +1,33 @@
+using System.Collections;
+using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
 using VoxelDestructionPro.VoxelObjects;
 
 public class Bullet : MonoBehaviour
 {
-    public GameObject bullet_hole;
-    private Rigidbody rb;
-    private VoxCollider voxCollider;
+    [Header("Trail")]
+    [SerializeField] private float delay = 0.5f;
+    [SerializeField] private TrailRenderer trail;
+    [SerializeField] private Rigidbody rb;
+    [SerializeField] private VoxCollider voxCollider;
     private float bulletDropMultiplier;
     private float damage;
     private float damage_dropoff;
     private float damage_dropoff_timer;
     private float minimum_damage;
     private float hs_multiplier;
+    private bool can_damage_vehicles;
+    private float vehicle_damage;
 
 
     [Header("Sounds")]
     public GameObject ricochet_sound;
     private RicochetSounds ricochetSounds;
     private Vector3 original_position;
+    private AudioSource hit_sound;
+
 
     [Header("HitEffects")]
     [SerializeField] private GameObject glass_hit_effect;
@@ -29,21 +38,31 @@ public class Bullet : MonoBehaviour
     [SerializeField] private GameObject dirt_hit_effect;
     [SerializeField] private GameObject softbody_hit_effect;
 
+    private HitMarker hitMarker;
+    private DamageMarker damageMarker;
+
+    private WeaponProperties weaponProperties;
+    private Vehicle vehicle;
+    private GameObject igore_hit_gameobject;
+    private EliminationMarker eliminationMarker;
 
     bool did_ricochet;
     GameObject custom_hit_effect_instance;
     float timer;
 
-    void Awake()
+
+    void Start()
     {
-        voxCollider = GetComponent<VoxCollider>();
-        rb = GetComponent<Rigidbody>();
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        hitMarker = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<HitMarker>();
+        damageMarker = hitMarker.GetComponent<DamageMarker>();
+        eliminationMarker = hitMarker.GetComponent<EliminationMarker>();
+        //voxCollider = GetComponent<VoxCollider>();
+        //rb = GetComponent<Rigidbody>();
+        //rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
-    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force, float minimum_damage, float hs_multiplier, GameObject hit_effect = null)
+    public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force, float minimum_damage, float hs_multiplier, float size, float delay, bool can_damage_vehicles, float vehicle_damage, GameObject hit_effect = null, AudioSource hit_sound = null, WeaponProperties weaponProperties = null, Vehicle vehicle = null, GameObject igore_hit_gameobject = null)
     {
-        GetComponent<MeshRenderer>().enabled = false;
 
         voxCollider.destructionRadius = destruction_force;
         did_ricochet = false;
@@ -52,9 +71,20 @@ public class Bullet : MonoBehaviour
         damage_dropoff_timer = dmg_dropoff_timer;
         custom_hit_effect_instance = hit_effect;
         this.minimum_damage = minimum_damage;
-        this.hs_multiplier = hs_multiplier; ;
+        this.hs_multiplier = hs_multiplier;
+        this.hit_sound = hit_sound;
+        this.delay = delay;
+        this.can_damage_vehicles = can_damage_vehicles;
+        this.vehicle_damage = vehicle_damage;
+        this.weaponProperties = weaponProperties;
+        this.vehicle = vehicle;
+        this.igore_hit_gameobject = igore_hit_gameobject;
 
         SetDirection(direction, speed, dropMultiplier);
+
+        if (size != 0) transform.localScale *= size;
+
+        StartCoroutine(EnableTrailAfterDelay());
     }
 
     public void SetDirection(Vector3 direction, float speed, float dropMultiplier)
@@ -65,134 +95,185 @@ public class Bullet : MonoBehaviour
         bulletDropMultiplier = dropMultiplier;
     }
 
+    IEnumerator EnableTrailAfterDelay()
+    {
+        yield return new WaitForSeconds(delay);
+        trail.enabled = true;
+    }
+
+    void FixedUpdate()
+    {
+        rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
+    }
+
     void Update()
     {
-        // Simula a queda da bala sem alterar a gravidade global
-        rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
 
-        /*
-        if (rb.linearVelocity.magnitude < 10)
-        {
-            Destroy(gameObject);
-        }
-        */
         if (damage > minimum_damage)
         {
             timer += Time.deltaTime;
             if (timer >= damage_dropoff_timer)
             {
                 damage -= damage_dropoff;
+                vehicle_damage -= damage_dropoff;
                 timer = 0;
             }
         }
 
+    }
 
+    void OnCollisionEnter(Collision collision)
+    {
 
-        if (timer >= 0.05f)
+        if (igore_hit_gameobject != null)
         {
-            GetComponent<MeshRenderer>().enabled = true;
+            if (collision.gameObject == igore_hit_gameobject)
+            {
+                return;
+            }
         }
+
+        if (did_ricochet)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+
+        if (collision.contacts.Length > 0)
+        {
+            ContactPoint contact = collision.contacts[0];
+            float calculated_distance = Vector3.Distance(original_position, contact.point);
+
+            if (calculated_distance > 3)
+            {
+
+                if (collision.gameObject.layer == LayerMask.NameToLayer("Voxel"))
+                {
+
+                    DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
+
+                    HitEffects(contact.point, contact.normal, collision.transform.GetComponentInParent<DynamicVoxelObj>());
+
+                    if (voxCollider.destructionRadius > 2)
+                    {
+
+                        voxCollider.SphereExplosion(contact.point, damage);
+                    }
+                    else
+                    {
+                        voxCollider.Collide(collision);
+                    }
+
+                    if (hit_sound != null)
+                    {
+                        AudioSource.PlayClipAtPoint(hit_sound.clip, contact.point);
+                    }
+
+                }
+                else if (collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
+                {
+
+                    if (hit_sound != null)
+                    {
+                        AudioSource.PlayClipAtPoint(hit_sound.clip, contact.point);
+                    }
+                }
+                else if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle") && can_damage_vehicles)
+                {
+
+                    hitMarker.CreateVehicleMarker();
+                    Vehicle hit_vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
+                    //print(vehicle_damage);
+                    if (hit_vehicle != null)
+                    {
+                        float damage_dealt = hit_vehicle.Damage(vehicle_damage);
+                        if (damage_dealt != 0) damageMarker.UpdateDamage(damage_dealt);
+
+                        if (hit_vehicle.vehicle_destroyed)
+                        {
+                            if (vehicle != null) vehicle.UpgradeVehicleLevel(20);
+                            if (weaponProperties != null) weaponProperties.UpgradeWeaponLevel(20);
+                            eliminationMarker.InstantiateVehicleImage();
+                        }
+                    }
+
+                }
+
+                Destroy(gameObject);
+
+            }
+            else
+            {
+                Ricochet(contact.point, contact.normal);
+            }
+
+        }
+
 
 
     }
 
-
-    void OnCollisionEnter(Collision collision)
+    //Player Collision
+    private void OnTriggerEnter(Collider other)
     {
-        if (!collision.gameObject.CompareTag("Bullet"))
+
+        if (other.gameObject.tag == "OwnerPlayer")
         {
-
-
-            if (did_ricochet)
-            {
-                Destroy(gameObject);
-                return;
-            }
-
-
-            if (collision.contacts.Length > 0)
-            {
-
-                ContactPoint contact = collision.contacts[0];
-                float calculated_position = Vector3.Distance(original_position, contact.point);
-
-                if (calculated_position > 3)
-                {
-
-                    if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
-                    {
-                        PlayerProperties player = collision.gameObject.GetComponent<PlayerProperties>();
-
-                        if (collision.gameObject.CompareTag("PlayerHead"))
-                        {
-                            player.Damage(damage * hs_multiplier);
-                        }
-                        else
-                        {
-                            player.Damage(damage);
-                        }
-
-
-
-                    }
-                    else if (collision.gameObject.layer == LayerMask.NameToLayer("Voxel"))
-                    {
-
-                        DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
-
-                        HitEffects(contact.point, contact.normal, collision.transform.GetComponentInParent<DynamicVoxelObj>());
-
-                        if (voxCollider.destructionRadius > 2)
-                        {
-
-                            bool do_once = true;
-                            Collider[] colliders = Physics.OverlapSphere(contact.point, voxCollider.destructionRadius);
-
-                            for (int i = 0; i < colliders.Length; i++)
-                            {
-                                PlayerProperties playerProps = colliders[i].GetComponentInParent<PlayerProperties>();
-
-                                if (do_once && playerProps != null)
-                                {
-                                    float distance = Vector3.Distance(transform.position, playerProps.transform.position);
-                                    float damage_distance = Mathf.Clamp(voxCollider.destructionRadius * (1 - distance / 10), 0, voxCollider.destructionRadius);
-                                    playerProps.Damage(damage * damage_distance);
-
-                                    CameraShake cameraShake = playerProps.GetComponentInChildren<CameraShake>();
-                                    if (cameraShake != null)
-                                    {
-                                        cameraShake.StartCoroutine(cameraShake.ExplosionShake(damage_distance / 10, 1f));
-                                    }
-
-                                    do_once = false;
-                                }
-
-                                if (vox == null)
-                                    continue;
-
-                                vox.AddDestruction_Sphere(contact.point, voxCollider.destructionRadius);
-
-                            }
-                        }
-                        else
-                        {
-                            voxCollider.Collide(collision);
-                        }
-
-                    }
-
-                    Destroy(gameObject);
-
-                }
-                else
-                {
-                    Ricochet(contact.point, contact.normal);
-                }
-
-            }
-
+            return;
         }
 
+        if (igore_hit_gameobject != null)
+        {
+            if (other.gameObject == igore_hit_gameobject)
+            {
+                return;
+            }
+        }
+
+
+
+        if (other.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
+        {
+            PlayerController player = other.gameObject.GetComponentInParent<PlayerController>();
+            float damage_dealt = 0;
+
+            if (other.gameObject.CompareTag("PlayerHead"))
+            {
+                //hitMarker.CreateHeadShotMarker();
+                damage_dealt = damage * hs_multiplier;
+                player.Damage(damage_dealt);
+            }
+            else if (other.gameObject.CompareTag("Arms and Legs"))
+            {
+                //hitMarker.CreateHeadShotMarker();
+                damage_dealt = damage * 0.8f;
+                player.Damage(damage_dealt);
+            }
+            else if (other.gameObject.CompareTag("Feet and Hands"))
+            {
+                //hitMarker.CreateHeadShotMarker();
+                damage_dealt = damage * 0.5f;
+                player.Damage(damage_dealt);
+            }
+            else
+            {
+                damage_dealt = damage;
+                hitMarker.CreateBodyShotMarker();
+                player.Damage(damage_dealt);
+
+            }
+
+            PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
+
+            if (playerProperties.is_dead)
+            {
+                weaponProperties.UpgradeWeaponLevel(damage_dealt);
+            }
+
+            if (damage_dealt != 0) damageMarker.UpdateDamage(damage_dealt);
+
+        }
     }
 
     void Ricochet(Vector3 position, Vector3 normal)

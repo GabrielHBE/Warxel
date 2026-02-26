@@ -16,7 +16,7 @@ public class RotateRotationFlaps : MonoBehaviour
 
     void Update()
     {
-        if (jet.is_in_jet)
+        if (jet.is_in_vehicle)
         {
             Rotate();
         }
@@ -26,7 +26,7 @@ public class RotateRotationFlaps : MonoBehaviour
 
     void Rotate()
     {
-        float rotationAmount = -jet.mouseX  * Time.deltaTime;
+        float rotationAmount = -jet.mouseX  * Time.deltaTime * 20;
 
         float current_rotation = transform.localRotation.z;
 

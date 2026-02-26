@@ -10,11 +10,7 @@ public class SwayNBobScript : MonoBehaviour
     public PlayerController mover;
     private PlayerProperties playerProperties;
 
-    [Header("Instances")]
-    [SerializeField] private Transform reticleTransform;
-
     [Header("Weapon")]
-
     private SwitchWeapon switchWeapon;
 
     [Header("Sway")]
@@ -22,6 +18,9 @@ public class SwayNBobScript : MonoBehaviour
     public float maxStepDistance = 0.06f;
     [HideInInspector] public Vector3 swayPos;
 
+    [Header("Aiming Movement Rotation")]
+    public float aimMoveRotationAmount = 5f; // Quantidade de rotação para cima/baixo
+    public float aimMoveRotationSpeed = 5f; // Velocidade da rotação
 
 
     [Header("Sway Rotation")]
@@ -55,7 +54,8 @@ public class SwayNBobScript : MonoBehaviour
     PlayerController playerController;
     Quaternion initial_rotation;
     Vector3 initial_position;
-    bool do_once;
+    bool do_land_camera_chake_once;
+    bool do_jump_camera_chake_once;
     float max_position_sprinting = 1;
     float current_position_sprinting = 0;
     int sprintDirection = 1;
@@ -68,6 +68,8 @@ public class SwayNBobScript : MonoBehaviour
     private bool isCrouched;
     private bool isReloading;
     private bool isFiring;
+    private bool isRolling;
+    private bool isProne;
 
 
     //Itens that change with the item
@@ -83,11 +85,13 @@ public class SwayNBobScript : MonoBehaviour
     [HideInInspector] public float[] vector3Values = new float[3];
     [HideInInspector] public float[] quaternionValues = new float[3];
 
+    private Settings settings;
 
 
-    // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
+        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
+
         restarted = false;
         initial_rotation = transform.localRotation;
         initial_position = transform.localPosition;
@@ -107,7 +111,7 @@ public class SwayNBobScript : MonoBehaviour
                         float[] vector3Values,
                         float[] quaternionValues)
     {
-        
+
         this.item = item;
         this.bob_walk_exageration = bob_walk_exageration;
         this.bob_sprint_exageration = bob_sprint_exageration;
@@ -145,25 +149,45 @@ public class SwayNBobScript : MonoBehaviour
         isCrouched = playerProperties.crouched;
         isReloading = playerProperties.is_reloading;
         isFiring = playerProperties.is_firing;
+        isProne = playerProperties.is_proned;
+        isRolling = playerProperties.roll;
+
     }
 
-
+    Vector3 shakeOffset = Vector3.zero;
     void Update()
     {
 
-        if (!restarted)
+        if (!restarted || settings.is_menu_settings_active)
         {
             return;
         }
 
         CachePlayerProperties();
 
-        if (playerProperties.sprinting == true && !playerProperties.is_reloading && switchWeapon._switch == false && !playerProperties.is_aiming)
+
+        // Verificar se o jogador está morto
+        if (playerProperties.is_dead || playerProperties.isProneTransition || playerProperties.is_composing_bullets || playerProperties.is_in_vehicle)
+        {
+            // Apenas aplicar rotação de morte
+            Quaternion deadRotation = Quaternion.Euler(40f, 0f, 0f);
+            myTransform.localRotation = Quaternion.Lerp(
+                myTransform.localRotation,
+                deadRotation,
+                Time.deltaTime * smoothRot
+            );
+
+            // Retornar para evitar outros cálculos
+            return;
+        }
+
+
+
+        if (playerProperties.sprinting && !switchWeapon._switch && !playerProperties.is_aiming && !playerProperties.is_proned && !playerProperties.roll && !playerProperties.isProneTransition)
         {
             bobExaggeration = bob_sprint_exageration;
             current_multiplier = sprint_multiplier;
 
-            Sprinting();
         }
         else
         {
@@ -178,7 +202,7 @@ public class SwayNBobScript : MonoBehaviour
             current_multiplier.z = inicialVector3.z;
         }
 
-        if ((playerProperties.crouched == true && playerProperties.sprinting == false) || playerProperties.is_aiming)
+        if (((playerProperties.crouched || playerProperties.is_proned) && !playerProperties.sprinting) || playerProperties.is_aiming)
         {
 
             bobExaggeration = bob_crouch_exageration;
@@ -208,6 +232,9 @@ public class SwayNBobScript : MonoBehaviour
             current_multiplier.z = aim_multiplier.z;
         }
 
+        //if ((!playerProperties.is_aiming && !playerProperties.is_firing && !playerProperties.is_reloading && !playerProperties.is_proned) || playerProperties.roll) Sprinting();
+        if((playerProperties.sprinting || playerProperties.roll) && !playerProperties.is_reloading) Sprinting();
+
         SwayRotation();
         Sway();
         BobOffset();
@@ -220,8 +247,8 @@ public class SwayNBobScript : MonoBehaviour
         Time.deltaTime
         );
 
-    }
 
+    }
 
     Vector2 walkInput;
     Vector2 lookInput;
@@ -284,6 +311,8 @@ public class SwayNBobScript : MonoBehaviour
 
     }
 
+
+    /*
     void CompositePositionRotation()
     {
         // Cache de Time.deltaTime
@@ -292,6 +321,10 @@ public class SwayNBobScript : MonoBehaviour
         Quaternion combinedRotation;
         Vector3 combinedPosition;
 
+
+        float x_input_amount = Input.GetAxis("Mouse X");
+
+        
         if (!isAiming)
         {
             combinedRotation = sprintTargetWeaponRotation * Quaternion.Euler(swayEulerRot) * Quaternion.Euler(bobEulerRotation);
@@ -299,7 +332,7 @@ public class SwayNBobScript : MonoBehaviour
         }
         else
         {
-            float divisor = isFiring ? 20f : 4f;
+            float divisor = isFiring ? 10f : 2f;
             combinedRotation = sprintTargetWeaponRotation * Quaternion.Euler(swayEulerRot / divisor) * Quaternion.Euler(bobEulerRotation / divisor);
             combinedPosition = sprintTargetWeaponPosition + swayPos / divisor + bobPosition / divisor;
         }
@@ -308,7 +341,8 @@ public class SwayNBobScript : MonoBehaviour
         if (!isGrounded)
         {
             float tiltAmount = Input.GetAxis("Horizontal") * 10f;
-            Quaternion targetRotation = Quaternion.Euler(15, Input.GetAxis("Mouse X") * 2, -tiltAmount);
+            Quaternion targetRotation = Quaternion.Euler(15, x_input_amount * 2, -tiltAmount);
+
 
             myTransform.localRotation = Quaternion.Lerp(
                 myTransform.localRotation,
@@ -322,19 +356,21 @@ public class SwayNBobScript : MonoBehaviour
                 deltaTime * smooth
             );
 
-            do_once = true;
+            do_land_camera_chake_once = true;
         }
         else
         {
-            if (do_once)
+
+            Quaternion targetRotation = Quaternion.Euler(0, x_input_amount, 0);
+            if (do_land_camera_chake_once)
             {
                 StartCoroutine(JumpWeaponShake());
-                do_once = false;
+                do_land_camera_chake_once = false;
             }
 
             myTransform.localRotation = Quaternion.Lerp(
                 myTransform.localRotation,
-                combinedRotation,
+                combinedRotation * targetRotation,
                 deltaTime * smoothRot
             );
 
@@ -349,13 +385,134 @@ public class SwayNBobScript : MonoBehaviour
             reticleTransform.localPosition = Vector3.Lerp(reticleTransform.localPosition, reticlePos, deltaTime * smooth);
         }
     }
+    */
+
+
+    void CompositePositionRotation()
+    {
+        float deltaTime = Time.deltaTime;
+
+        Quaternion combinedRotation;
+        Vector3 combinedPosition;
+
+        // Reutilizar os valores já obtidos em GetInput()
+        float x_input_amount = lookInput.x;
+        float y_input_amount = lookInput.y;
+
+        // Aplicar clamp
+        x_input_amount = Mathf.Clamp(x_input_amount, -5f, 5f);
+        y_input_amount = Mathf.Clamp(y_input_amount, -5f, 5f);
+
+        // Multiplicadores (ajuste conforme necessidade)
+        const int yRotationMultiplier = 4; // Ajuste para valores por SEGUNDO
+        const int zRotationMultiplier = 4;
+        const int xRotationMultiplier = 4;
+
+        // Agora escalado por deltaTime
+        float enhancedYRotation = x_input_amount * yRotationMultiplier;
+        float enhancedZRotation = x_input_amount * zRotationMultiplier;
+        float enhancedXRotation = y_input_amount * xRotationMultiplier;
+
+
+        float verticalAimMoveRotation = 0f;
+
+        if (isAiming && (playerController.moveForward != 0f || playerController.moveHorizontal != 0f) && !isSprinting && !isReloading && !isRolling)
+        {
+            float sinTime = Mathf.Sin(Time.time * aimMoveRotationSpeed);
+            verticalAimMoveRotation = sinTime * aimMoveRotationAmount;
+
+            if (isCrouched || isProne)
+            {
+                verticalAimMoveRotation /= 2;
+            }
+        }
+
+        if (!isAiming)
+        {
+            combinedRotation = sprintTargetWeaponRotation * Quaternion.Euler(swayEulerRot) * Quaternion.Euler(bobEulerRotation);
+            combinedPosition = sprintTargetWeaponPosition + swayPos + bobPosition;
+        }
+        else
+        {
+            float divisor = isFiring ? 20f : 5f;
+
+            Vector3 aimingRotation = swayEulerRot / divisor;
+            aimingRotation.x += verticalAimMoveRotation;
+
+            combinedRotation = sprintTargetWeaponRotation *
+                              Quaternion.Euler(aimingRotation) *
+                              Quaternion.Euler(bobEulerRotation / divisor);
+            combinedPosition = sprintTargetWeaponPosition + swayPos / divisor + bobPosition / divisor;
+        }
+
+        // ADICIONAR SHAKEOFFSET À ROTAÇÃO FINAL
+        Quaternion shakeRotation = Quaternion.Euler(shakeOffset);
+        combinedRotation = combinedRotation * shakeRotation;
+
+        if (!isGrounded)
+        {
+            float tiltAmount = Input.GetAxis("Horizontal") * 10f;
+
+            Quaternion targetRotation = Quaternion.Euler(15, enhancedYRotation, -tiltAmount + enhancedZRotation);
+
+            myTransform.localRotation = Quaternion.Lerp(
+                myTransform.localRotation,
+                combinedRotation * targetRotation,
+                deltaTime * smoothRot
+            );
+
+            myTransform.localPosition = Vector3.Lerp(
+                myTransform.localPosition,
+                new Vector3(combinedPosition.x, combinedPosition.y - 0.01f, combinedPosition.z),
+                deltaTime * smooth
+            );
+
+            if (do_jump_camera_chake_once)
+            {
+                //StartCoroutine(JumpWeaponShake());
+                do_jump_camera_chake_once = false;
+            }
+
+            do_land_camera_chake_once = true;
+        }
+        else
+        {
+            Quaternion targetRotation;
+
+            if (isFiring)
+            {
+                targetRotation = Quaternion.Euler(enhancedXRotation / 8, enhancedYRotation, -enhancedZRotation);
+            }
+            else
+            {
+                targetRotation = Quaternion.Euler(enhancedXRotation, enhancedYRotation, -enhancedZRotation);
+            }
+
+            if (do_land_camera_chake_once)
+            {
+                //StartCoroutine(JumpWeaponShake());
+                do_land_camera_chake_once = false;
+            }
+
+            myTransform.localRotation = Quaternion.Lerp(
+                myTransform.localRotation,
+                combinedRotation * targetRotation,
+                deltaTime * smoothRot
+            );
+
+            myTransform.localPosition = Vector3.Lerp(
+                myTransform.localPosition,
+                combinedPosition,
+                deltaTime * smooth
+            );
+            do_jump_camera_chake_once = true;
+        }
+    }
 
     void BobOffset()
     {
-        float axis_bob = 0;
-
         // Otimizar verificação de input
-        axis_bob = (Input.GetAxis("Vertical") != 0 || Input.GetAxis("Horizontal") != 0) ? 1 : 0;
+        float axis_bob = (Input.GetAxis("Vertical") != 0 || Input.GetAxis("Horizontal") != 0) ? 1 : 0;
 
         speedCurve += Time.deltaTime * (isGrounded ? axis_bob * bobExaggeration : 1f) + 0.005f;
 
@@ -381,12 +538,14 @@ public class SwayNBobScript : MonoBehaviour
 
     IEnumerator JumpWeaponShake()
     {
+
+        float intensity_local = 3;
         Quaternion originalRot = item.localRotation;
 
         // Usar valores pré-calculados para evitar Random.Range múltiplo
-        float randomX = UnityEngine.Random.Range(-2f, 2f);
-        float randomY = UnityEngine.Random.Range(-2f, 2f);
-        float randomZ = UnityEngine.Random.Range(-2f, 2f);
+        float randomX = UnityEngine.Random.Range(-intensity_local, intensity_local);
+        float randomY = UnityEngine.Random.Range(-intensity_local, intensity_local);
+        float randomZ = UnityEngine.Random.Range(-intensity_local, intensity_local);
 
         Quaternion upRot = originalRot * Quaternion.Euler(randomX, randomY, randomZ);
 
@@ -411,6 +570,50 @@ public class SwayNBobScript : MonoBehaviour
         }
 
         item.localRotation = originalRot;
+    }
+
+    float intensity = 2f;
+    public IEnumerator CrouchWeaponShake()
+    {
+        float elapsed = 0f;
+        float duration = 0.1f;
+
+        while (elapsed < duration)
+        {
+            // Calcula o offset do shake
+            float crouchTime = Time.time * 5f; // Frequência diferente para cada eixo
+
+            shakeOffset = new Vector3(
+                // Eixo X: mistura de Perlin noise com seno para movimento orgânico
+                (Mathf.PerlinNoise(crouchTime * 1.2f, 0) * 2f - 1f) * 3f * intensity,
+
+                // Eixo Y: usa combinação de noises para variação
+                ((Mathf.PerlinNoise(0, crouchTime * 1.5f) * 2f - 1f) * 0.4f +
+                 (Mathf.Sin(crouchTime * 3f) * 0.6f)) * 0.8f * intensity,
+
+                // Eixo Z: noise com offset diferente para variar
+                (Mathf.PerlinNoise(crouchTime * 0.8f, crouchTime * 0.8f) * 2f - 1f) * 0.7f * intensity
+            );
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        float returnTime = Mathf.Min(0.1f, duration * 0.5f);
+        elapsed = 0f;
+        Vector3 startingShake = shakeOffset;
+
+        while (elapsed < returnTime)
+        {
+            float t = elapsed / returnTime;
+            // Interpola suavemente de volta a zero
+            shakeOffset = Vector3.Lerp(startingShake, Vector3.zero, t);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        shakeOffset = Vector3.zero;
     }
 
 
