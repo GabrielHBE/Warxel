@@ -7,8 +7,10 @@ public class WeaponProperties : MonoBehaviour
 {
     [Header("Progression / Category")]
     public ClassManager.Class[] class_weapon;
+    public FactionManager.Faction[] faction;
+    public int battle_coins_to_unlock;
     public int weapon_level;
-    public float points_to_up_level;
+    private float points_to_up_level = 100;
     public float weapon_level_progression;
     public float current_attachment_points;
     public string category;
@@ -37,7 +39,7 @@ public class WeaponProperties : MonoBehaviour
     public float destruction_force;
 
     [Header("Bullet")]
-    [SerializeField] public float bullet_size = 1; // ✅ Agora aparecerá no Inspector
+    [SerializeField] public float bullet_size = 1;
     public int bullets_per_shot;
     public Transform bulletPref;
     public float muzzle_velocity;
@@ -85,7 +87,7 @@ public class WeaponProperties : MonoBehaviour
     public float reload_time;
     public int mag_count;
     public int bullets_per_mag;
-    [HideInInspector] public List<int> mags = new List<int>();
+    public List<int> mags = new List<int>();
 
     [Header("Shoot")]
     public float delay_to_shoot_animation;
@@ -111,7 +113,7 @@ public class WeaponProperties : MonoBehaviour
     public Quaternion inicial_rotation;
     private BulletExtractor bulletExtractor;
 
-    void Awake()
+    public void Initialize()
     {
         bulletExtractor = GetComponentInChildren<BulletExtractor>();
         FillMags();
@@ -206,6 +208,19 @@ public class WeaponProperties : MonoBehaviour
             weapon_level_progression = 0;
         }
 
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", weapon_level_progression);
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", weapon_level);
+        PlayerPrefs.Save();
+
+    }
+
+    public void ResetWeaponlevel()
+    {
+        weapon_level = 0;
+        weapon_level_progression = 0;
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", weapon_level_progression);
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", weapon_level);
+        PlayerPrefs.Save();
     }
 
 }

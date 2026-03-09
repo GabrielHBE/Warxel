@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class AttackHelicopter : Helicopter
 {
@@ -36,10 +37,11 @@ public class AttackHelicopter : Helicopter
     private float propellerDecelerationTime = 1f;
     private bool canShootGunnerGun;
     // Destruction
-   
+
 
     // Other
     private Coroutine activeShakeCoroutine;
+    private Transform current_seat_pos;
 
     #endregion
 
@@ -60,7 +62,7 @@ public class AttackHelicopter : Helicopter
 
     protected override void FixedUpdate()
     {
-        if (start_engine && is_in_vehicle && !settings.is_menu_settings_active && !vehicle_destroyed && is_pilot_seat_occupied)
+        if (start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && !vehicle_destroyed && is_pilot_seat_occupied)
         {
             Move();
             Rotate();
@@ -80,7 +82,7 @@ public class AttackHelicopter : Helicopter
 
     protected override void Update()
     {
-        //minFov = video.helicopter_fov;
+        //minFov = Settings.Instance._video.helicopter_fov;
 
         if (!canShootGunnerGun) HandleCooldown(Time.deltaTime);
 
@@ -104,15 +106,18 @@ public class AttackHelicopter : Helicopter
         {
             UpdateHUD();
 
+            player.transform.position = current_seat_pos.position;
+            player.transform.rotation = current_seat_pos.rotation;
+
             SwitchWeapon();
             if (Input.GetKeyDown(KeyCode.P))
             {
                 Damage(100);
             }
 
-            minFov = video.helicopter_fov;
+            minFov = Settings.Instance._video.helicopter_fov;
 
-            if (!settings.is_menu_settings_active) HandleVehicleInput();
+            if (!SettingsHUD.Instance.is_menu_settings_active) HandleVehicleInput();
 
         }
 
@@ -131,7 +136,7 @@ public class AttackHelicopter : Helicopter
         FreeLook();
         if (!vehicle_destroyed) Shoot();
 
-        if (Input.GetKeyDown(keyBinds.VEHICLE_switchSeatKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey))
         {
             SwitchSeats();
         }
@@ -154,7 +159,7 @@ public class AttackHelicopter : Helicopter
     {
         exit_cooldown += Time.deltaTime;
 
-        if (Input.GetKeyDown(keyBinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
         {
             gunner_gun_camera.enabled = false;
             vehicle_camera.enabled = true;
@@ -168,7 +173,7 @@ public class AttackHelicopter : Helicopter
 
     protected override void Start_Stop_Engine()
     {
-        if (Input.GetKeyDown(keyBinds.VEHICLE_startEngineKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
             start_engine = !start_engine;
             if (start_engine)
@@ -184,12 +189,17 @@ public class AttackHelicopter : Helicopter
 
     private void SwitchWeapon()
     {
-        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon1))
+        if (Mouse.current.scroll.ReadValue().y != 0)
+        {
+            is_using_primary = !is_using_primary;
+        }
+
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_weapon1))
         {
             is_using_primary = true;
         }
 
-        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon2))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_weapon2))
         {
             is_using_primary = false;
         }
@@ -210,16 +220,19 @@ public class AttackHelicopter : Helicopter
 
     private void RotateGunnerGun()
     {
-        mouseX = Input.GetAxis("Mouse X") * controls.helicopter_sensibility;
-        mouseY = Input.GetAxis("Mouse Y") * controls.helicopter_sensibility;
+        if(!gunner_gun_camera.enabled) return;
+
+        mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
+        mouseY = Input.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = gunner_gun.transform.localEulerAngles;
 
         float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
         float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
 
-        currentX -= mouseY;
+        // A mesma lógica do ApplyGunnerLookRotation()
         currentY += mouseX;
+        currentX -= mouseY;
 
         currentX = Mathf.Clamp(currentX, -5f, 80f);
         currentY = Mathf.Clamp(currentY, -90f, 90f);
@@ -249,7 +262,7 @@ public class AttackHelicopter : Helicopter
                 missileManager.main_missile.SetActive(true);
                 missileManager.secondary_missile.SetActive(false);
                 missileManager.secondary_missile.SetActive(false);
-                missileManager.main_missile.Shoot(keyBinds.HELICOPTER_shoot_key);
+                missileManager.main_missile.Shoot(Settings.Instance._keybinds.HELICOPTER_shoot_key);
                 //missileManager.main_missile.SetPlayerVehicle(this);
 
             }
@@ -258,7 +271,7 @@ public class AttackHelicopter : Helicopter
                 missileManager.secondary_missile.SetActive(true);
                 missileManager.main_missile.SetActive(false);
                 missileManager.secondary_missile.SetActive(true);
-                missileManager.secondary_missile.Shoot(keyBinds.HELICOPTER_shoot_key);
+                missileManager.secondary_missile.Shoot(Settings.Instance._keybinds.HELICOPTER_shoot_key);
                 //missileManager.secondary_missile.SetPlayerVehicle(this);
             }
         }
@@ -268,7 +281,7 @@ public class AttackHelicopter : Helicopter
     private void ShootGunnerGun()
     {
         float dt = Time.deltaTime;
-        bool isShooting = Input.GetKey(keyBinds.HELICOPTER_shoot_key);
+        bool isShooting = Input.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key);
         canShootGunnerGun = !overheated && isShooting;
 
         current_spread = Mathf.Clamp(current_spread, 0, heliProperties.max_spread);
@@ -380,7 +393,7 @@ public class AttackHelicopter : Helicopter
 
     private void HandlePilotCamera()
     {
-        if (Input.GetKeyDown(keyBinds.HELICOPTER_switch_camera_key))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.HELICOPTER_switch_camera_key))
         {
             current_camera += 1;
             if (current_camera > 3)
@@ -393,7 +406,7 @@ public class AttackHelicopter : Helicopter
 
     private void HandleGunnerCamera()
     {
-        if (Input.GetKeyDown(keyBinds.HELICOPTER_switch_camera_key))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.HELICOPTER_switch_camera_key))
         {
             current_camera += 1;
             if (current_camera > 2)
@@ -421,7 +434,7 @@ public class AttackHelicopter : Helicopter
 
         if (gunner_gun_camera.enabled)
         {
-            if (Input.GetKey(keyBinds.HELICOPTER_zoom_key))
+            if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
             {
                 float targetFov = minFov / heliProperties.zoom;
                 gunner_gun_camera.fieldOfView = Mathf.Lerp(gunner_gun_camera.fieldOfView, targetFov, 4 * Time.deltaTime);
@@ -436,7 +449,7 @@ public class AttackHelicopter : Helicopter
         }
         else
         {
-            if (Input.GetKey(keyBinds.HELICOPTER_zoom_key))
+            if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
             {
                 float targetFov = minFov / heliProperties.zoom;
                 vehicle_camera.fieldOfView = Mathf.Lerp(vehicle_camera.fieldOfView, targetFov, 4 * Time.deltaTime);
@@ -468,7 +481,7 @@ public class AttackHelicopter : Helicopter
 
     private void HandlePilotFreeLook()
     {
-        if (Input.GetKey(keyBinds.VEHICLE_freeLookKey))
+        if (Input.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
         {
 
             ApplyFreeLookRotation();
@@ -486,8 +499,8 @@ public class AttackHelicopter : Helicopter
 
     private void ApplyFreeLookRotation()
     {
-        float mouseY_freelook = Input.GetAxis("Mouse Y") * -controls.helicopter_sensibility;
-        float mouseX_freelook = Input.GetAxis("Mouse X") * controls.helicopter_sensibility;
+        float mouseY_freelook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
+        float mouseX_freelook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = player_camera.localEulerAngles;
 
@@ -504,9 +517,11 @@ public class AttackHelicopter : Helicopter
     }
 
     private void ApplyGunnerLookRotation()
-    {
-        mouseY = Input.GetAxis("Mouse Y") * controls.helicopter_sensibility;
-        mouseX = Input.GetAxis("Mouse X") * controls.helicopter_sensibility;
+    {   
+        if(gunner_gun_camera.enabled) return;
+
+        mouseY = Input.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
+        mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = player_camera.localEulerAngles;
 
@@ -597,11 +612,13 @@ public class AttackHelicopter : Helicopter
             (!is_pilot_seat_occupied && is_gunner_seat_occupied))
         {
             helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(true);
+            helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(false);
             EnterPilotSeat();
         }
         else if (is_pilot_seat_occupied && !is_gunner_seat_occupied)
         {
             helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(true);
+            helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(false);
             EnterGunnerSeat();
         }
 
@@ -742,6 +759,18 @@ public class AttackHelicopter : Helicopter
 
 
     #region Utility 
+
+    protected void SnapPlayerToSeat(Transform seat)
+    {
+        if (player == null) return;
+
+        current_seat_pos = seat;
+
+        // Fazer o parenting
+        //player.transform.SetParent(seat, false);
+        //player.transform.localPosition = Vector3.zero;
+        //player.transform.localRotation = Quaternion.identity;
+    }
 
     protected override void UpdateHUD()
     {

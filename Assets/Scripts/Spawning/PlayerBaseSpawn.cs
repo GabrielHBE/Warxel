@@ -37,9 +37,9 @@ public class PlayerBaseSpawn : MonoBehaviour
     private bool isTransitioning = false;
     private bool canDrag = true;
     private bool playerWasDestroyed = false;
-    private Settings settings;
 
-    private GeneralHudAlertMessages generalHudAlertMessages;
+    private bool isSpawning = false;
+
     private float original_spawn_delay;
 
     void Start()
@@ -49,12 +49,9 @@ public class PlayerBaseSpawn : MonoBehaviour
         x = spawn_camera.transform.rotation.x;
         y = spawn_camera.transform.rotation.y;
 
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
-        generalHudAlertMessages = settings.GetComponent<GeneralHudAlertMessages>();
         maxOrthographicSize = orthographicSize;
         spawn_camera_original_pos = spawn_camera.transform.position;
         spawn_camera_original_rot = spawn_camera.transform.rotation;
-
     }
 
     void Update()
@@ -85,21 +82,22 @@ public class PlayerBaseSpawn : MonoBehaviour
         }
 
         CheckPlayerDestroyed();
-        if (player == null && !settings.is_menu_settings_active)
+
+        if (player == null && !SettingsHUD.Instance.is_menu_settings_active)
         {
             playerLoadoutCustomization.gameObject.SetActive(true);
-            return;
+
+            // Só permite drag/zoom se não estiver spawnando
+            if (!isTransitioning && canDrag && !SettingsHUD.Instance.is_menu_settings_active)
+            {
+                HandleCameraDrag();
+                HandleCameraZoom();
+                HandleCameraRotation();
+            }
         }
         else
         {
             playerLoadoutCustomization.gameObject.SetActive(false);
-        }
-
-        if (player == null && !isTransitioning && canDrag && !settings.is_menu_settings_active)
-        {
-            HandleCameraDrag();
-            HandleCameraZoom();
-            HandleCameraRotation();
         }
     }
 
@@ -173,24 +171,19 @@ public class PlayerBaseSpawn : MonoBehaviour
         );
     }
 
-
     private void HandleCameraRotation()
     {
-
         if (Input.GetMouseButton(1))
         {
             x -= Input.GetAxis("Mouse Y");
             y += Input.GetAxis("Mouse X");
 
             spawn_camera.transform.rotation = Quaternion.Euler(x, y, 0f);
-
         }
-
     }
+
     private bool CheckForVehicleClick()
     {
-
-
         Ray ray = spawn_camera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
 
@@ -199,16 +192,15 @@ public class PlayerBaseSpawn : MonoBehaviour
             Vehicle vehicle = hit.collider.GetComponent<Vehicle>();
             if (vehicle != null && vehicle.can_spawn_in_vehicle)
             {
-                if (player_prefab.GetComponent<PlayerProperties>().selected_class == ClassManager.Class.Pilot)
+                if (AccountManager.Instance.selected_class == ClassManager.Class.Pilot)
                 {
                     StartCoroutine(TransitionToVehicle(vehicle));
                     return true;
                 }
                 else
                 {
-                    generalHudAlertMessages.CreateMessage("Only the pilot Class can drive vehicles", 2);
+                    GeneralHudAlertMessages.Instance.CreateMessage("Only the pilot Class can drive vehicles", 2);
                 }
-
             }
         }
 
@@ -219,11 +211,11 @@ public class PlayerBaseSpawn : MonoBehaviour
     {
         if (reespawn_delay > 0)
         {
-            generalHudAlertMessages.CreateMessage("Wait " + reespawn_delay.ToString("F1") + " seconds to spawn", 2);
+            GeneralHudAlertMessages.Instance.CreateMessage("Wait " + reespawn_delay.ToString("F1") + " seconds to spawn", 2);
             return;
         }
 
-        if (isTransitioning || !canDrag || player != null) return;
+        if (isTransitioning || !canDrag || player != null || isSpawning) return;
 
         StartCoroutine(TransitionToSpawn());
     }
@@ -268,7 +260,9 @@ public class PlayerBaseSpawn : MonoBehaviour
             yield return null;
         }
 
+        // Spawna o player diretamente
         SpawnPlayer(targetPosition, selectedSpawnPoint.rotation);
+
         spawn_camera.gameObject.SetActive(false);
         isTransitioning = false;
     }
@@ -317,6 +311,7 @@ public class PlayerBaseSpawn : MonoBehaviour
         isTransitioning = false;
     }
 
+    // Método para spawnar o player
     private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation)
     {
         if (player_prefab == null)
@@ -325,14 +320,33 @@ public class PlayerBaseSpawn : MonoBehaviour
             return;
         }
 
-        player = Instantiate(player_prefab, spawnPosition, spawnRotation);
+        isSpawning = true;
 
-        PlayerController playerController = player.GetComponent<PlayerController>();
+        Debug.Log("Spawnando player");
 
+        GameObject playerInstance = Instantiate(player_prefab, spawnPosition, spawnRotation);
+        player = playerInstance;
+
+        SwitchWeapon switchWeapon = playerInstance.GetComponentInChildren<SwitchWeapon>();
+        if (switchWeapon != null)
+        {
+            switchWeapon.primary = playerLoadoutCustomization.GetCurrentPrimaryWeapon();
+            switchWeapon.secondary = playerLoadoutCustomization.GetCurrentSecondaryWeapon();
+            switchWeapon.gadget1 = playerLoadoutCustomization.GetCurrentGadget1();
+            switchWeapon.gadget2 = playerLoadoutCustomization.GetCurrentGadget2();
+            switchWeapon.Initialize();
+        }
+
+        PlayerController playerController = playerInstance.GetComponent<PlayerController>();
         if (playerController != null)
         {
             playerController.InitializePlayer();
 
+            WeaponProperties[] weaponProperties = playerInstance.GetComponentsInChildren<WeaponProperties>(true);
+            foreach (WeaponProperties wp in weaponProperties)
+            {
+                wp.Initialize();
+            }
         }
         else
         {
@@ -340,6 +354,9 @@ public class PlayerBaseSpawn : MonoBehaviour
         }
 
         playerWasDestroyed = true;
+        isSpawning = false;
+
+        Debug.Log("Player spawnado com sucesso");
     }
 
     private void SpawnPlayerAtVehicle(Vehicle vehicle)
@@ -350,16 +367,22 @@ public class PlayerBaseSpawn : MonoBehaviour
             return;
         }
 
+        isSpawning = true;
 
-        player = Instantiate(player_prefab, vehicle.exit_vehicle_position.position, vehicle.exit_vehicle_position.rotation);
+        Debug.Log($"Spawnando player no veículo: {vehicle.name}");
 
-        PlayerController playerController = player.GetComponent<PlayerController>();
+        GameObject playerInstance = Instantiate(player_prefab, vehicle.exit_vehicle_position.position, vehicle.exit_vehicle_position.rotation);
+        player = playerInstance;
+
+        PlayerController playerController = playerInstance.GetComponent<PlayerController>();
 
         if (playerController != null)
         {
             playerController.InitializePlayer();
             playerController.DisableColliders();
-            vehicle.EnterVehicle(player);
+
+            // Entra no veículo
+            vehicle.EnterVehicle(playerInstance);
         }
         else
         {
@@ -367,14 +390,15 @@ public class PlayerBaseSpawn : MonoBehaviour
         }
 
         playerWasDestroyed = true;
+        isSpawning = false;
 
         Debug.Log($"Player spawnado no veículo: {vehicle.name}");
     }
 
     public void ResetSpawnCamera()
     {
-
         isTransitioning = false;
+        isSpawning = false;
         spawn_camera.transform.position = spawn_camera_original_pos;
         spawn_camera.transform.rotation = spawn_camera_original_rot;
         spawn_camera.gameObject.SetActive(true);
@@ -382,5 +406,4 @@ public class PlayerBaseSpawn : MonoBehaviour
         player = null;
         canDrag = true;
     }
-
 }

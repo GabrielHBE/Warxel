@@ -3,8 +3,6 @@ using UnityEngine;
 
 public class SideGrip : Attatchment
 {
-    [Header("Changes")]
-    private KeyBinds keyBinds;
 
     [Header("Configurations")]
     [SerializeField] private GameObject Object;
@@ -19,7 +17,6 @@ public class SideGrip : Attatchment
     void Start()
     {
         weapon = GetComponentInParent<Weapon>();
-        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
         weaponProperties = GetComponentInParent<WeaponProperties>();
         cameraShake = GetComponentInParent<CameraShake>();
         if(Object!=null) Object.SetActive(state);
@@ -29,7 +26,7 @@ public class SideGrip : Attatchment
     {
         if (!gameObject.activeSelf) return;
 
-        if (Input.GetKeyDown(keyBinds.WEAPON_activateSideGrip))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_activateSideGrip))
         {
             if (weaponProperties != null) StartCoroutine(Shake(weaponProperties.weapon.transform));
             if (cameraShake != null) cameraShake.RequestShake(CameraShake.ShakeType.SideGrip, 0.5f);

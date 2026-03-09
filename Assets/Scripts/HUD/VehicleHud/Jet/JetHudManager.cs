@@ -33,7 +33,7 @@ public class JetHudManager : VehicleHudManager
         Vector3 altitude_currentPosition = Vector3.Lerp(
             hud_altidude_controller_min_pos.transform.localPosition,
             hud_altidude_controller_max_pos.transform.localPosition,
-            Mathf.Clamp01(altitude / 400)
+            Mathf.Clamp01(altitude / MapSettings.Instante.max_altitude)
         );
 
         hud_altidude_controller.transform.localPosition = altitude_currentPosition;

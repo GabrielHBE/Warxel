@@ -6,12 +6,13 @@ using UnityEngine.InputSystem;
 using System;
 using UnityEngine.EventSystems;
 
-public class Settings : MonoBehaviour
+public class SettingsHUD : MonoBehaviour
 {
+    public static SettingsHUD Instance { get; private set; }
+
     [SerializeField] private GameObject reset_keyBind_button;
     [SerializeField] private GameObject error_image;
     [SerializeField] private UnityEngine.UI.Button close_image_error_button;
-    [SerializeField] private GameObject settings;
     [SerializeField] private GameObject settings_menu;
     [SerializeField] private Image background_image;
     [SerializeField] private TextMeshProUGUI tab_title;
@@ -189,11 +190,6 @@ public class Settings : MonoBehaviour
     [SerializeField] private TextMeshProUGUI HELICOPTER_gunnerSeatButton;
     [SerializeField] private TextMeshProUGUI HELICOPTER_pilotSeatButton;
 
-    private KeyBinds keyBinds;
-    private Controls controls;
-    private Gameplay gameplay;
-    private Audio audio_;
-    private Video video;
 
     private bool is_mouse_over_close_error_message_button;
     private bool show_message_error = false;
@@ -201,13 +197,8 @@ public class Settings : MonoBehaviour
     TextMeshProUGUI text_error;
     void Start()
     {
+        Instance = this;
         text_error = error_image.GetComponentInChildren<TextMeshProUGUI>();
-        settings = GameObject.FindGameObjectWithTag("Settings");
-        keyBinds = settings.GetComponent<KeyBinds>();
-        controls = settings.GetComponent<Controls>();
-        gameplay = settings.GetComponent<Gameplay>();
-        audio_ = settings.GetComponent<Audio>();
-        video = settings.GetComponent<Video>();
 
         if (settings_menu != null)
             settings_menu.SetActive(false);
@@ -324,7 +315,7 @@ public class Settings : MonoBehaviour
         if (settings_menu != null)
             settings_menu.SetActive(is_menu_settings_active);
 
-  
+
     }
 
     public void OpenSettingsMenu()
@@ -431,131 +422,138 @@ public class Settings : MonoBehaviour
     private void InitializeUIValues()
     {
 
+        // VERIFICAR SE Settings.Instance EXISTE
+        if (Settings.Instance == null)
+        {
+            Debug.LogError("Settings.Instance is null! Make sure Settings object exists in the scene.");
+            return;
+        }
+
         //LoadColors();
 
         // Áudio - Carregar valores salvos ou usar padrão
-        if (generalVolumeSlider != null) generalVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.GENERAL_VOLUME, audio_.general_volume);
-        if (voipVolumeSlider != null) voipVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VOIP_VOLUME, audio_.in_world_voip_volume);
-        if (musicVolumeSlider != null) musicVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MUSIC_VOLUME, audio_.music_volume);
-        if (worldVolumeSlider != null) worldVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.WORLD_VOLUME, audio_.world_volume);
-        if (hitVolumeSlider != null) hitVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_VOLUME, audio_.hit_volume);
-        if (killVolumeSlider != null) killVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.KILL_VOLUME, audio_.kill_volume);
-        if (vehicleVolumeSlider != null) vehicleVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VEHICLE_VOLUME, audio_.vehicle_volume);
-        if (infantryVolumeSlider != null) infantryVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_VOLUME, audio_.infantary_volume);
-        if (microphoneVolumeSlider != null) microphoneVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MICROPHONE_VOLUME, audio_.microphone_volume);
-        if (enableDeathVoipToggle != null) enableDeathVoipToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.ENABLE_DEATH_VOIP, audio_.enable_deth_voip ? 1 : 0) == 1;
+        if (generalVolumeSlider != null) generalVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.GENERAL_VOLUME, Settings.Instance._audio.general_volume);
+        if (voipVolumeSlider != null) voipVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VOIP_VOLUME, Settings.Instance._audio.in_world_voip_volume);
+        if (musicVolumeSlider != null) musicVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MUSIC_VOLUME, Settings.Instance._audio.music_volume);
+        if (worldVolumeSlider != null) worldVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.WORLD_VOLUME, Settings.Instance._audio.world_volume);
+        if (hitVolumeSlider != null) hitVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_VOLUME, Settings.Instance._audio.hit_volume);
+        if (killVolumeSlider != null) killVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.KILL_VOLUME, Settings.Instance._audio.kill_volume);
+        if (vehicleVolumeSlider != null) vehicleVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VEHICLE_VOLUME, Settings.Instance._audio.vehicle_volume);
+        if (infantryVolumeSlider != null) infantryVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_VOLUME, Settings.Instance._audio.infantary_volume);
+        if (microphoneVolumeSlider != null) microphoneVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MICROPHONE_VOLUME, Settings.Instance._audio.microphone_volume);
+        if (enableDeathVoipToggle != null) enableDeathVoipToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.ENABLE_DEATH_VOIP, Settings.Instance._audio.enable_deth_voip ? 1 : 0) == 1;
 
         // Configurar dropdowns
         if (inWorldVoipDropdown != null)
         {
             inWorldVoipDropdown.ClearOptions();
-            inWorldVoipDropdown.AddOptions(audio_.in_world_voip_modes);
+            inWorldVoipDropdown.AddOptions(Settings.Instance._audio.in_world_voip_modes);
             inWorldVoipDropdown.value = PlayerPrefs.GetInt(SettingsKeys.IN_WORLD_VOIP_MODE, 0);
         }
 
         if (radioVoipDropdown != null)
         {
             radioVoipDropdown.ClearOptions();
-            radioVoipDropdown.AddOptions(audio_.radio_world_voip_modes);
+            radioVoipDropdown.AddOptions(Settings.Instance._audio.radio_world_voip_modes);
             radioVoipDropdown.value = PlayerPrefs.GetInt(SettingsKeys.RADIO_VOIP_MODE, 0);
         }
 
         // Controls - Carregar valores salvos
-        if (aimHoldToggle != null) aimHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.AIM_HOLD, controls.is_aim_on_hold ? 1 : 0) == 1;
-        if (sprintHoldToggle != null) sprintHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SPRINT_HOLD, controls.is_sprint_on_hold ? 1 : 0) == 1;
-        if (crouchHoldToggle != null) crouchHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.CROUCH_HOLD, controls.is_crouch_on_hold ? 1 : 0) == 1;
-        if (proneHoldToggle != null) proneHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.PRONE_HOLD, controls.is_prone_on_hold ? 1 : 0) == 1;
-        if (vehicleBoostHoldToggle != null) vehicleBoostHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.VEHICLE_BOOST_HOLD, controls.is_vehicle_boost_on_hold ? 1 : 0) == 1;
+        if (aimHoldToggle != null) aimHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.AIM_HOLD, Settings.Instance._controls.is_aim_on_hold ? 1 : 0) == 1;
+        if (sprintHoldToggle != null) sprintHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SPRINT_HOLD, Settings.Instance._controls.is_sprint_on_hold ? 1 : 0) == 1;
+        if (crouchHoldToggle != null) crouchHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.CROUCH_HOLD, Settings.Instance._controls.is_crouch_on_hold ? 1 : 0) == 1;
+        if (proneHoldToggle != null) proneHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.PRONE_HOLD, Settings.Instance._controls.is_prone_on_hold ? 1 : 0) == 1;
+        if (vehicleBoostHoldToggle != null) vehicleBoostHoldToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.VEHICLE_BOOST_HOLD, Settings.Instance._controls.is_vehicle_boost_on_hold ? 1 : 0) == 1;
 
         // Mouse Infantry
-        if (invertVerticalInfantryToggle != null) invertVerticalInfantryToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_INFANTRY, controls.invert_vertical_infantary_mouse ? 1 : 0) == 1;
-        if (infantrySensibilitySlider != null) infantrySensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_SENSIBILITY, controls.infantary_sensibility);
-        if (infantryAimSensibilitySlider != null) infantryAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_AIM_SENSIBILITY, controls.infantary_aim_sensibility);
+        if (invertVerticalInfantryToggle != null) invertVerticalInfantryToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_INFANTRY, Settings.Instance._controls.invert_vertical_infantary_mouse ? 1 : 0) == 1;
+        if (infantrySensibilitySlider != null) infantrySensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_SENSIBILITY, Settings.Instance._controls.infantary_sensibility);
+        if (infantryAimSensibilitySlider != null) infantryAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_AIM_SENSIBILITY, Settings.Instance._controls.infantary_aim_sensibility);
 
         // Mouse Tank
-        if (invertVerticalTankToggle != null) invertVerticalTankToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_TANK, controls.invert_vertical_tank_mouse ? 1 : 0) == 1;
-        if (tankSensibilitySlider != null) tankSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.TANK_SENSIBILITY, controls.tank_sensibility);
-        if (tankAimSensibilitySlider != null) tankAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.TANK_AIM_SENSIBILITY, controls.tank_aim_sensibility);
+        if (invertVerticalTankToggle != null) invertVerticalTankToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_TANK, Settings.Instance._controls.invert_vertical_tank_mouse ? 1 : 0) == 1;
+        if (tankSensibilitySlider != null) tankSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.TANK_SENSIBILITY, Settings.Instance._controls.tank_sensibility);
+        if (tankAimSensibilitySlider != null) tankAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.TANK_AIM_SENSIBILITY, Settings.Instance._controls.tank_aim_sensibility);
 
         // Mouse Jet
-        if (invertVerticalJetToggle != null) invertVerticalJetToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_JET, controls.invert_vertical_jet_mouse ? 1 : 0) == 1;
-        if (jetSensibilitySlider != null) jetSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.JET_SENSIBILITY, controls.jet_sensibility);
-        if (jetAimSensibilitySlider != null) jetAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.JET_AIM_SENSIBILITY, controls.jet_aim_sensibility);
+        if (invertVerticalJetToggle != null) invertVerticalJetToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_JET, Settings.Instance._controls.invert_vertical_jet_mouse ? 1 : 0) == 1;
+        if (jetSensibilitySlider != null) jetSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.JET_SENSIBILITY, Settings.Instance._controls.jet_sensibility);
+        if (jetAimSensibilitySlider != null) jetAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.JET_AIM_SENSIBILITY, Settings.Instance._controls.jet_aim_sensibility);
 
         // Mouse Helicopter
-        if (invertVerticalHeliToggle != null) invertVerticalHeliToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_HELI, controls.invert_vertical_heli_mouse ? 1 : 0) == 1;
-        if (helicopterSensibilitySlider != null) helicopterSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.HELICOPTER_SENSIBILITY, controls.helicopter_sensibility);
-        if (helicopterAimSensibilitySlider != null) helicopterAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.HELICOPTER_AIM_SENSIBILITY, controls.helicopter_aim_sensibility);
+        if (invertVerticalHeliToggle != null) invertVerticalHeliToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.INVERT_VERTICAL_HELI, Settings.Instance._controls.invert_vertical_heli_mouse ? 1 : 0) == 1;
+        if (helicopterSensibilitySlider != null) helicopterSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.HELICOPTER_SENSIBILITY, Settings.Instance._controls.helicopter_sensibility);
+        if (helicopterAimSensibilitySlider != null) helicopterAimSensibilitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.HELICOPTER_AIM_SENSIBILITY, Settings.Instance._controls.helicopter_aim_sensibility);
 
         // Gameplay - Carregar valores salvos
-        if (showHitMarkerToggle != null) showHitMarkerToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_HIT_MARKER, gameplay.show_hit_marker ? 1 : 0) == 1;
-        if (hitMarkerOpacitySlider != null) hitMarkerOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_MARKER_OPACITY, gameplay.hit_marker_opacity);
-        if (hitMarkerSizeSlider != null) hitMarkerSizeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_MARKER_SIZE, gameplay.hit_marker_size);
+        if (showHitMarkerToggle != null) showHitMarkerToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_HIT_MARKER, Settings.Instance._gameplay.show_hit_marker ? 1 : 0) == 1;
+        if (hitMarkerOpacitySlider != null) hitMarkerOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_MARKER_OPACITY, Settings.Instance._gameplay.hit_marker_opacity);
+        if (hitMarkerSizeSlider != null) hitMarkerSizeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_MARKER_SIZE, Settings.Instance._gameplay.hit_marker_size);
 
-        if (showFpsToggle != null) showFpsToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_FPS, gameplay.show_fps ? 1 : 0) == 1;
-        if (showNetworkStatusToggle != null) showNetworkStatusToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_NETWORK_STATUS, gameplay.show_network_status ? 1 : 0) == 1;
-        if (showLevelProgressionToggle != null) showLevelProgressionToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_LEVEL_PROGRESSION, gameplay.show_level_progression ? 1 : 0) == 1;
-        if (showKillFeedToggle != null) showKillFeedToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_KILL_FEED, gameplay.show_kill_feed ? 1 : 0) == 1;
-        if (sightReticleSizeSlider != null) sightReticleSizeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.SIGHT_RETICLE_SIZE, gameplay.sight_reticle_size);
+        if (showFpsToggle != null) showFpsToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_FPS, Settings.Instance._gameplay.show_fps ? 1 : 0) == 1;
+        if (showNetworkStatusToggle != null) showNetworkStatusToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_NETWORK_STATUS, Settings.Instance._gameplay.show_network_status ? 1 : 0) == 1;
+        if (showLevelProgressionToggle != null) showLevelProgressionToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_LEVEL_PROGRESSION, Settings.Instance._gameplay.show_level_progression ? 1 : 0) == 1;
+        if (showKillFeedToggle != null) showKillFeedToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_KILL_FEED, Settings.Instance._gameplay.show_kill_feed ? 1 : 0) == 1;
+        if (sightReticleSizeSlider != null) sightReticleSizeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.SIGHT_RETICLE_SIZE, Settings.Instance._gameplay.sight_reticle_size);
 
         // Indicators
-        if (enemyIndicatorOpacitySlider != null) enemyIndicatorOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_INDICATOR_OPACITY, gameplay.enemy_indicator_opacity);
-        if (allyIndicatorOpacitySlider != null) allyIndicatorOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_INDICATOR_OPACITY, gameplay.ally_indicator_opacity);
-        if (squadIndicatorOpacitySlider != null) squadIndicatorOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.SQUAD_INDICATOR_OPACITY, gameplay.squad_indicator_opacity);
-        if (enemyIndicatorAimOpacitySlider != null) enemyIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_INDICATOR_AIM_OPACITY, gameplay.enemy_indicator_aim_opacity);
-        if (allyIndicatorAimOpacitySlider != null) allyIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_INDICATOR_AIM_OPACITY, gameplay.ally_indicator_aim_opacity);
-        if (squadIndicatorAimOpacitySlider != null) squadIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.SQUAD_INDICATOR_AIM_OPACITY, gameplay.squad_indicator_aim_opacity);
+        if (enemyIndicatorOpacitySlider != null) enemyIndicatorOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_INDICATOR_OPACITY, Settings.Instance._gameplay.enemy_indicator_opacity);
+        if (allyIndicatorOpacitySlider != null) allyIndicatorOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_INDICATOR_OPACITY, Settings.Instance._gameplay.ally_indicator_opacity);
+        if (squadIndicatorOpacitySlider != null) squadIndicatorOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.SQUAD_INDICATOR_OPACITY, Settings.Instance._gameplay.squad_indicator_opacity);
+        if (enemyIndicatorAimOpacitySlider != null) enemyIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_INDICATOR_AIM_OPACITY, Settings.Instance._gameplay.enemy_indicator_aim_opacity);
+        if (allyIndicatorAimOpacitySlider != null) allyIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_INDICATOR_AIM_OPACITY, Settings.Instance._gameplay.ally_indicator_aim_opacity);
+        if (squadIndicatorAimOpacitySlider != null) squadIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.SQUAD_INDICATOR_AIM_OPACITY, Settings.Instance._gameplay.squad_indicator_aim_opacity);
 
         // Flags
-        if (enemyFlagOpacitySlider != null) enemyFlagOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_FLAG_OPACITY, gameplay.enemy_flag_opacity);
-        if (allyFlagOpacitySlider != null) allyFlagOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_FLAG_OPACITY, gameplay.ally_flag_opacity);
-        if (enemyFlagAimOpacitySlider != null) enemyFlagAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_FLAG_AIM_OPACITY, gameplay.enemy_flag_aim_opacity);
-        if (allyFlagAimOpacitySlider != null) allyFlagAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_FLAG_AIM_OPACITY, gameplay.ally_flag_aim_opacity);
+        if (enemyFlagOpacitySlider != null) enemyFlagOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_FLAG_OPACITY, Settings.Instance._gameplay.enemy_flag_opacity);
+        if (allyFlagOpacitySlider != null) allyFlagOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_FLAG_OPACITY, Settings.Instance._gameplay.ally_flag_opacity);
+        if (enemyFlagAimOpacitySlider != null) enemyFlagAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_FLAG_AIM_OPACITY, Settings.Instance._gameplay.enemy_flag_aim_opacity);
+        if (allyFlagAimOpacitySlider != null) allyFlagAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_FLAG_AIM_OPACITY, Settings.Instance._gameplay.ally_flag_aim_opacity);
 
         // Chat
-        if (showChatToggle != null) showChatToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_CHAT, gameplay.show_chat ? 1 : 0) == 1;
-        if (chatOpacitySlider != null) chatOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.CHAT_OPACITY, gameplay.chat_opacity);
-        if (chatSizeSlider != null) chatSizeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.CHAT_SIZE, gameplay.chat_size);
+        if (showChatToggle != null) showChatToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_CHAT, Settings.Instance._gameplay.show_chat ? 1 : 0) == 1;
+        if (chatOpacitySlider != null) chatOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.CHAT_OPACITY, Settings.Instance._gameplay.chat_opacity);
+        if (chatSizeSlider != null) chatSizeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.CHAT_SIZE, Settings.Instance._gameplay.chat_size);
 
         // Video - Carregar valores salvos
         if (graphicPresetsDropdown != null)
         {
             graphicPresetsDropdown.ClearOptions();
-            graphicPresetsDropdown.AddOptions(video.graphic_presets);
+            graphicPresetsDropdown.AddOptions(Settings.Instance._video.graphic_presets);
             graphicPresetsDropdown.value = PlayerPrefs.GetInt(SettingsKeys.GRAPHIC_PRESET, 0);
         }
 
-        if (renderDistanceSlider != null) renderDistanceSlider.value = PlayerPrefs.GetFloat(SettingsKeys.RENDER_DISTANCE, video.render_distance);
-        if (enableShadowsToggle != null) enableShadowsToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.ENABLE_SHADOWS, video.enable_shadows ? 1 : 0) == 1;
+        if (renderDistanceSlider != null) renderDistanceSlider.value = PlayerPrefs.GetFloat(SettingsKeys.RENDER_DISTANCE, Settings.Instance._video.render_distance);
+        if (enableShadowsToggle != null) enableShadowsToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.ENABLE_SHADOWS, Settings.Instance._video.enable_shadows ? 1 : 0) == 1;
 
         if (shadowsDropdown != null)
         {
             shadowsDropdown.ClearOptions();
-            shadowsDropdown.AddOptions(video.shadows);
+            shadowsDropdown.AddOptions(Settings.Instance._video.shadows);
             shadowsDropdown.value = PlayerPrefs.GetInt(SettingsKeys.SHADOWS_QUALITY, 0);
         }
 
         if (meshesDropdown != null)
         {
             meshesDropdown.ClearOptions();
-            meshesDropdown.AddOptions(video.meshes);
+            meshesDropdown.AddOptions(Settings.Instance._video.meshes);
             meshesDropdown.value = PlayerPrefs.GetInt(SettingsKeys.MESHES_QUALITY, 0);
         }
 
         if (rainQualityDropdown != null)
         {
             rainQualityDropdown.ClearOptions();
-            rainQualityDropdown.AddOptions(video.rain_quality);
+            rainQualityDropdown.AddOptions(Settings.Instance._video.rain_quality);
             rainQualityDropdown.value = PlayerPrefs.GetInt(SettingsKeys.RAIN_QUALITY, 0);
         }
 
         // Screen
-        if (limitFpsToggle != null) limitFpsToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.LIMIT_FPS, video.limit_fps ? 1 : 0) == 1;
-        if (maxFpsInput != null) maxFpsInput.text = PlayerPrefs.GetFloat(SettingsKeys.MAX_FPS, video.max_fps).ToString("F0");
-        if (vsyncSlider != null) vsyncSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VSYNC, video.Vsync);
-        if (brightnessSlider != null) brightnessSlider.value = PlayerPrefs.GetFloat(SettingsKeys.BRIGHTNESS, video.brightness);
-        if (renderScaleSlider != null) renderScaleSlider.value = PlayerPrefs.GetFloat(SettingsKeys.RENDER_SCALE, video.render_scale);
-        if (customResolutionToggle != null) customResolutionToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.CUSTOM_RESOLUTION, video.custom_resolution ? 1 : 0) == 1;
+        if (limitFpsToggle != null) limitFpsToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.LIMIT_FPS, Settings.Instance._video.limit_fps ? 1 : 0) == 1;
+        if (maxFpsInput != null) maxFpsInput.text = PlayerPrefs.GetFloat(SettingsKeys.MAX_FPS, Settings.Instance._video.max_fps).ToString("F0");
+        if (vsyncSlider != null) vsyncSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VSYNC, Settings.Instance._video.Vsync);
+        if (brightnessSlider != null) brightnessSlider.value = PlayerPrefs.GetFloat(SettingsKeys.BRIGHTNESS, Settings.Instance._video.brightness);
+        if (renderScaleSlider != null) renderScaleSlider.value = PlayerPrefs.GetFloat(SettingsKeys.RENDER_SCALE, Settings.Instance._video.render_scale);
+        if (customResolutionToggle != null) customResolutionToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.CUSTOM_RESOLUTION, Settings.Instance._video.custom_resolution ? 1 : 0) == 1;
 
         if (resolutionWidthInput != null && resolutionHeightInput != null)
         {
@@ -566,18 +564,18 @@ public class Settings : MonoBehaviour
         if (screenModeDropdown != null)
         {
             screenModeDropdown.ClearOptions();
-            screenModeDropdown.AddOptions(video.screen_mode);
+            screenModeDropdown.AddOptions(Settings.Instance._video.screen_mode);
             screenModeDropdown.value = PlayerPrefs.GetInt(SettingsKeys.SCREEN_MODE, 0);
         }
 
         // Camera
-        if (infantryFovSlider != null) infantryFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_FOV, video.infantary_fov);
-        if (jetFovSlider != null) jetFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.JET_FOV, video.jet_fov);
-        if (tankFovSlider != null) tankFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.TANK_FOV, video.tank_fov);
-        if (helicopterFovSlider != null) helicopterFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HELICOPTER_FOV, video.helicopter_fov);
-        if (cameraShakeIntensitySlider != null) cameraShakeIntensitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.CAMERA_SHAKE_INTENSITY, video.camera_shake_intensity);
-        if (vignetteToggle != null) vignetteToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.VIGNETTE, video.vignette ? 1 : 0) == 1;
-        if (motionBlurSlider != null) motionBlurSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MOTION_BLUR, video.motion_blur);
+        if (infantryFovSlider != null) infantryFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_FOV, Settings.Instance._video.infantary_fov);
+        if (jetFovSlider != null) jetFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.JET_FOV, Settings.Instance._video.jet_fov);
+        if (tankFovSlider != null) tankFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.TANK_FOV, Settings.Instance._video.tank_fov);
+        if (helicopterFovSlider != null) helicopterFovSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HELICOPTER_FOV, Settings.Instance._video.helicopter_fov);
+        if (cameraShakeIntensitySlider != null) cameraShakeIntensitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.CAMERA_SHAKE_INTENSITY, Settings.Instance._video.camera_shake_intensity);
+        if (vignetteToggle != null) vignetteToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.VIGNETTE, Settings.Instance._video.vignette ? 1 : 0) == 1;
+        if (motionBlurSlider != null) motionBlurSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MOTION_BLUR, Settings.Instance._video.motion_blur);
     }
 
     #endregion
@@ -586,115 +584,115 @@ public class Settings : MonoBehaviour
     // Gameplay Controls
     public void OnAimHoldChanged()
     {
-        controls.is_aim_on_hold = aimHoldToggle.isOn;
+        Settings.Instance._controls.is_aim_on_hold = aimHoldToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.AIM_HOLD, aimHoldToggle.isOn ? 1 : 0);
     }
 
     public void OnSprintHoldChanged()
     {
-        controls.is_sprint_on_hold = sprintHoldToggle.isOn;
+        Settings.Instance._controls.is_sprint_on_hold = sprintHoldToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SPRINT_HOLD, sprintHoldToggle.isOn ? 1 : 0);
     }
 
     public void OnCrouchHoldChanged()
     {
-        controls.is_crouch_on_hold = crouchHoldToggle.isOn;
+        Settings.Instance._controls.is_crouch_on_hold = crouchHoldToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.CROUCH_HOLD, crouchHoldToggle.isOn ? 1 : 0);
     }
 
     public void OnProneHoldChanged()
     {
-        controls.is_prone_on_hold = proneHoldToggle.isOn;
+        Settings.Instance._controls.is_prone_on_hold = proneHoldToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.PRONE_HOLD, proneHoldToggle.isOn ? 1 : 0);
     }
 
     public void OnVehicleBoostHoldChanged()
     {
-        controls.is_vehicle_boost_on_hold = vehicleBoostHoldToggle.isOn;
+        Settings.Instance._controls.is_vehicle_boost_on_hold = vehicleBoostHoldToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.VEHICLE_BOOST_HOLD, vehicleBoostHoldToggle.isOn ? 1 : 0);
     }
 
     // Mouse Infantry
     public void OnInvertVerticalInfantryChanged()
     {
-        controls.invert_vertical_infantary_mouse = invertVerticalInfantryToggle.isOn;
+        Settings.Instance._controls.invert_vertical_infantary_mouse = invertVerticalInfantryToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.INVERT_VERTICAL_INFANTRY, invertVerticalInfantryToggle.isOn ? 1 : 0);
     }
 
     public void OnInfantrySensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + infantrySensibilitySlider.value.ToString("F1") + "] Infantaty Mouse Sensibility";
-        controls.infantary_sensibility = infantrySensibilitySlider.value;
+        Settings.Instance._controls.infantary_sensibility = infantrySensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.INFANTRY_SENSIBILITY, infantrySensibilitySlider.value);
     }
 
     public void OnInfantryAimSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + infantryAimSensibilitySlider.value.ToString("F1") + "] Infantaty Aim Mouse Sensibility";
-        controls.infantary_aim_sensibility = infantryAimSensibilitySlider.value;
+        Settings.Instance._controls.infantary_aim_sensibility = infantryAimSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.INFANTRY_AIM_SENSIBILITY, infantryAimSensibilitySlider.value);
     }
 
     // Mouse Tank
     public void OnInvertVerticalTankChanged()
     {
-        controls.invert_vertical_tank_mouse = invertVerticalTankToggle.isOn;
+        Settings.Instance._controls.invert_vertical_tank_mouse = invertVerticalTankToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.INVERT_VERTICAL_TANK, invertVerticalTankToggle.isOn ? 1 : 0);
     }
 
     public void OnTankSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + tankSensibilitySlider.value.ToString("F1") + "] Tank Mouse Sensibility";
-        controls.tank_sensibility = tankSensibilitySlider.value;
+        Settings.Instance._controls.tank_sensibility = tankSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.TANK_SENSIBILITY, tankSensibilitySlider.value);
     }
 
     public void OnTankAimSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + tankAimSensibilitySlider.value.ToString("F1") + "] Tank Aim Mouse Sensibility";
-        controls.tank_aim_sensibility = tankAimSensibilitySlider.value;
+        Settings.Instance._controls.tank_aim_sensibility = tankAimSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.TANK_AIM_SENSIBILITY, tankAimSensibilitySlider.value);
     }
 
     // Mouse Jet
     public void OnInvertVerticalJetChanged()
     {
-        controls.invert_vertical_jet_mouse = invertVerticalJetToggle.isOn;
+        Settings.Instance._controls.invert_vertical_jet_mouse = invertVerticalJetToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.INVERT_VERTICAL_JET, invertVerticalJetToggle.isOn ? 1 : 0);
     }
 
     public void OnJetSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + jetSensibilitySlider.value.ToString("F1") + "] Jet Mouse Sensibility";
-        controls.jet_sensibility = jetSensibilitySlider.value;
+        Settings.Instance._controls.jet_sensibility = jetSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.JET_SENSIBILITY, jetSensibilitySlider.value);
     }
 
     public void OnJetAimSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + jetAimSensibilitySlider.value.ToString("F1") + "] Jet Aim Mouse Sensibility";
-        controls.jet_aim_sensibility = jetAimSensibilitySlider.value;
+        Settings.Instance._controls.jet_aim_sensibility = jetAimSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.JET_AIM_SENSIBILITY, jetAimSensibilitySlider.value);
     }
 
     // Mouse Helicopter
     public void OnInvertVerticalHeliChanged()
     {
-        controls.invert_vertical_heli_mouse = invertVerticalHeliToggle.isOn;
+        Settings.Instance._controls.invert_vertical_heli_mouse = invertVerticalHeliToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.INVERT_VERTICAL_HELI, invertVerticalHeliToggle.isOn ? 1 : 0);
     }
 
     public void OnHelicopterSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + helicopterSensibilitySlider.value.ToString("F1") + "] Helicopter Mouse Sensibility";
-        controls.helicopter_sensibility = helicopterSensibilitySlider.value;
+        Settings.Instance._controls.helicopter_sensibility = helicopterSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.HELICOPTER_SENSIBILITY, helicopterSensibilitySlider.value);
     }
 
     public void OnHelicopterAimSensibilityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + helicopterAimSensibilitySlider.value.ToString("F1") + "] Helicopter Aim Mouse Sensibility";
-        controls.helicopter_aim_sensibility = helicopterAimSensibilitySlider.value;
+        Settings.Instance._controls.helicopter_aim_sensibility = helicopterAimSensibilitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.HELICOPTER_AIM_SENSIBILITY, helicopterAimSensibilitySlider.value);
     }
     #endregion
@@ -702,73 +700,73 @@ public class Settings : MonoBehaviour
     #region Audio
     public void OnGeneralVolumeChanged(float value)
     {
-        audio_.general_volume = value;
+        Settings.Instance._audio.general_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.GENERAL_VOLUME, value);
     }
 
     public void OnVoipVolumeChanged(float value)
     {
-        audio_.in_world_voip_volume = value;
+        Settings.Instance._audio.in_world_voip_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.VOIP_VOLUME, value);
     }
 
     public void OnMusicVolumeChanged(float value)
     {
-        audio_.music_volume = value;
+        Settings.Instance._audio.music_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.MUSIC_VOLUME, value);
     }
 
     public void OnWorldVolumeChanged(float value)
     {
-        audio_.world_volume = value;
+        Settings.Instance._audio.world_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.WORLD_VOLUME, value);
     }
 
     public void OnHitVolumeChanged(float value)
     {
-        audio_.hit_volume = value;
+        Settings.Instance._audio.hit_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.HIT_VOLUME, value);
     }
 
     public void OnKillVolumeChanged(float value)
     {
-        audio_.kill_volume = value;
+        Settings.Instance._audio.kill_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.KILL_VOLUME, value);
     }
 
     public void OnVehicleVolumeChanged(float value)
     {
-        audio_.vehicle_volume = value;
+        Settings.Instance._audio.vehicle_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.VEHICLE_VOLUME, value);
     }
 
     public void OnInfantryVolumeChanged(float value)
     {
-        audio_.infantary_volume = value;
+        Settings.Instance._audio.infantary_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.INFANTRY_VOLUME, value);
     }
 
     public void OnMicrophoneVolumeChanged(float value)
     {
-        audio_.microphone_volume = value;
+        Settings.Instance._audio.microphone_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.MICROPHONE_VOLUME, value);
     }
 
     public void OnEnableDeathVoipChanged()
     {
-        audio_.enable_deth_voip = enableDeathVoipToggle.isOn;
+        Settings.Instance._audio.enable_deth_voip = enableDeathVoipToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.ENABLE_DEATH_VOIP, enableDeathVoipToggle.isOn ? 1 : 0);
     }
 
     public void OnInWorldVoipModeChanged(int index)
     {
-        audio_.in_world_voip_key = GetKeyForMode(audio_.in_world_voip_modes[index]);
+        Settings.Instance._audio.in_world_voip_key = GetKeyForMode(Settings.Instance._audio.in_world_voip_modes[index]);
         PlayerPrefs.SetInt(SettingsKeys.IN_WORLD_VOIP_MODE, index);
     }
 
     public void OnRadioVoipModeChanged(int index)
     {
-        audio_.radio_voip_key = GetKeyForMode(audio_.radio_world_voip_modes[index]);
+        Settings.Instance._audio.radio_voip_key = GetKeyForMode(Settings.Instance._audio.radio_world_voip_modes[index]);
         PlayerPrefs.SetInt(SettingsKeys.RADIO_VOIP_MODE, index);
     }
 
@@ -787,195 +785,195 @@ public class Settings : MonoBehaviour
     // HitMarkers
     public void OnShowHitMarkerChanged()
     {
-        gameplay.show_hit_marker = showHitMarkerToggle.isOn;
+        Settings.Instance._gameplay.show_hit_marker = showHitMarkerToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SHOW_HIT_MARKER, showHitMarkerToggle.isOn ? 1 : 0);
     }
 
     public void OnHitMarkerOpacityChanged(TextMeshProUGUI text)
     {
         text.text = "[" + hitMarkerOpacitySlider.value.ToString("F1") + "] Hit Marker Opacity";
-        gameplay.hit_marker_opacity = hitMarkerOpacitySlider.value;
+        Settings.Instance._gameplay.hit_marker_opacity = hitMarkerOpacitySlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.HIT_MARKER_OPACITY, hitMarkerOpacitySlider.value);
     }
 
     public void OnHitMarkerSizeChanged(TextMeshProUGUI text)
     {
         text.text = "[" + hitMarkerSizeSlider.value.ToString("F1") + "] Hit Marker Size";
-        gameplay.hit_marker_size = hitMarkerSizeSlider.value;
+        Settings.Instance._gameplay.hit_marker_size = hitMarkerSizeSlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.HIT_MARKER_SIZE, hitMarkerSizeSlider.value);
     }
 
     // User Interface
     public void OnShowFpsChanged()
     {
-        gameplay.show_fps = showFpsToggle.isOn;
+        Settings.Instance._gameplay.show_fps = showFpsToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SHOW_FPS, showFpsToggle.isOn ? 1 : 0);
     }
 
     public void OnShowNetworkStatusChanged()
     {
-        gameplay.show_network_status = showNetworkStatusToggle.isOn;
+        Settings.Instance._gameplay.show_network_status = showNetworkStatusToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SHOW_NETWORK_STATUS, showNetworkStatusToggle.isOn ? 1 : 0);
     }
 
     public void OnShowLevelProgressionChanged()
     {
-        gameplay.show_level_progression = showLevelProgressionToggle.isOn;
+        Settings.Instance._gameplay.show_level_progression = showLevelProgressionToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SHOW_LEVEL_PROGRESSION, showLevelProgressionToggle.isOn ? 1 : 0);
     }
 
     public void OnShowKillFeedChanged()
     {
-        gameplay.show_kill_feed = showKillFeedToggle.isOn;
+        Settings.Instance._gameplay.show_kill_feed = showKillFeedToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SHOW_KILL_FEED, showKillFeedToggle.isOn ? 1 : 0);
     }
 
     public void OnSightReticleSizeChanged(TextMeshProUGUI text)
     {
         text.text = "[" + sightReticleSizeSlider.value.ToString("F1") + "] Sight Reticle Size";
-        gameplay.sight_reticle_size = sightReticleSizeSlider.value;
+        Settings.Instance._gameplay.sight_reticle_size = sightReticleSizeSlider.value;
         PlayerPrefs.SetFloat(SettingsKeys.SIGHT_RETICLE_SIZE, sightReticleSizeSlider.value);
     }
 
     // Indicators
     public void OnEnemyIndicatorOpacityChanged(float value)
     {
-        gameplay.enemy_indicator_opacity = value;
+        Settings.Instance._gameplay.enemy_indicator_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ENEMY_INDICATOR_OPACITY, value);
     }
 
     public void OnAllyIndicatorOpacityChanged(float value)
     {
-        gameplay.ally_indicator_opacity = value;
+        Settings.Instance._gameplay.ally_indicator_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ALLY_INDICATOR_OPACITY, value);
     }
 
     public void OnSquadIndicatorOpacityChanged(float value)
     {
-        gameplay.squad_indicator_opacity = value;
+        Settings.Instance._gameplay.squad_indicator_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.SQUAD_INDICATOR_OPACITY, value);
     }
 
     public void OnEnemyIndicatorAimOpacityChanged(float value)
     {
-        gameplay.enemy_indicator_aim_opacity = value;
+        Settings.Instance._gameplay.enemy_indicator_aim_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ENEMY_INDICATOR_AIM_OPACITY, value);
     }
 
     public void OnAllyIndicatorAimOpacityChanged(float value)
     {
-        gameplay.ally_indicator_aim_opacity = value;
+        Settings.Instance._gameplay.ally_indicator_aim_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ALLY_INDICATOR_AIM_OPACITY, value);
     }
 
     public void OnSquadIndicatorAimOpacityChanged(float value)
     {
-        gameplay.squad_indicator_aim_opacity = value;
+        Settings.Instance._gameplay.squad_indicator_aim_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.SQUAD_INDICATOR_AIM_OPACITY, value);
     }
 
     // Flags
     public void OnEnemyFlagOpacityChanged(float value)
     {
-        gameplay.enemy_flag_opacity = value;
+        Settings.Instance._gameplay.enemy_flag_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ENEMY_FLAG_OPACITY, value);
     }
 
     public void OnAllyFlagOpacityChanged(float value)
     {
-        gameplay.ally_flag_opacity = value;
+        Settings.Instance._gameplay.ally_flag_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ALLY_FLAG_OPACITY, value);
     }
 
     public void OnEnemyFlagAimOpacityChanged(float value)
     {
-        gameplay.enemy_flag_aim_opacity = value;
+        Settings.Instance._gameplay.enemy_flag_aim_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ENEMY_FLAG_AIM_OPACITY, value);
     }
 
     public void OnAllyFlagAimOpacityChanged(float value)
     {
-        gameplay.ally_flag_aim_opacity = value;
+        Settings.Instance._gameplay.ally_flag_aim_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.ALLY_FLAG_AIM_OPACITY, value);
     }
 
     // Chat
     public void OnShowChatChanged()
     {
-        gameplay.show_chat = showChatToggle.isOn;
+        Settings.Instance._gameplay.show_chat = showChatToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.SHOW_CHAT, showChatToggle.isOn ? 1 : 0);
     }
 
     public void OnChatOpacityChanged(float value)
     {
-        gameplay.chat_opacity = value;
+        Settings.Instance._gameplay.chat_opacity = value;
         PlayerPrefs.SetFloat(SettingsKeys.CHAT_OPACITY, value);
     }
 
     public void OnChatSizeChanged(float value)
     {
-        gameplay.chat_size = value;
+        Settings.Instance._gameplay.chat_size = value;
         PlayerPrefs.SetFloat(SettingsKeys.CHAT_SIZE, value);
     }
 
     // Funções para selecionar cores (usando ColorPicker ou botões)
     public void OnBodyShotColorSelected(Color color)
     {
-        gameplay.body_shot_marker_colour = color;
+        Settings.Instance._gameplay.body_shot_marker_colour = color;
         PlayerPrefs.SetString("BodyShotColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnHeadShotColorSelected(Color color)
     {
-        gameplay.head_shot_marker_colour = color;
+        Settings.Instance._gameplay.head_shot_marker_colour = color;
         PlayerPrefs.SetString("HeadShotColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnVehicleMarkerColorSelected(Color color)
     {
-        gameplay.vehicle_marker_colour = color;
+        Settings.Instance._gameplay.vehicle_marker_colour = color;
         PlayerPrefs.SetString("VehicleMarkerColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnSightReticleColorSelected(Color color)
     {
-        gameplay.sight_reticle_collor = color;
+        Settings.Instance._gameplay.sight_reticle_collor = color;
         PlayerPrefs.SetString("SightReticleColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnEnemyColorSelected(Color color)
     {
-        gameplay.enemy_color = color;
+        Settings.Instance._gameplay.enemy_color = color;
         PlayerPrefs.SetString("EnemyColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnAllyColorSelected(Color color)
     {
-        gameplay.ally_color = color;
+        Settings.Instance._gameplay.ally_color = color;
         PlayerPrefs.SetString("AllyColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnSquadColorSelected(Color color)
     {
-        gameplay.squad_color = color;
+        Settings.Instance._gameplay.squad_color = color;
         PlayerPrefs.SetString("SquadColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnEnemyFlagColorSelected(Color color)
     {
-        gameplay.enemy_color_flag = color;
+        Settings.Instance._gameplay.enemy_color_flag = color;
         PlayerPrefs.SetString("EnemyFlagColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnAllyFlagColorSelected(Color color)
     {
-        gameplay.ally_color_flag = color;
+        Settings.Instance._gameplay.ally_color_flag = color;
         PlayerPrefs.SetString("AllyFlagColor", ColorUtility.ToHtmlStringRGBA(color));
     }
 
     public void OnSquadFlagColorSelected(Color color)
     {
-        gameplay.squad_color_flag = color;
+        Settings.Instance._gameplay.squad_color_flag = color;
         PlayerPrefs.SetString("SquadFlagColor", ColorUtility.ToHtmlStringRGBA(color));
     }
     #endregion
@@ -992,13 +990,13 @@ public class Settings : MonoBehaviour
 
     public void OnRenderDistanceChanged(float value)
     {
-        video.render_distance = value;
+        Settings.Instance._video.render_distance = value;
         PlayerPrefs.SetFloat(SettingsKeys.RENDER_DISTANCE, value);
     }
 
     public void OnEnableShadowsChanged()
     {
-        video.enable_shadows = enableShadowsToggle.isOn;
+        Settings.Instance._video.enable_shadows = enableShadowsToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.ENABLE_SHADOWS, enableShadowsToggle.isOn ? 1 : 0);
     }
 
@@ -1023,7 +1021,7 @@ public class Settings : MonoBehaviour
     // Screen
     public void OnLimitFpsChanged()
     {
-        video.limit_fps = limitFpsToggle.isOn;
+        Settings.Instance._video.limit_fps = limitFpsToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.LIMIT_FPS, limitFpsToggle.isOn ? 1 : 0);
     }
 
@@ -1034,7 +1032,7 @@ public class Settings : MonoBehaviour
 
         if (int.TryParse(maxFpsInput.text, out numero))
         {
-            video.max_fps = numero;
+            Settings.Instance._video.max_fps = numero;
             PlayerPrefs.SetFloat(SettingsKeys.MAX_FPS, numero);
             Application.targetFrameRate = numero;
             QualitySettings.vSyncCount = 0;
@@ -1048,42 +1046,42 @@ public class Settings : MonoBehaviour
 
     public void OnVsyncChanged(float value)
     {
-        video.Vsync = value;
+        Settings.Instance._video.Vsync = value;
         PlayerPrefs.SetFloat(SettingsKeys.VSYNC, value);
     }
 
     public void OnBrightnessChanged(float value)
     {
-        video.brightness = value;
+        Settings.Instance._video.brightness = value;
         PlayerPrefs.SetFloat(SettingsKeys.BRIGHTNESS, value);
     }
 
     public void OnRenderScaleChanged(float value)
     {
-        video.render_scale = value;
+        Settings.Instance._video.render_scale = value;
         PlayerPrefs.SetFloat(SettingsKeys.RENDER_SCALE, value);
     }
 
     public void OnCustomResolutionChanged()
     {
-        video.custom_resolution = customResolutionToggle.isOn;
+        Settings.Instance._video.custom_resolution = customResolutionToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.CUSTOM_RESOLUTION, customResolutionToggle.isOn ? 1 : 0);
     }
 
     public void OnResolutionWidthChanged(string value)
     {
-        if (float.TryParse(value, out float width) && video.resolution.Length >= 2)
+        if (float.TryParse(value, out float width) && Settings.Instance._video.resolution.Length >= 2)
         {
-            video.resolution[0] = width;
+            Settings.Instance._video.resolution[0] = width;
             PlayerPrefs.SetInt(SettingsKeys.RESOLUTION_WIDTH, (int)width);
         }
     }
 
     public void OnResolutionHeightChanged(string value)
     {
-        if (float.TryParse(value, out float height) && video.resolution.Length >= 2)
+        if (float.TryParse(value, out float height) && Settings.Instance._video.resolution.Length >= 2)
         {
-            video.resolution[1] = height;
+            Settings.Instance._video.resolution[1] = height;
             PlayerPrefs.SetInt(SettingsKeys.RESOLUTION_HEIGHT, (int)height);
         }
     }
@@ -1097,43 +1095,43 @@ public class Settings : MonoBehaviour
     // Camera
     public void OnInfantryFovChanged(float value)
     {
-        video.infantary_fov = value;
+        Settings.Instance._video.infantary_fov = value;
         PlayerPrefs.SetFloat(SettingsKeys.INFANTRY_FOV, value);
     }
 
     public void OnJetFovChanged(float value)
     {
-        video.jet_fov = value;
+        Settings.Instance._video.jet_fov = value;
         PlayerPrefs.SetFloat(SettingsKeys.JET_FOV, value);
     }
 
     public void OnTankFovChanged(float value)
     {
-        video.tank_fov = value;
+        Settings.Instance._video.tank_fov = value;
         PlayerPrefs.SetFloat(SettingsKeys.TANK_FOV, value);
     }
 
     public void OnHelicopterFovChanged(float value)
     {
-        video.helicopter_fov = value;
+        Settings.Instance._video.helicopter_fov = value;
         PlayerPrefs.SetFloat(SettingsKeys.HELICOPTER_FOV, value);
     }
 
     public void OnCameraShakeIntensityChanged(float value)
     {
-        video.camera_shake_intensity = value;
+        Settings.Instance._video.camera_shake_intensity = value;
         PlayerPrefs.SetFloat(SettingsKeys.CAMERA_SHAKE_INTENSITY, value);
     }
 
     public void OnVignetteChanged()
     {
-        video.vignette = vignetteToggle.isOn;
+        Settings.Instance._video.vignette = vignetteToggle.isOn;
         PlayerPrefs.SetInt(SettingsKeys.VIGNETTE, vignetteToggle.isOn ? 1 : 0);
     }
 
     public void OnMotionBlurChanged(float value)
     {
-        video.motion_blur = value;
+        Settings.Instance._video.motion_blur = value;
         PlayerPrefs.SetFloat(SettingsKeys.MOTION_BLUR, value);
     }
     #endregion
@@ -1261,7 +1259,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + bodyShotColor, out Color color))
             {
-                gameplay.body_shot_marker_colour = color;
+                Settings.Instance._gameplay.body_shot_marker_colour = color;
             }
         }
 
@@ -1270,7 +1268,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + headShotColor, out Color color))
             {
-                gameplay.head_shot_marker_colour = color;
+                Settings.Instance._gameplay.head_shot_marker_colour = color;
             }
         }
 
@@ -1279,7 +1277,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + vehicleMarkerColor, out Color color))
             {
-                gameplay.vehicle_marker_colour = color;
+                Settings.Instance._gameplay.vehicle_marker_colour = color;
             }
         }
 
@@ -1288,7 +1286,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + sightReticleColor, out Color color))
             {
-                gameplay.sight_reticle_collor = color;
+                Settings.Instance._gameplay.sight_reticle_collor = color;
             }
         }
 
@@ -1297,7 +1295,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + enemyColor, out Color color))
             {
-                gameplay.enemy_color = color;
+                Settings.Instance._gameplay.enemy_color = color;
             }
         }
 
@@ -1306,7 +1304,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + allyColor, out Color color))
             {
-                gameplay.ally_color = color;
+                Settings.Instance._gameplay.ally_color = color;
             }
         }
 
@@ -1315,7 +1313,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + squadColor, out Color color))
             {
-                gameplay.squad_color = color;
+                Settings.Instance._gameplay.squad_color = color;
             }
         }
 
@@ -1324,7 +1322,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + enemyFlagColor, out Color color))
             {
-                gameplay.enemy_color_flag = color;
+                Settings.Instance._gameplay.enemy_color_flag = color;
             }
         }
 
@@ -1333,7 +1331,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + allyFlagColor, out Color color))
             {
-                gameplay.ally_color_flag = color;
+                Settings.Instance._gameplay.ally_color_flag = color;
             }
         }
 
@@ -1342,7 +1340,7 @@ public class Settings : MonoBehaviour
         {
             if (ColorUtility.TryParseHtmlString("#" + squadFlagColor, out Color color))
             {
-                gameplay.squad_color_flag = color;
+                Settings.Instance._gameplay.squad_color_flag = color;
             }
         }
 
@@ -1353,7 +1351,7 @@ public class Settings : MonoBehaviour
             if (ColorUtility.TryParseHtmlString("#" + uiTextColor, out Color color))
             {
                 // Se você tiver variável para cor de texto da UI
-                // gameplay.ui_text_color = color;
+                // Settings.Instance._gameplay.ui_text_color = color;
             }
         }
 
@@ -1363,7 +1361,7 @@ public class Settings : MonoBehaviour
             if (ColorUtility.TryParseHtmlString("#" + uiBackgroundColor, out Color color))
             {
                 // Se você tiver variável para cor de fundo da UI
-                // gameplay.ui_background_color = color;
+                // Settings.Instance._gameplay.ui_background_color = color;
             }
         }
 
@@ -1373,7 +1371,7 @@ public class Settings : MonoBehaviour
             if (ColorUtility.TryParseHtmlString("#" + crosshairColor, out Color color))
             {
                 // Se você tiver variável para cor da mira
-                // gameplay.crosshair_color = color;
+                // Settings.Instance._gameplay.crosshair_color = color;
             }
         }
     }
@@ -1483,7 +1481,7 @@ public class Settings : MonoBehaviour
 
     private void LoadAllKeybindsToUI()
     {
-        var keyBindsType = keyBinds.GetType();
+        var keyBindsType = Settings.Instance._keybinds.GetType();
         var fields = keyBindsType.GetFields();
 
         foreach (var field in fields)
@@ -1499,7 +1497,7 @@ public class Settings : MonoBehaviour
                     if (Enum.TryParse<KeyCode>(savedKey, out KeyCode loadedKey))
                     {
                         // Atualizar no script KeyBinds
-                        field.SetValue(keyBinds, loadedKey);
+                        field.SetValue(Settings.Instance._keybinds, loadedKey);
 
                         // Atualizar na UI
                         if (keyButtonMap.ContainsKey(actionName) && keyButtonMap[actionName] != null)
@@ -1511,7 +1509,7 @@ public class Settings : MonoBehaviour
                 else
                 {
                     // Mostrar valor padrão na UI
-                    KeyCode defaultKey = (KeyCode)field.GetValue(keyBinds);
+                    KeyCode defaultKey = (KeyCode)field.GetValue(Settings.Instance._keybinds);
                     if (keyButtonMap.ContainsKey(actionName) && keyButtonMap[actionName] != null)
                     {
                         keyButtonMap[actionName].text = defaultKey.ToString();
@@ -1577,7 +1575,7 @@ public class Settings : MonoBehaviour
     public void StartRebindHelicopterLeanLeft() => StartRebinding("HELICOPTER_lean_left_key");
     public void StartRebindHelicopterLeanRight() => StartRebinding("HELICOPTER_lean_right_key");
     public void StartRebindHelicopterZoom() => StartRebinding("HELICOPTER_zoom_key");
-   public void StartRebindHelicopterGunnerSeat() => StartRebinding("HELICOPTER_gunner_seat_key");
+    public void StartRebindHelicopterGunnerSeat() => StartRebinding("HELICOPTER_gunner_seat_key");
     public void StartRebindHelicopterPilotSeat() => StartRebinding("HELICOPTER_pilot_seat_key");
 
     private void StartRebinding(string actionName)
@@ -1601,7 +1599,7 @@ public class Settings : MonoBehaviour
     {
 
         // Obter todas as teclas atuais do KeyBinds
-        var keyBindsType = keyBinds.GetType();
+        var keyBindsType = Settings.Instance._keybinds.GetType();
         var fields = keyBindsType.GetFields();
 
         foreach (var field in fields)
@@ -1611,7 +1609,7 @@ public class Settings : MonoBehaviour
 
             if (field.FieldType == typeof(KeyCode))
             {
-                KeyCode existingKey = (KeyCode)field.GetValue(keyBinds);
+                KeyCode existingKey = (KeyCode)field.GetValue(Settings.Instance._keybinds);
                 if (existingKey == key)
                 {
 
@@ -1625,10 +1623,10 @@ public class Settings : MonoBehaviour
 
     private KeyCode GetCurrentKey(string actionName)
     {
-        var field = keyBinds.GetType().GetField(actionName);
+        var field = Settings.Instance._keybinds.GetType().GetField(actionName);
         if (field != null && field.FieldType == typeof(KeyCode))
         {
-            return (KeyCode)field.GetValue(keyBinds);
+            return (KeyCode)field.GetValue(Settings.Instance._keybinds);
         }
         return KeyCode.None;
     }
@@ -1642,7 +1640,7 @@ public class Settings : MonoBehaviour
     public void ResetAllKeybindsToDefault()
     {
         // Definir valores padrão no KeyBinds
-        var keyBindsType = keyBinds.GetType();
+        var keyBindsType = Settings.Instance._keybinds.GetType();
         var fields = keyBindsType.GetFields();
 
         foreach (var field in fields)
@@ -1653,7 +1651,7 @@ public class Settings : MonoBehaviour
 
                 // Obter valor padrão baseado no nome
                 KeyCode defaultValue = GetDefaultKey(actionName);
-                field.SetValue(keyBinds, defaultValue);
+                field.SetValue(Settings.Instance._keybinds, defaultValue);
 
                 // Atualizar na UI
                 if (keyButtonMap.ContainsKey(actionName) && keyButtonMap[actionName] != null)
@@ -1740,14 +1738,14 @@ public class Settings : MonoBehaviour
 
     public void SaveAllKeybinds()
     {
-        var keyBindsType = keyBinds.GetType();
+        var keyBindsType = Settings.Instance._keybinds.GetType();
         var fields = keyBindsType.GetFields();
 
         foreach (var field in fields)
         {
             if (field.FieldType == typeof(KeyCode))
             {
-                KeyCode currentKey = (KeyCode)field.GetValue(keyBinds);
+                KeyCode currentKey = (KeyCode)field.GetValue(Settings.Instance._keybinds);
                 SaveKeybind(field.Name, currentKey);
             }
         }
@@ -1852,64 +1850,64 @@ public class Settings : MonoBehaviour
         switch (actionName)
         {
             // Player
-            case "PLAYER_moveFowardKey": keyBinds.PLAYER_moveFowardKey = keyCode; break;
-            case "PLAYER_moveBackwardsdKey": keyBinds.PLAYER_moveBackwardsdKey = keyCode; break;
-            case "PLAYER_moveLeftKey": keyBinds.PLAYER_moveLeftKey = keyCode; break;
-            case "PLAYER_moveRightKey": keyBinds.PLAYER_moveRightKey = keyCode; break;
-            case "PLAYER_jumpKey": keyBinds.PLAYER_jumpKey = keyCode; break;
-            case "PLAYER_interactKey": keyBinds.PLAYER_interactKey = keyCode; break;
-            case "PLAYER_sprintKey": keyBinds.PLAYER_sprintKey = keyCode; break;
-            case "PLAYER_crouchKey": keyBinds.PLAYER_crouchKey = keyCode; break;
-            case "PLAYER_proneKey": keyBinds.PLAYER_proneKey = keyCode; break;
-            case "PLAYER_leanLeftKey": keyBinds.PLAYER_leanLeftKey = keyCode; break;
-            case "PLAYER_leanRightKey": keyBinds.PLAYER_leanRightKey = keyCode; break;
-            case "PLAYER_rollKey": keyBinds.PLAYER_rollKey = keyCode; break;
+            case "PLAYER_moveFowardKey": Settings.Instance._keybinds.PLAYER_moveFowardKey = keyCode; break;
+            case "PLAYER_moveBackwardsdKey": Settings.Instance._keybinds.PLAYER_moveBackwardsdKey = keyCode; break;
+            case "PLAYER_moveLeftKey": Settings.Instance._keybinds.PLAYER_moveLeftKey = keyCode; break;
+            case "PLAYER_moveRightKey": Settings.Instance._keybinds.PLAYER_moveRightKey = keyCode; break;
+            case "PLAYER_jumpKey": Settings.Instance._keybinds.PLAYER_jumpKey = keyCode; break;
+            case "PLAYER_interactKey": Settings.Instance._keybinds.PLAYER_interactKey = keyCode; break;
+            case "PLAYER_sprintKey": Settings.Instance._keybinds.PLAYER_sprintKey = keyCode; break;
+            case "PLAYER_crouchKey": Settings.Instance._keybinds.PLAYER_crouchKey = keyCode; break;
+            case "PLAYER_proneKey": Settings.Instance._keybinds.PLAYER_proneKey = keyCode; break;
+            case "PLAYER_leanLeftKey": Settings.Instance._keybinds.PLAYER_leanLeftKey = keyCode; break;
+            case "PLAYER_leanRightKey": Settings.Instance._keybinds.PLAYER_leanRightKey = keyCode; break;
+            case "PLAYER_rollKey": Settings.Instance._keybinds.PLAYER_rollKey = keyCode; break;
 
             // Weapons
-            case "WEAPON_composeBulletsKey": keyBinds.WEAPON_composeBulletsKey = keyCode; break;
-            case "WEAPON_activateSideGrip": keyBinds.WEAPON_activateSideGrip = keyCode; break;
-            case "WEAPON_shootKey": keyBinds.WEAPON_shootKey = keyCode; break;
-            case "WEAPON_reloadKey": keyBinds.WEAPON_reloadKey = keyCode; break;
-            case "WEAPON_aimKey": keyBinds.WEAPON_aimKey = keyCode; break;
-            case "WEAPON_switchFireModeKey": keyBinds.WEAPON_switchFireModeKey = keyCode; break;
-            case "WEAPON_weapon1Key": keyBinds.WEAPON_weapon1Key = keyCode; break;
-            case "WEAPON_weapon2Key": keyBinds.WEAPON_weapon2Key = keyCode; break;
+            case "WEAPON_composeBulletsKey": Settings.Instance._keybinds.WEAPON_composeBulletsKey = keyCode; break;
+            case "WEAPON_activateSideGrip": Settings.Instance._keybinds.WEAPON_activateSideGrip = keyCode; break;
+            case "WEAPON_shootKey": Settings.Instance._keybinds.WEAPON_shootKey = keyCode; break;
+            case "WEAPON_reloadKey": Settings.Instance._keybinds.WEAPON_reloadKey = keyCode; break;
+            case "WEAPON_aimKey": Settings.Instance._keybinds.WEAPON_aimKey = keyCode; break;
+            case "WEAPON_switchFireModeKey": Settings.Instance._keybinds.WEAPON_switchFireModeKey = keyCode; break;
+            case "WEAPON_weapon1Key": Settings.Instance._keybinds.WEAPON_weapon1Key = keyCode; break;
+            case "WEAPON_weapon2Key": Settings.Instance._keybinds.WEAPON_weapon2Key = keyCode; break;
 
             // Gadget
-            case "GADGET_gadget1Key": keyBinds.GADGET_gadget1Key = keyCode; break;
-            case "GADGET_gadget2Key": keyBinds.GADGET_gadget2Key = keyCode; break;
-            case "GADGET_throwGrenadeKey": keyBinds.GADGET_throwGrenadeKey = keyCode; break;
-            case "GADGET_throwC4Key": keyBinds.GADGET_throwC4Key = keyCode; break;
-            case "GADGET_detonateC4Key": keyBinds.GADGET_detonateC4Key = keyCode; break;
+            case "GADGET_gadget1Key": Settings.Instance._keybinds.GADGET_gadget1Key = keyCode; break;
+            case "GADGET_gadget2Key": Settings.Instance._keybinds.GADGET_gadget2Key = keyCode; break;
+            case "GADGET_throwGrenadeKey": Settings.Instance._keybinds.GADGET_throwGrenadeKey = keyCode; break;
+            case "GADGET_throwC4Key": Settings.Instance._keybinds.GADGET_throwC4Key = keyCode; break;
+            case "GADGET_detonateC4Key": Settings.Instance._keybinds.GADGET_detonateC4Key = keyCode; break;
 
             // Vehicle
-            case "VEHICLE_startEngineKey": keyBinds.VEHICLE_startEngineKey = keyCode; break;
-            case "VEHICLE_freeLookKey": keyBinds.VEHICLE_freeLookKey = keyCode; break;
+            case "VEHICLE_startEngineKey": Settings.Instance._keybinds.VEHICLE_startEngineKey = keyCode; break;
+            case "VEHICLE_freeLookKey": Settings.Instance._keybinds.VEHICLE_freeLookKey = keyCode; break;
 
             // Jet
-            case "JET_boostKey": keyBinds.JET_boostKey = keyCode; break;
-            case "JET_shootVehicleKey": keyBinds.JET_shootVehicleKey = keyCode; break;
-            case "JET_pitchUpKey": keyBinds.JET_pitchUpKey = keyCode; break;
-            case "JET_pitchDownKey": keyBinds.JET_pitchDownKey = keyCode; break;
-            case "JET_yawLeftKey": keyBinds.JET_yawLeftKey = keyCode; break;
-            case "JET_yawRightKey": keyBinds.JET_yawRightKey = keyCode; break;
-            case "JET_speedUpKey": keyBinds.JET_speedUpKey = keyCode; break;
-            case "JET_speedDownKey": keyBinds.JET_speedDownKey = keyCode; break;
+            case "JET_boostKey": Settings.Instance._keybinds.JET_boostKey = keyCode; break;
+            case "JET_shootVehicleKey": Settings.Instance._keybinds.JET_shootVehicleKey = keyCode; break;
+            case "JET_pitchUpKey": Settings.Instance._keybinds.JET_pitchUpKey = keyCode; break;
+            case "JET_pitchDownKey": Settings.Instance._keybinds.JET_pitchDownKey = keyCode; break;
+            case "JET_yawLeftKey": Settings.Instance._keybinds.JET_yawLeftKey = keyCode; break;
+            case "JET_yawRightKey": Settings.Instance._keybinds.JET_yawRightKey = keyCode; break;
+            case "JET_speedUpKey": Settings.Instance._keybinds.JET_speedUpKey = keyCode; break;
+            case "JET_speedDownKey": Settings.Instance._keybinds.JET_speedDownKey = keyCode; break;
 
             // Helicopter
-            case "HELICOPTER_increase_throtlle": keyBinds.HELICOPTER_increase_throtlle = keyCode; break;
-            case "HELICOPTER_decrease_throtlle": keyBinds.HELICOPTER_decrease_throtlle = keyCode; break;
-            case "HELICOPTER_switch_camera_key": keyBinds.HELICOPTER_switch_camera_key = keyCode; break;
-            case "HELICOPTER_main_cannon_key": keyBinds.HELICOPTER_main_cannon_key = keyCode; break;
-            case "HELICOPTER_upgrade_gun_key": keyBinds.HELICOPTER_upgrade_gun_key = keyCode; break;
-            case "HELICOPTER_shoot_key": keyBinds.HELICOPTER_shoot_key = keyCode; break;
-            case "HELICOPTER_pitch_up_key": keyBinds.HELICOPTER_pitch_up_key = keyCode; break;
-            case "HELICOPTER_pitch_down_key": keyBinds.HELICOPTER_pitch_down_key = keyCode; break;
-            case "HELICOPTER_lean_left_key": keyBinds.HELICOPTER_lean_left_key = keyCode; break;
-            case "HELICOPTER_lean_right_key": keyBinds.HELICOPTER_lean_right_key = keyCode; break;
-            case "HELICOPTER_zoom_key": keyBinds.HELICOPTER_zoom_key = keyCode; break;
-            case "HELICOPTER_gunner_seat_key": keyBinds.HELICOPTER_gunner_seat_key = keyCode; break;
-            case "HELICOPTER_pilot_seat_key": keyBinds.HELICOPTER_pilot_seat_key = keyCode; break;
+            case "HELICOPTER_increase_throtlle": Settings.Instance._keybinds.HELICOPTER_increase_throtlle = keyCode; break;
+            case "HELICOPTER_decrease_throtlle": Settings.Instance._keybinds.HELICOPTER_decrease_throtlle = keyCode; break;
+            case "HELICOPTER_switch_camera_key": Settings.Instance._keybinds.HELICOPTER_switch_camera_key = keyCode; break;
+            case "HELICOPTER_main_cannon_key": Settings.Instance._keybinds.HELICOPTER_main_cannon_key = keyCode; break;
+            case "HELICOPTER_upgrade_gun_key": Settings.Instance._keybinds.HELICOPTER_upgrade_gun_key = keyCode; break;
+            case "HELICOPTER_shoot_key": Settings.Instance._keybinds.HELICOPTER_shoot_key = keyCode; break;
+            case "HELICOPTER_pitch_up_key": Settings.Instance._keybinds.HELICOPTER_pitch_up_key = keyCode; break;
+            case "HELICOPTER_pitch_down_key": Settings.Instance._keybinds.HELICOPTER_pitch_down_key = keyCode; break;
+            case "HELICOPTER_lean_left_key": Settings.Instance._keybinds.HELICOPTER_lean_left_key = keyCode; break;
+            case "HELICOPTER_lean_right_key": Settings.Instance._keybinds.HELICOPTER_lean_right_key = keyCode; break;
+            case "HELICOPTER_zoom_key": Settings.Instance._keybinds.HELICOPTER_zoom_key = keyCode; break;
+            case "HELICOPTER_gunner_seat_key": Settings.Instance._keybinds.HELICOPTER_gunner_seat_key = keyCode; break;
+            case "HELICOPTER_pilot_seat_key": Settings.Instance._keybinds.HELICOPTER_pilot_seat_key = keyCode; break;
         }
 
         // Atualizar a UI

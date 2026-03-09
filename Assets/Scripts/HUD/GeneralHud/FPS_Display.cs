@@ -6,16 +6,9 @@ public class FPS_Display : MonoBehaviour
     float timer = 0.2f;
     public TMPro.TextMeshProUGUI fps_counter_text;
 
-    private Gameplay gameplay;
-
-    void Start()
-    {
-        gameplay = GameObject.FindGameObjectWithTag("Settings").GetComponent<Gameplay>();
-    }
-
     void Update()
     {
-        if (!gameplay.show_fps)
+        if (!Settings.Instance._gameplay.show_fps)
         {
             fps_counter_text.text = "";
             return;

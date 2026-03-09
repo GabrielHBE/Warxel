@@ -10,19 +10,20 @@ public class RocketPodsMissile : Missiles
 
     protected override void Update()
     {
-        if(didShoot) DestroyTimer();
+        if (parent_gameobject == null || !parent_gameobject.gameObject.activeSelf) Explode(transform.position);
+        if (didShoot) DestroyTimer();
     }
 
     protected override void FixedUpdate()
     {
         base.FixedUpdate();
-        
+
         // Calcula a força da gravidade
         gravityForce = Vector3.down * bulletDropMultiplier * rb.mass;
         rb.AddForce(gravityForce, ForceMode.Acceleration);
-        
+
     }
-    
+
     public override void Shoot()
     {
         if (didShoot) return;

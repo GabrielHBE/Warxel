@@ -17,7 +17,7 @@ public class JetProperties : MonoBehaviour
     public float pitch_value;
     public float max_pitch_value;
     public float lean_value;
-    public float max_lean_value;
+    public float max_lean_speed;
     public bool invertY;
     public float dive_speed_boost = 50f;
     
@@ -38,6 +38,8 @@ public class JetProperties : MonoBehaviour
     public float damage_dropoff;
     public float damage_dropoff_timer;
     public float destruction_force;
+    public float spread;
+    public float max_spread;
 
     [Header("Audio")]
     public AudioSource interior_turbine;

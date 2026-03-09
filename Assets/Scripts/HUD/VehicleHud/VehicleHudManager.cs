@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public class VehicleHudManager : MonoBehaviour
 {
     [Header("Instances")]
-    protected Settings settings;
+
     [SerializeField] protected Vehicle vehicle;
     [SerializeField] private RectTransform hp_bar;
     [SerializeField] protected TextMeshProUGUI countermeasures_status;
@@ -33,7 +33,6 @@ public class VehicleHudManager : MonoBehaviour
     {
         if (hp_bar != null) originalWidth = hp_bar.sizeDelta.x;
 
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
 
         foreach (Image image in images_change_color_itens)
         {

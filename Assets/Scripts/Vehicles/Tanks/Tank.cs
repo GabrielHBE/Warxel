@@ -72,7 +72,7 @@ public class Tank : Vehicle
     public override void Spawn()
     {
         base.Spawn();
-        minFov = video.tank_fov;
+        minFov = Settings.Instance._video.tank_fov;
         SetHpProperties(tankProperties.hp, tankProperties.resistance);
         acceleration = tankProperties.acceleration;
 
@@ -90,7 +90,7 @@ public class Tank : Vehicle
         if (tankMainShell.image_hud != null && tankProperties.pilot_gun_hud_image != null && countermeasures.image_icon_hud != null) tankHudManager.SetImages(tankMainShell.image_hud, tankProperties.pilot_gun_hud_image, countermeasures.image_icon_hud);
     }
 
-    bool did_explode = false;
+    bool did_play_destroy_animation = false;
     protected override void Update()
     {
         if (!canShootMainGun) CoolDownGun();
@@ -99,7 +99,7 @@ public class Tank : Vehicle
         {
             _exitCooldown += Time.deltaTime;
 
-            if (!settings.is_menu_settings_active)
+            if (!SettingsHUD.Instance.is_menu_settings_active)
             {
                 SwitchGun();
                 HandleShooting();
@@ -116,23 +116,23 @@ public class Tank : Vehicle
                         RotateTurret();
                     }
                 }
-                if (Input.GetKeyDown(keyBinds.PLAYER_interactKey) && _exitCooldown > 0.1f) ExitVehicle();
+                if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && _exitCooldown > 0.1f) ExitVehicle();
 
             }
 
         }
 
-        if (vehicle_destroyed && !did_explode)
+        if (vehicle_destroyed && !did_play_destroy_animation)
         {
             DestroyAnimation();
-            did_explode = true;
+            did_play_destroy_animation = true;
         }
 
     }
     protected override void FixedUpdate()
     {
         speed = rb.linearVelocity.magnitude;
-        if (is_in_vehicle && start_engine && !settings.is_menu_settings_active && !vehicle_destroyed)
+        if (is_in_vehicle && start_engine && !SettingsHUD.Instance.is_menu_settings_active && !vehicle_destroyed)
         {
             Move();
         }
@@ -228,13 +228,13 @@ public class Tank : Vehicle
         float targetAcceleration;
         bool shouldBoost;
 
-        if (controls.is_vehicle_boost_on_hold)
+        if (Settings.Instance._controls.is_vehicle_boost_on_hold)
         {
-            shouldBoost = Input.GetKey(keyBinds.TANK_boostKey) && moveForward > 0;
+            shouldBoost = Input.GetKey(Settings.Instance._keybinds.TANK_boostKey) && moveForward > 0;
         }
         else
         {
-            if (Input.GetKeyDown(keyBinds.TANK_boostKey))
+            if (Input.GetKeyDown(Settings.Instance._keybinds.TANK_boostKey))
                 is_boosting = !is_boosting;
 
             if (moveForward <= 0)
@@ -455,15 +455,15 @@ public class Tank : Vehicle
         moveSideways = 0;
 
 
-        if (Input.GetKey(keyBinds.TANK_turn_left_key) && Input.GetKey(keyBinds.TANK_turn_right_key))
+        if (Input.GetKey(Settings.Instance._keybinds.TANK_turn_left_key) && Input.GetKey(Settings.Instance._keybinds.TANK_turn_right_key))
         {
             moveSideways = 0;
         }
-        else if (Input.GetKey(keyBinds.TANK_turn_right_key))
+        else if (Input.GetKey(Settings.Instance._keybinds.TANK_turn_right_key))
         {
             moveSideways = 1;
         }
-        else if (Input.GetKey(keyBinds.TANK_turn_left_key))
+        else if (Input.GetKey(Settings.Instance._keybinds.TANK_turn_left_key))
         {
             moveSideways = -1;
         }
@@ -482,7 +482,7 @@ public class Tank : Vehicle
     {
         targetRotationForce = 0f;
 
-        if (Input.GetKey(keyBinds.TANK_increase_throtlle) && !Input.GetKey(keyBinds.TANK_decrease_throtlle))
+        if (Input.GetKey(Settings.Instance._keybinds.TANK_increase_throtlle) && !Input.GetKey(Settings.Instance._keybinds.TANK_decrease_throtlle))
         {
             applied_break_rotation = false;
             moveForward = 1;
@@ -493,7 +493,7 @@ public class Tank : Vehicle
                 targetRotationForce = -4000;
             }
         }
-        else if (Input.GetKey(keyBinds.TANK_decrease_throtlle) && !Input.GetKey(keyBinds.TANK_increase_throtlle))
+        else if (Input.GetKey(Settings.Instance._keybinds.TANK_decrease_throtlle) && !Input.GetKey(Settings.Instance._keybinds.TANK_increase_throtlle))
         {
             applied_speed_rotation = false;
             moveForward = -1;
@@ -532,7 +532,7 @@ public class Tank : Vehicle
     private void RotateTurret()
     {
 
-        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * controls.tank_sensibility,
+        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * Settings.Instance._controls.tank_sensibility,
                            -tankProperties.turret_max_rotation_value, tankProperties.turret_max_rotation_value);
 
         turret.transform.Rotate(Vector3.up * mouseX * tankProperties.turret_rotation_value / 20);
@@ -540,7 +540,7 @@ public class Tank : Vehicle
 
     private void RotateCannon()
     {
-        float mouseInput = Math.Clamp(Input.GetAxisRaw("Mouse Y") * controls.tank_sensibility,
+        float mouseInput = Math.Clamp(Input.GetAxisRaw("Mouse Y") * Settings.Instance._controls.tank_sensibility,
                            -tankProperties.turret_max_rotation_value, tankProperties.turret_max_rotation_value);
 
         float rotationAmount = -mouseInput * tankProperties.turret_rotation_value / 20;
@@ -575,7 +575,7 @@ public class Tank : Vehicle
     {
         if (!vehicle_camera.enabled) return;
 
-        if (Input.GetKey(keyBinds.TANK_zoom_key))
+        if (Input.GetKey(Settings.Instance._keybinds.TANK_zoom_key))
         {
 
             float targetFov = minFov / tankProperties.zoom;
@@ -612,7 +612,7 @@ public class Tank : Vehicle
 
     protected override void Start_Stop_Engine()
     {
-        if (Input.GetKeyDown(keyBinds.VEHICLE_startEngineKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
             start_engine = !start_engine;
             UpdateLightState();
@@ -628,12 +628,12 @@ public class Tank : Vehicle
             usingMainCannon = !usingMainCannon;
         }
 
-        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon1))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_weapon1))
         {
             usingMainCannon = true;
         }
 
-        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon2))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_weapon2))
         {
             usingMainCannon = false;
 
@@ -662,7 +662,7 @@ public class Tank : Vehicle
 
     private void ShootMainCannon()
     {
-        if (cannon_shoot_delay == tankMainShell.reload_time && Input.GetKeyDown(keyBinds.TANK_shoot_key))
+        if (cannon_shoot_delay == tankMainShell.reload_time && Input.GetKeyDown(Settings.Instance._keybinds.TANK_shoot_key))
         {
             if (main_cannon_sound != null) HandleSound(main_cannon_sound);
             GameObject current_shell = Instantiate(tankMainShell.gameObject, cannonShootPos.position, cannonShootPos.rotation);
@@ -702,7 +702,7 @@ public class Tank : Vehicle
     {
         float deltaTime = Time.deltaTime;
 
-        bool isShooting = Input.GetKey(keyBinds.TANK_shoot_key);
+        bool isShooting = Input.GetKey(Settings.Instance._keybinds.TANK_shoot_key);
         canShootMainGun = !is_pilot_gun_overheated && isShooting;
 
         if (canShootMainGun)

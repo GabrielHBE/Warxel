@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 using VoxelDestructionPro.Tools;
 using VoxelDestructionPro.VoxDataProviders;
 using VoxelDestructionPro.VoxelObjects;
@@ -61,11 +60,7 @@ public class Vehicle : MonoBehaviour
     [SerializeField] protected LayerMask collisionLayers;
     public Vector3 forwardReference;
 
-    [Header("System References")]
-    protected Settings settings;
-    protected KeyBinds keyBinds;
-    protected Controls controls;
-    protected Video video;
+
 
 
     #region Unity Lifecycle
@@ -73,19 +68,16 @@ public class Vehicle : MonoBehaviour
     protected virtual void FixedUpdate() { }
     public virtual void Spawn()
     {
+
         is_in_vehicle = false;
 
         if (vehicleHudManager != null) vehicleHudManager.gameObject.SetActive(false);
-        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
-        controls = keyBinds.GetComponent<Controls>();
-        video = keyBinds.GetComponent<Video>();
         voxelObj = GetComponentsInChildren<VoxDataProvider>();
 
         if (countermeasures != null)
         {
             countermeasures.SetVehicle(this);
-            countermeasures.SetUseCountermeasureKey(keyBinds.VEHICLE_countermeasureKey);
+            countermeasures.SetUseCountermeasureKey(Settings.Instance._keybinds.VEHICLE_countermeasureKey);
         }
     }
 

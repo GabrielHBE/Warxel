@@ -4,7 +4,6 @@ public class PlayerLeaninig : MonoBehaviour
 {
 
     [SerializeField] private GameObject spine;
-    private KeyBinds keyBinds;
     [SerializeField] private float rotation_value;
     private Quaternion rotation_left_total;
     private Quaternion rotation_right_total;
@@ -22,7 +21,7 @@ public class PlayerLeaninig : MonoBehaviour
 
     void Start()
     {
-        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
+        Settings.Instance._keybinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
         playerProperties = GetComponent<PlayerProperties>();
 
         // Obter o Animator
@@ -61,14 +60,14 @@ public class PlayerLeaninig : MonoBehaviour
     void Update()
     {
         // Seu código de input existente...
-        if (Input.GetKeyDown(keyBinds.PLAYER_leanLeftKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_leanLeftKey))
         {
             elapsed_timer = 0;
             is_leaning_left = !is_leaning_left;
             is_leaning_right = false;
         }
 
-        if (Input.GetKeyDown(keyBinds.PLAYER_leanRightKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_leanRightKey))
         {
             elapsed_timer = 0;
             is_leaning_right = !is_leaning_right;

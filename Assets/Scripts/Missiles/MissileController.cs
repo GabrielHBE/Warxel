@@ -45,6 +45,7 @@ public class MissileController : MonoBehaviour
             GameObject currentItem;
             currentItem = Instantiate(missile, spawnPoint);
             currentItem.GetComponent<Rigidbody>().isKinematic = true;
+            //currentItem.GetComponent<NetworkObject>().Spawn();
 
             T rocket = currentItem.GetComponent<T>();
 

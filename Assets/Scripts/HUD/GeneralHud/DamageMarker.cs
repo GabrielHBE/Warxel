@@ -4,6 +4,7 @@ using System.Collections;
 
 public class DamageMarker : MonoBehaviour
 {
+    public static DamageMarker Instance {get; private set;}
     [SerializeField] private TextMeshProUGUI damage_text;
     [SerializeField] private float fadeDuration = 0.5f; // Duração do fade out
     [SerializeField] private float idleTimeToFade = 1f; // Tempo sem chamadas para começar a desaparecer
@@ -15,6 +16,7 @@ public class DamageMarker : MonoBehaviour
 
     private void Start()
     {
+        Instance = this;
         // Garantir que temos um CanvasGroup para controlar a transparência
         canvasGroup = damage_text.GetComponent<CanvasGroup>();
         if (canvasGroup == null)

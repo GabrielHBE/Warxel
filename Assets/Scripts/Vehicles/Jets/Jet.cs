@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 
 public class Jet : Vehicle
@@ -64,6 +65,8 @@ public class Jet : Vehicle
     private float _maxSpeed = 500;
     private float _mainCannonRotationValue = 0;
     private float _shootDelayTimer = 0;
+    private Quaternion shoot_pos_original_rotation;
+    private float current_spread;
 
     #endregion
 
@@ -71,8 +74,9 @@ public class Jet : Vehicle
 
     public override void Spawn()
     {
+        shoot_pos_original_rotation = _shootPosition.transform.localRotation;
         base.Spawn();
-        minFov = video.jet_fov;
+        minFov = Settings.Instance._video.jet_fov;
 
         if (bombsAndMissiles.missile != null) _hudManager.SetImages(_properties.hud_icon, bombsAndMissiles.missile.image_hud, countermeasures.image_icon_hud);
         if (bombsAndMissiles.bombs != null) _hudManager.SetImages(_properties.hud_icon, bombsAndMissiles.bombs.image_hud, countermeasures.image_icon_hud);
@@ -88,12 +92,14 @@ public class Jet : Vehicle
 
     protected override void FixedUpdate()
     {
+
         if (!vehicle_destroyed)
         {
             if (is_in_vehicle)
             {
-                if (start_engine && !settings.is_menu_settings_active)
+                if (start_engine && !SettingsHUD.Instance.is_menu_settings_active)
                 {
+                    Lean();
                     Move();
                     Rotate();
                 }
@@ -117,9 +123,33 @@ public class Jet : Vehicle
 
     protected override void Update()
     {
+
         speed = rb.linearVelocity.magnitude;
 
-        if (is_in_vehicle && !settings.is_menu_settings_active)
+        // Limitar altura
+        if (transform.position.y > MapSettings.Instante.max_altitude)
+        {
+            // Opção A: Impedir movimento para cima
+            Vector3 newPosition = transform.position;
+            newPosition.y = MapSettings.Instante.max_altitude;
+            transform.position = newPosition;
+
+            // Opcional: parar velocidade vertical
+            if (rb.linearVelocity.y > 0)
+            {
+                Vector3 newVelocity = rb.linearVelocity;
+                newVelocity.y = 0;
+                rb.linearVelocity = newVelocity;
+            }
+        }
+
+        if (is_in_vehicle)
+        {
+            player.transform.position = _playerPosition.position;
+            player.transform.rotation = _playerPosition.rotation;
+        }
+
+        if (is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active)
         {
             if (Input.GetKeyDown(KeyCode.P))
             {
@@ -133,8 +163,9 @@ public class Jet : Vehicle
         else
         {
             SlowDownEngine();
-
         }
+
+        current_spread = Math.Clamp(current_spread, 0, _properties.max_spread);
 
         UpdateEngineSound();
     }
@@ -153,6 +184,7 @@ public class Jet : Vehicle
 
     protected override void OnCollisionEnter(Collision collision)
     {
+
         if (isWheelTouchingGround || collision.gameObject.GetComponent<Missiles>() != null) return;
 
         if (vehicle_destroyed || hp <= 0)
@@ -184,6 +216,8 @@ public class Jet : Vehicle
 
     protected void PilotBehaviour()
     {
+
+
         moveForward = Input.GetAxisRaw("Vertical");
         forwardReference = -transform.right;
         _exitCooldown += Time.deltaTime;
@@ -208,8 +242,7 @@ public class Jet : Vehicle
 
         if (start_engine)
         {
-
-            if (!vehicle_destroyed) Lean();
+            HandleLeanInput();
             HandlePassout();
 
             //_properties.interior_turbine.pitch = Math.Clamp(_properties.interior_turbine.pitch, 0.15f, 2);
@@ -313,9 +346,9 @@ public class Jet : Vehicle
 
         float deltaTime = Time.fixedDeltaTime;
 
-        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * controls.jet_sensibility,
+        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * Settings.Instance._controls.jet_sensibility,
                            -_properties.max_rotation_value, _properties.max_rotation_value);
-        mouseY = Math.Clamp(Input.GetAxis("Mouse Y") * controls.jet_sensibility,
+        mouseY = Math.Clamp(Input.GetAxis("Mouse Y") * Settings.Instance._controls.jet_sensibility,
                            -_properties.max_pitch_value, _properties.max_pitch_value);
 
         HandlePitchKeys();
@@ -334,9 +367,9 @@ public class Jet : Vehicle
 
     protected void HandlePitchKeys()
     {
-        if (Input.GetKey(keyBinds.JET_pitchUpKey))
+        if (Input.GetKey(Settings.Instance._keybinds.JET_pitchUpKey))
             mouseY = _properties.max_pitch_value;
-        if (Input.GetKey(keyBinds.JET_pitchDownKey))
+        if (Input.GetKey(Settings.Instance._keybinds.JET_pitchDownKey))
             mouseY = -_properties.max_pitch_value;
     }
 
@@ -369,9 +402,8 @@ public class Jet : Vehicle
     {
         if (_isPassingOut) return;
 
-        HandleLeanInput();
-
-        float speedFactor = Mathf.Clamp01(speed / _properties.max_throttle);
+        float speedFactor = Mathf.Clamp01(speed / _maxSpeed);
+        /*
         float rotationAmount = isNearGround && (throttle >= 20 || throttle < -10) && throttle <= 50
             ? leanValue * Time.deltaTime
             : leanValue * speedFactor * Time.deltaTime;
@@ -381,21 +413,42 @@ public class Jet : Vehicle
 
         rotationAmount = Mathf.Clamp(rotationAmount, -_properties.max_lean_value, _properties.max_lean_value);
         transform.Rotate(Vector3.up * rotationAmount, Space.Self);
+
+        */
+
+        if (isNearGround && (throttle >= 20 || throttle < -10) && throttle <= 50)
+        {
+            if (Mathf.Abs(rb.angularVelocity.y) < _properties.max_lean_speed)
+            {
+                float turnForce = leanValue * _properties.lean_value * rb.mass * 100;
+                rb.AddTorque(transform.up * turnForce, ForceMode.Force);
+            }
+        }
+        else
+        {
+            if (Mathf.Abs(rb.angularVelocity.y) < _properties.max_lean_speed)
+            {
+                float turnForce = leanValue * _properties.lean_value * rb.mass * 5 * speedFactor;
+                rb.AddTorque(transform.up * turnForce, ForceMode.Force);
+            }
+        }
+
+
     }
 
     protected void HandleLeanInput()
     {
-        if (Input.GetKey(keyBinds.JET_yawLeftKey))
+        if (Input.GetKey(Settings.Instance._keybinds.JET_yawLeftKey))
         {
-            leanValue -= _properties.lean_value * Time.deltaTime;
+            leanValue = -1;
         }
-        else if (Input.GetKey(keyBinds.JET_yawRightKey))
+        else if (Input.GetKey(Settings.Instance._keybinds.JET_yawRightKey))
         {
-            leanValue += _properties.lean_value * Time.deltaTime;
+            leanValue = 1;
         }
         else
         {
-            leanValue = Mathf.MoveTowards(leanValue, 0f, 25 * Time.deltaTime);
+            leanValue = 0;
         }
     }
 
@@ -508,7 +561,7 @@ public class Jet : Vehicle
         float delayToShoot = 0.05f;
         float deltaTime = Time.deltaTime;
 
-        bool isShooting = Input.GetKey(keyBinds.JET_shootVehicleKey);
+        bool isShooting = Input.GetKey(Settings.Instance._keybinds.JET_shootVehicleKey);
         bool canShootMain = usingMainCannon && !_isOverheated && isShooting;
 
         HandleShootDelay(canShootMain, deltaTime);
@@ -561,14 +614,23 @@ public class Jet : Vehicle
 
         if (_nextFireTime <= 0f)
         {
+            // CORREÇÃO: Aplicar spread como rotação Euler
+            float spreadX = UnityEngine.Random.Range(-current_spread, current_spread);
+            float spreadY = UnityEngine.Random.Range(-current_spread, current_spread);
+            float spreadZ = UnityEngine.Random.Range(-current_spread, current_spread);
+
+            // Aplica o spread como uma rotação adicional à rotação original
+            Quaternion spreadRotation = Quaternion.Euler(spreadX / 10, spreadY / 10, spreadZ / 10);
+            Quaternion finalRotation = _shootPosition.rotation * spreadRotation;
+
             Transform bulletObj = Instantiate(
                 _properties.bullefPref,
                 _shootPosition.position,
-                _shootPosition.rotation
+                finalRotation  // Usa a rotação com spread
             );
 
             bulletObj.GetComponent<Bullet>().CreateBullet(
-                _shootPosition.forward,
+                finalRotation * Vector3.forward,  // Direção corrigida
                 _properties.muzzle_velocity,
                 _properties.bullet_drop,
                 _properties.damage,
@@ -582,6 +644,7 @@ public class Jet : Vehicle
                 _bulletHitAudio
             );
 
+            current_spread += _properties.spread;
             Destroy(bulletObj.gameObject, 10f);
             _nextFireTime = _properties.interval;
         }
@@ -598,7 +661,10 @@ public class Jet : Vehicle
     {
         _mainCannonRotationValue = Mathf.Lerp(_mainCannonRotationValue, 0f, deltaTime * 3f);
         float coolSpeed = _isOverheated ? (deltaTime / 2f) : deltaTime;
+
         _overheatAmount = Mathf.MoveTowards(_overheatAmount, 0f, coolSpeed);
+        current_spread = Mathf.MoveTowards(current_spread, 0f, 5 * Time.deltaTime);
+
         if (_overheatAmount <= 0)
         {
             _isOverheated = false;
@@ -611,8 +677,8 @@ public class Jet : Vehicle
         if (!usingMainCannon && bombsAndMissiles != null)
         {
 
-            if (bombsAndMissiles.missile != null) bombsAndMissiles.missile.Shoot(keyBinds.JET_shootVehicleKey);
-            if (bombsAndMissiles.bombs != null) bombsAndMissiles.bombs.Shoot(keyBinds.JET_shootVehicleKey);
+            if (bombsAndMissiles.missile != null) bombsAndMissiles.missile.Shoot(Settings.Instance._keybinds.JET_shootVehicleKey);
+            if (bombsAndMissiles.bombs != null) bombsAndMissiles.bombs.Shoot(Settings.Instance._keybinds.JET_shootVehicleKey);
 
 
         }
@@ -626,8 +692,12 @@ public class Jet : Vehicle
 
     protected override void Switch_weapon()
     {
+        if (Mouse.current.scroll.ReadValue().y != 0)
+        {
+            usingMainCannon = !usingMainCannon;
+        }
 
-        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon1))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_weapon1))
         {
             usingMainCannon = true;
 
@@ -636,7 +706,7 @@ public class Jet : Vehicle
 
         }
 
-        if (Input.GetKeyDown(keyBinds.VEHICLE_weapon2))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_weapon2))
         {
 
             usingMainCannon = false;
@@ -655,9 +725,9 @@ public class Jet : Vehicle
         base.EnterVehicle(_player);
         _exitCooldown = 0;
 
-        player.transform.SetParent(_playerPosition);
-        player.transform.localPosition = Vector3.zero;
-        player.transform.localRotation = Quaternion.identity;
+        //player.transform.SetParent(_playerPosition);
+        //player.transform.localPosition = Vector3.zero;
+        //player.transform.localRotation = Quaternion.identity;
 
 
         _turbineSmoke.SetActive(start_engine);
@@ -665,7 +735,7 @@ public class Jet : Vehicle
 
     protected void HandleExitInput()
     {
-        if (Input.GetKeyDown(keyBinds.PLAYER_interactKey) && _exitCooldown > 0.1f)
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && _exitCooldown > 0.1f)
         {
             _turbineSmoke.SetActive(false);
 
@@ -736,7 +806,7 @@ public class Jet : Vehicle
     {
         float maxAfterburnerSpeed = 100;
 
-        if (Input.GetKey(keyBinds.JET_boostKey) && moveForward > 0)
+        if (Input.GetKey(Settings.Instance._keybinds.JET_boostKey) && moveForward > 0)
         {
             _afterburnerSpeedModifier += Time.deltaTime * 50;
         }
@@ -750,10 +820,10 @@ public class Jet : Vehicle
 
     protected void FreeLook()
     {
-        if (Input.GetKey(keyBinds.VEHICLE_freeLookKey))
+        if (Input.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
         {
-            float mouseYFreeLook = Input.GetAxis("Mouse Y") * -controls.helicopter_sensibility;
-            float mouseXFreeLook = Input.GetAxis("Mouse X") * controls.helicopter_sensibility;
+            float mouseYFreeLook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
+            float mouseXFreeLook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
             Vector3 currentEuler = vehicle_camera.transform.localEulerAngles;
 
@@ -782,7 +852,7 @@ public class Jet : Vehicle
     {
         if (!vehicle_camera.enabled) return;
 
-        if (Input.GetKey(keyBinds.HELICOPTER_zoom_key))
+        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
         {
 
             float targetFov = minFov / _properties.zoom;
@@ -818,7 +888,7 @@ public class Jet : Vehicle
 
     protected override void Start_Stop_Engine()
     {
-        if (Input.GetKeyDown(keyBinds.VEHICLE_startEngineKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
             start_engine = !start_engine;
 
@@ -914,7 +984,8 @@ public class Jet : Vehicle
     protected override void UpdateHUD()
     {
         _hudManager.UpdateSpeed(speed);
-        _hudManager.UpdateAltitude(transform.position.y / 3);
+        _hudManager.UpdateAltitude(transform.position.y);
+
         _hudManager.UpdateGravity(_currentGravity);
         _hudManager.UpdateGforce(_gForce);
         _hudManager.UpdateHeat(_overheatAmount);

@@ -14,7 +14,7 @@ public class JetGunship : Jet
             StitchSeats();
         }
 
-        if (is_pilot && !settings.is_menu_settings_active && is_in_vehicle)
+        if (is_pilot && !SettingsHUD.Instance.is_menu_settings_active && is_in_vehicle)
         {
             UpdateHUD();
 

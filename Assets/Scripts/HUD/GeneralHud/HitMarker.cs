@@ -4,10 +4,10 @@ using System.Collections;
 
 public class HitMarker : MonoBehaviour
 {
+    public static HitMarker Instance {get; private set;}
     private float show_time = 0.5f;
     [SerializeField] private HitMarkerSound hitMarkerSound;
     [SerializeField] private Image hitMarker;
-    private Gameplay gameplay;
     private Coroutine currentCoroutine;
 
 
@@ -17,42 +17,41 @@ public class HitMarker : MonoBehaviour
 
     void Start()
     {
-
-        gameplay = GameObject.FindGameObjectWithTag("Settings").GetComponent<Gameplay>();
+        Instance = this;
 
         DeactivateHitMarker();
     }
 
     public void CreateBodyShotMarker()
     {
-        if (!gameplay.show_hit_marker)
+        if (!Settings.Instance._gameplay.show_hit_marker)
         {
             return;
         }
 
         hitMarkerSound.CrateBodyHitMarkerSound();
-        ShowHitMarker(gameplay.body_shot_marker_colour, gameplay.hit_marker_size);
+        ShowHitMarker(Settings.Instance._gameplay.body_shot_marker_colour, Settings.Instance._gameplay.hit_marker_size);
     }
 
     public void CreateHeadShotMarker()
     {
-        if (!gameplay.show_hit_marker)
+        if (!Settings.Instance._gameplay.show_hit_marker)
         {
             return;
         }
         hitMarkerSound.CreateHeadShotMarkerSound();
-        ShowHitMarker(gameplay.head_shot_marker_colour, gameplay.hit_marker_size);
+        ShowHitMarker(Settings.Instance._gameplay.head_shot_marker_colour, Settings.Instance._gameplay.hit_marker_size);
     }
 
     public void CreateVehicleMarker()
     {
-        if (!gameplay.show_hit_marker)
+        if (!Settings.Instance._gameplay.show_hit_marker)
         {
             
             return;
         }
         hitMarkerSound.CreateVehicleShotMarkerSound();
-        ShowHitMarker(gameplay.vehicle_marker_colour, gameplay.hit_marker_size);
+        ShowHitMarker(Settings.Instance._gameplay.vehicle_marker_colour, Settings.Instance._gameplay.hit_marker_size);
     }
 
     private void ShowHitMarker(Color color, float scale)
@@ -86,7 +85,7 @@ public class HitMarker : MonoBehaviour
 
         // Mostrar com opacidade total
         Color currentColor = hitMarker.color;
-        currentColor.a = gameplay.hit_marker_opacity;
+        currentColor.a = Settings.Instance._gameplay.hit_marker_opacity;
         hitMarker.color = currentColor;
         // Aguardar tempo visível
         float visibleTime = show_time - fadeDuration;
@@ -98,7 +97,7 @@ public class HitMarker : MonoBehaviour
 
 
         float elapsed = 0f;
-        float startAlpha = gameplay.hit_marker_opacity;
+        float startAlpha = Settings.Instance._gameplay.hit_marker_opacity;
 
         while (elapsed < fadeDuration)
         {
@@ -131,7 +130,7 @@ public class HitMarker : MonoBehaviour
 
             // Aplicar cor com opacidade inicial
             Color newColor = color;
-            newColor.a = gameplay.hit_marker_opacity;
+            newColor.a = Settings.Instance._gameplay.hit_marker_opacity;
             hitMarker.color = newColor;
 
         }

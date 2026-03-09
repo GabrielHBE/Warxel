@@ -117,7 +117,6 @@ public class Flares : Countermeasures
 
     private void AddRigidbodyAndForce(GameObject flare, Vector3 direction)
     {
-        flare.transform.localScale *= 3;
 
         Rigidbody rb = flare.GetComponent<Rigidbody>();
         if (rb == null)

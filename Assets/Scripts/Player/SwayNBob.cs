@@ -85,12 +85,11 @@ public class SwayNBobScript : MonoBehaviour
     [HideInInspector] public float[] vector3Values = new float[3];
     [HideInInspector] public float[] quaternionValues = new float[3];
 
-    private Settings settings;
 
 
     void Awake()
     {
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
+
 
         restarted = false;
         initial_rotation = transform.localRotation;
@@ -158,7 +157,7 @@ public class SwayNBobScript : MonoBehaviour
     void Update()
     {
 
-        if (!restarted || settings.is_menu_settings_active)
+        if (!restarted)
         {
             return;
         }
@@ -233,7 +232,7 @@ public class SwayNBobScript : MonoBehaviour
         }
 
         //if ((!playerProperties.is_aiming && !playerProperties.is_firing && !playerProperties.is_reloading && !playerProperties.is_proned) || playerProperties.roll) Sprinting();
-        if((playerProperties.sprinting || playerProperties.roll) && !playerProperties.is_reloading) Sprinting();
+        if ((playerProperties.sprinting || playerProperties.roll) && !playerProperties.is_reloading) Sprinting();
 
         SwayRotation();
         Sway();
@@ -286,8 +285,17 @@ public class SwayNBobScript : MonoBehaviour
         walkInput.y = playerController.moveForward;
         walkInput = walkInput.normalized;
 
-        lookInput.x = Input.GetAxis("Mouse X");
-        lookInput.y = Input.GetAxis("Mouse Y");
+        if (!SettingsHUD.Instance.is_menu_settings_active)
+        {
+            lookInput.x = Input.GetAxis("Mouse X");
+            lookInput.y = Input.GetAxis("Mouse Y");
+        }
+        else
+        {
+            lookInput.x = 0;
+            lookInput.y = 0;
+        }
+
 
     }
 

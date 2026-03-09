@@ -52,15 +52,15 @@ public class Helicopter : Vehicle
     {
         move_upwards = 0;
 
-        if (Input.GetKey(keyBinds.HELICOPTER_increase_throtlle) && Input.GetKey(keyBinds.HELICOPTER_decrease_throtlle))
+        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_increase_throtlle) && Input.GetKey(Settings.Instance._keybinds.HELICOPTER_decrease_throtlle))
         {
             move_upwards = 0;
         }
-        else if (Input.GetKey(keyBinds.HELICOPTER_increase_throtlle))
+        else if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_increase_throtlle))
         {
             move_upwards = 1;
         }
-        else if (Input.GetKey(keyBinds.HELICOPTER_decrease_throtlle))
+        else if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_decrease_throtlle))
         {
             move_upwards = -1;
         }
@@ -155,17 +155,17 @@ public class Helicopter : Vehicle
 
     protected void CalculateRotationInput(float deltaTime)
     {
-        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * controls.helicopter_sensibility, -heliProperties.max_rotation_value, heliProperties.max_rotation_value);
-        mouseY = Math.Clamp(Input.GetAxis("Mouse Y") * controls.helicopter_sensibility, -heliProperties.max_pitch_value, heliProperties.max_pitch_value);
+        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility, -heliProperties.max_rotation_value, heliProperties.max_rotation_value);
+        mouseY = Math.Clamp(Input.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility, -heliProperties.max_pitch_value, heliProperties.max_pitch_value);
 
-        if (Input.GetKey(keyBinds.HELICOPTER_pitch_up_key))
+        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_pitch_up_key))
             mouseY = heliProperties.max_pitch_value;
-        if (Input.GetKey(keyBinds.HELICOPTER_pitch_down_key))
+        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_pitch_down_key))
             mouseY = -heliProperties.max_pitch_value;
 
         HandleLeanInput(deltaTime);
 
-        if (controls.invert_vertical_heli_mouse)
+        if (Settings.Instance._controls.invert_vertical_heli_mouse)
         {
             mouseY *= -1;
         }
@@ -173,12 +173,12 @@ public class Helicopter : Vehicle
 
     protected void HandleLeanInput(float deltaTime)
     {
-        if (Input.GetKey(keyBinds.HELICOPTER_lean_left_key))
+        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_lean_left_key))
         {
             lean_value -= heliProperties.lean_value * deltaTime;
             lean_value = Mathf.Clamp(lean_value, -heliProperties.max_lean_value, heliProperties.max_lean_value);
         }
-        else if (Input.GetKey(keyBinds.HELICOPTER_lean_right_key))
+        else if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_lean_right_key))
         {
             lean_value += heliProperties.lean_value * deltaTime;
             lean_value = Mathf.Clamp(lean_value, -heliProperties.max_lean_value, heliProperties.max_lean_value);
@@ -199,18 +199,6 @@ public class Helicopter : Vehicle
     #endregion
 
     #region Utility 
-
-    protected void SnapPlayerToSeat(Transform seat)
-    {
-        if (player == null) return;
-
-        // Fazer o parenting
-        player.transform.SetParent(seat, false);
-        player.transform.localPosition = Vector3.zero;
-        player.transform.localRotation = Quaternion.identity;
-    }
-
-
     protected override void UpdateHUD()
     {
         helicopterHudManager.helicopterPilotHUD.UpdateDamage();

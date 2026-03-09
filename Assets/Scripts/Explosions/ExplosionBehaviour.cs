@@ -12,7 +12,7 @@ public class ExplosionBehaviour : MonoBehaviour
 
     void Awake()
     {
-        explosion_light.enabled = true;
+        if (explosion_light != null) explosion_light.enabled = true;
 
         // Se não foi atribuída uma camada, usa a padrão "Ground"
         if (groundLayer.value == 0)

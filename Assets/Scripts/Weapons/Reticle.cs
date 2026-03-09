@@ -16,11 +16,10 @@ public class Reticle : MonoBehaviour
     Vector3 original_pos;
     float magnitude = 0.02f;
 
-    private Gameplay gameplay;
+
 
     void Start()
     {
-        gameplay = GameObject.FindGameObjectWithTag("Settings").GetComponent<Gameplay>();
         playerProperties = GetComponentInParent<PlayerProperties>();
 
     }
@@ -54,8 +53,8 @@ public class Reticle : MonoBehaviour
                 if (rend != null)
                 {
                     material = rend.material;
-                    material.color = gameplay.sight_reticle_collor;
-                    material.SetColor("_EmissionColor", gameplay.sight_reticle_collor);
+                    material.color = Settings.Instance._gameplay.sight_reticle_collor;
+                    material.SetColor("_EmissionColor", Settings.Instance._gameplay.sight_reticle_collor);
                     material.EnableKeyword("_EMISSION");
 
                     rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -89,7 +88,7 @@ public class Reticle : MonoBehaviour
                 {
                     reticle.transform.localPosition = original_pos;
                 }
-                transform.localScale = new Vector3(gameplay.sight_reticle_size, gameplay.sight_reticle_size, gameplay.sight_reticle_size);
+                transform.localScale = new Vector3(Settings.Instance._gameplay.sight_reticle_size, Settings.Instance._gameplay.sight_reticle_size, Settings.Instance._gameplay.sight_reticle_size);
                 mesh.enabled = true;
             }
 

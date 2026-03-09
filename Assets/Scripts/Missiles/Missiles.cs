@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using VoxelDestructionPro.Tools;
 public class Missiles : MonoBehaviour
@@ -15,16 +16,12 @@ public class Missiles : MonoBehaviour
     protected float speed;
 
     public GameObject parent_gameobject;
-    private EliminationMarker eliminationMarker;
-    private DamageMarker damageMarker;
 
     protected bool didShoot;
 
     #region Unity Lifecycle
     protected virtual void Start()
     {
-        eliminationMarker = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<EliminationMarker>();
-        damageMarker = eliminationMarker.GetComponent<DamageMarker>();
         SetParentVehicle();
     }
 
@@ -61,12 +58,14 @@ public class Missiles : MonoBehaviour
                 Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
                 if (vehicle != null)
                 {
-                    damageMarker.UpdateDamage(vehicle.Damage(damage));
-                    if (vehicle.vehicle_destroyed)
+                    if (!vehicle.vehicle_destroyed)
                     {
-                        eliminationMarker.InstantiateVehicleImage();
+                        DamageMarker.Instance.UpdateDamage(vehicle.Damage(damage));
+                        if (vehicle.vehicle_destroyed)
+                        {
+                            EliminationMarker.Instance.InstantiateVehicleImage();
+                        }
                     }
-
                 }
 
             }
@@ -74,10 +73,11 @@ public class Missiles : MonoBehaviour
             {
                 PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
                 PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
-                damageMarker.UpdateDamage(player.Damage(damage));
+                DamageMarker.Instance.UpdateDamage(player.Damage(damage));
                 if (player_properties.is_dead)
                 {
-                    eliminationMarker.InstantiateVehicleImage();
+                    AccountManager.Instance.status.AddKill();
+                    EliminationMarker.Instance.InstantiateVehicleImage();
                 }
 
             }
@@ -96,7 +96,7 @@ public class Missiles : MonoBehaviour
 
     #region Collision / Explosion
 
-    void Explode(Vector3 contact_point)
+    protected void Explode(Vector3 contact_point)
     {
         CreateSound(explosion_sound);
 

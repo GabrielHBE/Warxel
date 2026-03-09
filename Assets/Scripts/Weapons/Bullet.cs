@@ -1,5 +1,4 @@
 using System.Collections;
-using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
@@ -38,28 +37,15 @@ public class Bullet : MonoBehaviour
     [SerializeField] private GameObject dirt_hit_effect;
     [SerializeField] private GameObject softbody_hit_effect;
 
-    private HitMarker hitMarker;
-    private DamageMarker damageMarker;
 
     private WeaponProperties weaponProperties;
     private Vehicle vehicle;
     private GameObject igore_hit_gameobject;
-    private EliminationMarker eliminationMarker;
+
 
     bool did_ricochet;
     GameObject custom_hit_effect_instance;
     float timer;
-
-
-    void Start()
-    {
-        hitMarker = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<HitMarker>();
-        damageMarker = hitMarker.GetComponent<DamageMarker>();
-        eliminationMarker = hitMarker.GetComponent<EliminationMarker>();
-        //voxCollider = GetComponent<VoxCollider>();
-        //rb = GetComponent<Rigidbody>();
-        //rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-    }
 
     public void CreateBullet(Vector3 direction, float speed, float dropMultiplier, float dmg, float dmg_dropoff, float dmg_dropoff_timer, float destruction_force, float minimum_damage, float hs_multiplier, float size, float delay, bool can_damage_vehicles, float vehicle_damage, GameObject hit_effect = null, AudioSource hit_sound = null, WeaponProperties weaponProperties = null, Vehicle vehicle = null, GameObject igore_hit_gameobject = null)
     {
@@ -151,8 +137,6 @@ public class Bullet : MonoBehaviour
                 if (collision.gameObject.layer == LayerMask.NameToLayer("Voxel"))
                 {
 
-                    DynamicVoxelObj vox = collision.transform.GetComponentInParent<DynamicVoxelObj>();
-
                     HitEffects(contact.point, contact.normal, collision.transform.GetComponentInParent<DynamicVoxelObj>());
 
                     if (voxCollider.destructionRadius > 2)
@@ -165,39 +149,48 @@ public class Bullet : MonoBehaviour
                         voxCollider.Collide(collision);
                     }
 
-                    if (hit_sound != null)
-                    {
-                        AudioSource.PlayClipAtPoint(hit_sound.clip, contact.point);
-                    }
 
                 }
                 else if (collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
                 {
-
-                    if (hit_sound != null)
-                    {
-                        AudioSource.PlayClipAtPoint(hit_sound.clip, contact.point);
-                    }
+                    voxCollider.SphereExplosion(contact.point, damage);
+                    HitEffects(contact.point, contact.normal, null);
                 }
                 else if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle") && can_damage_vehicles)
                 {
+                    HitEffects(contact.point, contact.normal, null);
 
-                    hitMarker.CreateVehicleMarker();
+                    HitMarker.Instance.CreateVehicleMarker();
                     Vehicle hit_vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
+
                     //print(vehicle_damage);
                     if (hit_vehicle != null)
                     {
-                        float damage_dealt = hit_vehicle.Damage(vehicle_damage);
-                        if (damage_dealt != 0) damageMarker.UpdateDamage(damage_dealt);
-
-                        if (hit_vehicle.vehicle_destroyed)
+                        if (!hit_vehicle.vehicle_destroyed)
                         {
-                            if (vehicle != null) vehicle.UpgradeVehicleLevel(20);
-                            if (weaponProperties != null) weaponProperties.UpgradeWeaponLevel(20);
-                            eliminationMarker.InstantiateVehicleImage();
+                            float damage_dealt = hit_vehicle.Damage(vehicle_damage);
+                            if (damage_dealt != 0)
+                            {
+                                if (vehicle != null) vehicle.UpgradeVehicleLevel(damage_dealt / 10);
+                                DamageMarker.Instance.UpdateDamage(damage_dealt);
+                            }
+
+                            if (hit_vehicle.vehicle_destroyed)
+                            {
+                                AccountManager.Instance.AddPointsToLevelUp(10);
+                                if (weaponProperties != null) weaponProperties.UpgradeWeaponLevel(damage_dealt / 10);
+                                EliminationMarker.Instance.InstantiateVehicleImage();
+                            }
                         }
+
                     }
 
+                }
+
+
+                if (hit_sound != null)
+                {
+                    AudioSource.PlayClipAtPoint(hit_sound.clip, contact.point);
                 }
 
                 Destroy(gameObject);
@@ -231,18 +224,19 @@ public class Bullet : MonoBehaviour
             }
         }
 
-
+        bool hs_hit = false;
 
         if (other.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
         {
             PlayerController player = other.gameObject.GetComponentInParent<PlayerController>();
-            float damage_dealt = 0;
+            float damage_dealt;
 
             if (other.gameObject.CompareTag("PlayerHead"))
             {
                 //hitMarker.CreateHeadShotMarker();
                 damage_dealt = damage * hs_multiplier;
                 player.Damage(damage_dealt);
+                hs_hit = true;
             }
             else if (other.gameObject.CompareTag("Arms and Legs"))
             {
@@ -259,19 +253,23 @@ public class Bullet : MonoBehaviour
             else
             {
                 damage_dealt = damage;
-                hitMarker.CreateBodyShotMarker();
+                HitMarker.Instance.CreateBodyShotMarker();
                 player.Damage(damage_dealt);
 
             }
 
             PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
+            weaponProperties.UpgradeWeaponLevel(damage_dealt / 10);
 
             if (playerProperties.is_dead)
             {
-                weaponProperties.UpgradeWeaponLevel(damage_dealt);
+                AccountManager.Instance.status.AddKill();
+                if (hs_hit) AccountManager.Instance.status.AddHeadShotKill();
+
+                AccountManager.Instance.AddPointsToLevelUp(10);
             }
 
-            if (damage_dealt != 0) damageMarker.UpdateDamage(damage_dealt);
+            if (damage_dealt != 0) DamageMarker.Instance.UpdateDamage(damage_dealt);
 
         }
     }
@@ -295,38 +293,43 @@ public class Bullet : MonoBehaviour
             return;
         }
 
-        switch (vox.material)
+
+        if (vox != null)
         {
-            case "Glass":
-                Transform child = vox.transform.GetChild(0);
-                Material mat = child.GetComponent<MeshRenderer>().material;
+            switch (vox.material)
+            {
+                case "Glass":
+                    Transform child = vox.transform.GetChild(0);
+                    Material mat = child.GetComponent<MeshRenderer>().material;
 
-                var particleRenderer = glass_hit_effect.GetComponent<ParticleSystemRenderer>();
-                particleRenderer.material = mat;
+                    var particleRenderer = glass_hit_effect.GetComponent<ParticleSystemRenderer>();
+                    particleRenderer.material = mat;
 
-                Instantiate(glass_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            case "Metal":
-                Instantiate(metal_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            case "Wood":
-                Instantiate(wood_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            case "Concrete":
-                Instantiate(concrete_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            case "Sand":
-                Instantiate(sand_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            case "Dirt":
-                Instantiate(dirt_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            case "SoftBody":
-                Instantiate(softbody_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
-                break;
-            default:
-                break;
+                    Instantiate(glass_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                case "Metal":
+                    Instantiate(metal_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                case "Wood":
+                    Instantiate(wood_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                case "Concrete":
+                    Instantiate(concrete_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                case "Sand":
+                    Instantiate(sand_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                case "Dirt":
+                    Instantiate(dirt_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                case "SoftBody":
+                    Instantiate(softbody_hit_effect, position + normal * 0.01f, Quaternion.LookRotation(normal));
+                    break;
+                default:
+                    break;
+            }
         }
+
 
     }
 

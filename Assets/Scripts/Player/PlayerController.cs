@@ -10,6 +10,7 @@ public class PlayerController : MonoBehaviour
     #region Serialized Fields
 
     [Header("Multiplayer / Player")]
+    [SerializeField] private AudioListener camera_audio;
     [SerializeField] private GameObject first_person_player;
     [SerializeField] private MeshRenderer[] hideToOwnerItems;
     [SerializeField] private GameObject[] hideToNotOwnerItems;
@@ -68,8 +69,8 @@ public class PlayerController : MonoBehaviour
     public LayerMask groundLayer;
 
     [Header("Private References")]
-    [SerializeField] private Volume volume;
     [SerializeField] private float footstepSound_interval;
+    [SerializeField] private CameraShake cameraShake;
     [SerializeField] private FootstepSound footstepSound;
     [SerializeField] private Weapon weapon;
     [SerializeField] private SoldierHudManager soldierHudManager;
@@ -77,17 +78,23 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private ThirdPersonWeapon thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
 
+    [Header("Volumes")]
+    [SerializeField] private Volume nightVision_volume;
+    [SerializeField] private Volume damageTaken_volume;
+
     #endregion
 
     #region Private Variables
 
     // Components
     public Rigidbody rb;
-    private CameraShake cameraShake;
+    
 
-    private Vignette vignette;
-    private ColorAdjustments colorAdjustments;
-    private FilmGrain filmGrain;
+    //Volume
+    private Vignette nightVision_vignette;
+    private ColorAdjustments nightVision_Color_adjustments;
+    private FilmGrain nightVision_filmGrain;
+    private Vignette damageTaken_vignette;
 
     // Movement - Tutorial Style
     public float currentMoveSpeed;
@@ -136,14 +143,6 @@ public class PlayerController : MonoBehaviour
     // Interaction
     public const float INTERACT_DISTANCE = 10f;
 
-    //Settings
-    private Settings settings;
-    private KeyBinds keyBinds;
-    private Controls controls;
-    private Video video;
-    private GeneralHudAlertMessages generalHudAlertMessages;
-
-
     private float yaw;
 
     #endregion
@@ -152,6 +151,8 @@ public class PlayerController : MonoBehaviour
 
     public void InitializePlayer()
     {
+        //if (!IsOwner) return;
+        camera_audio.enabled = true;
         stepRayUpper.transform.position = new Vector3(stepRayUpper.transform.position.x, stepHeight, stepRayUpper.transform.position.z);
 
         original_footstepSound_interval = footstepSound_interval;
@@ -164,15 +165,10 @@ public class PlayerController : MonoBehaviour
         InitializeComponents();
         SetupPhysics();
 
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
-        generalHudAlertMessages = settings.GetComponent<GeneralHudAlertMessages>();
-        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
-        controls = keyBinds.transform.GetComponent<Controls>();
-        video = keyBinds.transform.GetComponent<Video>();
-
         playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+        playerProperties.selected_class =  AccountManager.Instance.selected_class;
 
-        InitializeVignette();
+        InitializeVolume();
         HideOwnerItems(true);
 
         readyToJump = true;
@@ -180,8 +176,10 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+
         HandleDebugInput();
 
+        UpdateDamageVignette();
         if (playerProperties.is_in_vehicle)
         {
             first_person_player.SetActive(false);
@@ -211,7 +209,7 @@ public class PlayerController : MonoBehaviour
         UpdateRecoil();
 
         // Jump handling
-        if (Input.GetKeyDown(keyBinds.PLAYER_jumpKey) && readyToJump && grounded && !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded && !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
         {
             readyToJump = false;
             Jump();
@@ -227,6 +225,7 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
+
         if (playerProperties.is_dead || playerProperties.is_in_vehicle)
         {
             moveForward = 0;
@@ -259,7 +258,6 @@ public class PlayerController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
         rb.freezeRotation = true;
-        cameraShake = GetComponentInChildren<CameraShake>();
     }
 
     private void SetupPhysics()
@@ -267,14 +265,20 @@ public class PlayerController : MonoBehaviour
         currentMoveSpeed = walkSpeed;
     }
 
-    private void InitializeVignette()
+    private void InitializeVolume()
     {
-        if (volume != null && volume.profile != null)
+        if (nightVision_volume != null && nightVision_volume.profile != null)
         {
-            volume.profile.TryGet(out vignette);
-            volume.profile.TryGet(out filmGrain);
-            volume.profile.TryGet(out colorAdjustments);
+            nightVision_volume.profile.TryGet(out nightVision_vignette);
+            nightVision_volume.profile.TryGet(out nightVision_filmGrain);
+            nightVision_volume.profile.TryGet(out nightVision_Color_adjustments);
         }
+
+        if (damageTaken_volume != null && damageTaken_volume.profile != null)
+        {
+            damageTaken_volume.profile.TryGet(out damageTaken_vignette);
+        }
+
     }
 
     #endregion
@@ -296,7 +300,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleInteractionInput()
     {
-        if (Input.GetKeyDown(keyBinds.PLAYER_interactKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey))
         {
             Interact();
         }
@@ -314,28 +318,28 @@ public class PlayerController : MonoBehaviour
             moveHorizontal = 0;
             moveForward = 0;
 
-            if ((Input.GetKey(keyBinds.PLAYER_moveFowardKey) && Input.GetKey(keyBinds.PLAYER_moveBackwardsdKey)) || settings.is_menu_settings_active)
+            if ((Input.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey) && Input.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey)) || SettingsHUD.Instance.is_menu_settings_active)
             {
                 moveForward = 0;
             }
-            else if (Input.GetKey(keyBinds.PLAYER_moveFowardKey))
+            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey))
             {
                 moveForward = 1;
             }
-            else if (Input.GetKey(keyBinds.PLAYER_moveBackwardsdKey))
+            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey))
             {
                 moveForward = -1;
             }
 
-            if ((Input.GetKey(keyBinds.PLAYER_moveLeftKey) && Input.GetKey(keyBinds.PLAYER_moveRightKey)) || settings.is_menu_settings_active)
+            if ((Input.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey) && Input.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey)) || SettingsHUD.Instance.is_menu_settings_active)
             {
                 moveHorizontal = 0;
             }
-            else if (Input.GetKey(keyBinds.PLAYER_moveLeftKey))
+            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey))
             {
                 moveHorizontal = -1;
             }
-            else if (Input.GetKey(keyBinds.PLAYER_moveRightKey))
+            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey))
             {
                 moveHorizontal = 1;
             }
@@ -366,7 +370,7 @@ public class PlayerController : MonoBehaviour
         Vector3 origin_ = playerHead.transform.position;
         float distance = colliders_difference * 4.5f;
 
-        if (!controls.is_sprint_on_hold && Input.GetKeyDown(keyBinds.PLAYER_sprintKey))
+        if (!Settings.Instance._controls.is_sprint_on_hold && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_sprintKey))
         {
             if (playerProperties.crouched)
             {
@@ -374,13 +378,13 @@ public class PlayerController : MonoBehaviour
 
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
-                    generalHudAlertMessages.CreateMessage("Not Enough Space", 2);
+                    GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                     return;
                 }
             }
             ToggleSprint();
         }
-        else if (controls.is_sprint_on_hold)
+        else if (Settings.Instance._controls.is_sprint_on_hold)
         {
             if (playerProperties.crouched)
             {
@@ -388,7 +392,7 @@ public class PlayerController : MonoBehaviour
 
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
-                    generalHudAlertMessages.CreateMessage("Not Enough Space", 2);
+                    GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                     return;
                 }
             }
@@ -409,7 +413,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateHoldSprint()
     {
-        playerProperties.sprinting = Input.GetKey(keyBinds.PLAYER_sprintKey);
+        playerProperties.sprinting = Input.GetKey(Settings.Instance._keybinds.PLAYER_sprintKey);
 
         if (playerProperties.sprinting)
         {
@@ -423,22 +427,22 @@ public class PlayerController : MonoBehaviour
         Vector3 origin_ = transform.position;
         float distance = 7f;
 
-        if (!controls.is_prone_on_hold && Input.GetKeyDown(keyBinds.PLAYER_proneKey))
+        if (!Settings.Instance._controls.is_prone_on_hold && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_proneKey))
         {
             if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer) && playerProperties.is_proned)
             {
                 Debug.Log(hit.transform.gameObject.name);
-                generalHudAlertMessages.CreateMessage("Not Enough Space", 2);
+                GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                 return;
             }
 
             ToggleProne();
         }
-        else if (controls.is_prone_on_hold)
+        else if (Settings.Instance._controls.is_prone_on_hold)
         {
             if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer) && playerProperties.is_proned)
             {
-                generalHudAlertMessages.CreateMessage("Not Enough Space", 2);
+                GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                 return;
             }
             UpdateHoldProne();
@@ -469,7 +473,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateHoldProne()
     {
-        playerProperties.is_proned = Input.GetKey(keyBinds.PLAYER_proneKey);
+        playerProperties.is_proned = Input.GetKey(Settings.Instance._keybinds.PLAYER_proneKey);
 
         if (playerProperties.is_proned)
         {
@@ -480,14 +484,14 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCrouch()
     {
-        bool crouchInput = Input.GetKeyDown(keyBinds.PLAYER_crouchKey);
+        bool crouchInput = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_crouchKey);
         bool jumpWhileCrouched = playerProperties.crouched &&
-                                 Input.GetKeyDown(keyBinds.PLAYER_jumpKey);
+                                 Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey);
 
         Vector3 origin_ = playerHead.transform.position;
         float distance = colliders_difference * 4.5f;
 
-        if (!controls.is_crouch_on_hold && (crouchInput || jumpWhileCrouched))
+        if (!Settings.Instance._controls.is_crouch_on_hold && (crouchInput || jumpWhileCrouched))
         {
             if (playerProperties.is_proned)
             {
@@ -501,14 +505,14 @@ public class PlayerController : MonoBehaviour
 
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
-                    generalHudAlertMessages.CreateMessage("Not Enough Space", 2);
+                    GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                     return;
                 }
             }
 
             ToggleCrouch();
         }
-        else if (controls.is_crouch_on_hold)
+        else if (Settings.Instance._controls.is_crouch_on_hold)
         {
             if (playerProperties.is_proned)
             {
@@ -519,7 +523,7 @@ public class PlayerController : MonoBehaviour
 
             if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
             {
-                generalHudAlertMessages.CreateMessage("Not Enough Space", 2);
+                GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                 return;
             }
 
@@ -542,7 +546,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateHoldCrouch()
     {
-        playerProperties.crouched = Input.GetKey(keyBinds.PLAYER_crouchKey);
+        playerProperties.crouched = Input.GetKey(Settings.Instance._keybinds.PLAYER_crouchKey);
 
         if (playerProperties.crouched)
         {
@@ -573,7 +577,7 @@ public class PlayerController : MonoBehaviour
 
     private void CheckForDoubleClickRoll()
     {
-        if (Input.GetKeyDown(keyBinds.PLAYER_rollKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey))
         {
             float currentTime = Time.time;
 
@@ -818,7 +822,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleNightVision()
     {
-        if (Input.GetKeyDown(keyBinds.PLAYER_activateNightNision))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision))
         {
             is_night_vision_active = !is_night_vision_active;
 
@@ -833,23 +837,45 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private float targetVignetteIntensity;
+    private float currentVignetteIntensity;
+    private float vignetteVelocity;
+
+    private void UpdateDamageVignette()
+    {
+        if (damageTaken_vignette == null) return;
+
+        float hpPercentage = playerProperties.hp / playerProperties.max_hp;
+        targetVignetteIntensity = 1f - hpPercentage;
+
+        // Transição suave usando SmoothDamp
+        currentVignetteIntensity = Mathf.SmoothDamp(
+            currentVignetteIntensity,
+            targetVignetteIntensity,
+            ref vignetteVelocity,
+            0.2f // Tempo de transição em segundos
+        );
+
+        damageTaken_vignette.intensity.value = currentVignetteIntensity;
+    }
+
     private void EnableNightVision()
     {
-        filmGrain.active = true;
-        colorAdjustments.active = true;
-        vignette.active = true;
+        nightVision_filmGrain.active = true;
+        nightVision_Color_adjustments.active = true;
+        nightVision_vignette.active = true;
     }
 
     private void DisableNightVision()
     {
-        filmGrain.active = false;
-        colorAdjustments.active = false;
-        vignette.active = false;
+        nightVision_filmGrain.active = false;
+        nightVision_Color_adjustments.active = false;
+        nightVision_vignette.active = false;
     }
 
     private void RotateCamera()
     {
-        if (playerProperties.roll || settings.is_menu_settings_active || playerProperties.is_in_vehicle) return;
+        if (playerProperties.roll || SettingsHUD.Instance.is_menu_settings_active || playerProperties.is_in_vehicle) return;
 
         HandleHorizontalRotation();
         HandleVerticalRotation();
@@ -858,7 +884,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateMouseSensitivity()
     {
-        currentMouseSensitivity = playerProperties.is_aiming ? controls.infantary_aim_sensibility : controls.infantary_sensibility;
+        currentMouseSensitivity = playerProperties.is_aiming ? Settings.Instance._controls.infantary_aim_sensibility : Settings.Instance._controls.infantary_sensibility;
     }
 
     private void HandleHorizontalRotation()
@@ -881,7 +907,7 @@ public class PlayerController : MonoBehaviour
     private void HandleVerticalRotation()
     {
         float mouseVertical = Input.GetAxis("Mouse Y") * currentMouseSensitivity;
-        if (controls.invert_vertical_infantary_mouse)
+        if (Settings.Instance._controls.invert_vertical_infantary_mouse)
         {
             mouseVertical *= -1;
         }
@@ -955,7 +981,7 @@ public class PlayerController : MonoBehaviour
             float lerpSpeed = 10f * Time.deltaTime;
             playerCamera.fieldOfView = Mathf.Lerp(
                 playerCamera.fieldOfView,
-                video.infantary_fov,
+                Settings.Instance._video.infantary_fov,
                 lerpSpeed
             );
         }
@@ -1012,7 +1038,7 @@ public class PlayerController : MonoBehaviour
             {
                 if (playerProperties.selected_class != ClassManager.Class.Pilot)
                 {
-                    generalHudAlertMessages.CreateMessage("Only the pilot Class can drive vehicles", 2);
+                    GeneralHudAlertMessages.Instance.CreateMessage("Only the pilot Class can drive vehicles", 2);
                     return;
                 }
 
@@ -1103,17 +1129,20 @@ public class PlayerController : MonoBehaviour
 
         float deathProgress = Mathf.Clamp01(death_timer / playerProperties.death_timer);
 
-        if (deathProgress >= 1f)
-        {
-            vignette.intensity.value = 0;
+        if (deathProgress >= 1)
+        {   
+            AccountManager.Instance.status.AddDeath();
+            AccountManager.Instance.RemoveBattleCoin(10);
+
+            nightVision_vignette.intensity.value = 0;
             Destroy(gameObject);
             return;
         }
 
-        if (vignette != null)
+        if (nightVision_vignette != null)
         {
             float maxVignetteIntensity = 1;
-            vignette.intensity.value = deathProgress * maxVignetteIntensity;
+            nightVision_vignette.intensity.value = deathProgress * maxVignetteIntensity;
         }
 
         HideOwnerItems(false);
@@ -1172,7 +1201,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateGroundCheck()
     {
-        bool is_holding_roll = Input.GetKey(keyBinds.PLAYER_rollKey);
+        bool is_holding_roll = Input.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
 
         Vector3 rayOrigin = transform.position + Vector3.up;
 
@@ -1267,6 +1296,8 @@ public class PlayerController : MonoBehaviour
             if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
             EnableDeathCollier();
         }
+
+
         return dmg;
     }
 
@@ -1301,7 +1332,7 @@ public class PlayerController : MonoBehaviour
     public void Revive()
     {
         HideOwnerItems(true);
-        if (vignette != null) vignette.intensity.value = 0;
+        if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
         playerProperties.is_dead = false;
         playerProperties.hp = 100;
         soldierHudManager.soldierHudHpManager.UpdateHp();
@@ -1347,28 +1378,4 @@ public class PlayerController : MonoBehaviour
     }
 
     #endregion
-
-    private void DrawWireSphere(Vector3 center, float radius, Color color)
-    {
-        int segments = 16;
-        float angle = 0f;
-        float angleStep = 360f / segments;
-
-        for (int i = 0; i < segments; i++)
-        {
-            Vector3 start = center + Quaternion.Euler(0, angle, 0) * Vector3.forward * radius;
-            Vector3 end = center + Quaternion.Euler(0, angle + angleStep, 0) * Vector3.forward * radius;
-            Debug.DrawLine(start, end, color);
-            angle += angleStep;
-        }
-
-        angle = 0f;
-        for (int i = 0; i < segments; i++)
-        {
-            Vector3 start = center + Quaternion.Euler(angle, 0, 0) * Vector3.forward * radius;
-            Vector3 end = center + Quaternion.Euler(angle + angleStep, 0, 0) * Vector3.forward * radius;
-            Debug.DrawLine(start, end, color);
-            angle += angleStep;
-        }
-    }
 }

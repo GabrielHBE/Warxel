@@ -8,7 +8,8 @@ public class TowMissile : Missiles
 
     protected override void Update()
     {
-    
+
+        if (parent_gameobject == null || !parent_gameobject.gameObject.activeSelf) Explode(transform.position);
         if (!didShoot) return;
         DestroyTimer();
 
@@ -29,7 +30,7 @@ public class TowMissile : Missiles
     public void Shoot(Transform cameraTransform)
     {
         trail.gameObject.SetActive(true);
-        
+
         this.cameraTransform = cameraTransform;
         didShoot = true;
 
@@ -47,6 +48,6 @@ public class TowMissile : Missiles
             rb.useGravity = false;
         }
 
-        
+
     }
 }

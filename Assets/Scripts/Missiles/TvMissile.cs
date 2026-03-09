@@ -7,37 +7,31 @@ public class TvMissile : Missiles
 {
     [SerializeField] private Camera missile_camera;
     [SerializeField] private float turnSpeed = 5f;
-    private Volume volume;
+    [SerializeField] private Volume volume;
     private Camera original_camera;
 
     [Header("Post-Processing Effects")]
     [SerializeField] private Texture filmGrainTexture;
-    [SerializeField] private float filmGrainIntensity = 0.442f;
-    [SerializeField] private float filmGrainResponse = 0.496f;
-    private FilmGrain filmGrainComponent;
 
 
-
-    protected override void Start()
-    {
-        base.Start();
-        volume = GetVolume();
-    }
     protected override void Update()
     {
 
+
         if (!didShoot) return;
+
         DestroyTimer();
 
+        // Garante que a câmera seja restaurada quando o tempo acabar
         if (time_to_explode <= 0)
         {
-            original_camera.enabled = true;
-            missile_camera.enabled = false;
-            RemoveFilmGrainEffect();
+            RestoreOriginalCamera();
+            //RemoveFilmGrainEffect();
         }
 
-        float mouseX = Math.Clamp(Input.GetAxis("Mouse X"), -turnSpeed, turnSpeed) * (turnSpeed/2);
-        float mouseY = Math.Clamp(Input.GetAxis("Mouse Y"), -turnSpeed, turnSpeed) * (turnSpeed/2);
+
+        float mouseX = Math.Clamp(Input.GetAxis("Mouse X"), -turnSpeed, turnSpeed) * (turnSpeed / 2);
+        float mouseY = Math.Clamp(Input.GetAxis("Mouse Y"), -turnSpeed, turnSpeed) * (turnSpeed / 2);
 
         rb.AddTorque(transform.forward * -mouseX / 15, ForceMode.Force);
         rb.AddTorque(transform.right * -mouseY, ForceMode.Force);
@@ -46,25 +40,45 @@ public class TvMissile : Missiles
 
     }
 
-
-
     protected override void OnCollisionEnter(Collision collision)
     {
-        original_camera.enabled = true;
-        missile_camera.enabled = false; 
-        RemoveFilmGrainEffect();
+        if (collision.gameObject != parent_gameobject)
+        {
+            RestoreOriginalCamera();
+            //RemoveFilmGrainEffect();
+            base.OnCollisionEnter(collision);
+        }
 
-        base.OnCollisionEnter(collision);
+    }
+    private void RestoreOriginalCamera()
+    {
+        if (original_camera != null)
+        {
+            original_camera.enabled = true;
+        }
 
+        if (missile_camera != null)
+        {
+            missile_camera.enabled = false;
+        }
     }
 
     public void Shoot(Camera original_camera)
     {
+        // IMPORTANTE: Salva a referência da câmera original
         transform.SetParent(null);
-        AddFilmGrainEffect();
-        missile_camera.enabled = true;
         this.original_camera = original_camera;
+
+        //AddFilmGrainEffect();
+
+        // Ativa a câmera do míssil
+        if (missile_camera != null)
+        {
+            missile_camera.enabled = true;
+        }
+
         didShoot = true;
+
 
         CreateSound(shoot_sound);
         missile_collider.enabled = true;
@@ -79,66 +93,5 @@ public class TvMissile : Missiles
         trail.gameObject.SetActive(true);
     }
 
-    Volume GetVolume()
-    {
 
-        GameObject globalVolumeObj = GameObject.FindGameObjectWithTag("GlobalVolume");
-        if (globalVolumeObj != null)
-        {
-            return globalVolumeObj.GetComponent<Volume>();
-        }
-
-        return null;
-
-    }
-
-    public void AddFilmGrainEffect()
-    {
-        if (volume == null || volume.profile == null) return;
-
-        // Verificar se já existe o componente
-        if (!volume.profile.TryGet<FilmGrain>(out filmGrainComponent))
-        {
-            filmGrainComponent = volume.profile.Add<FilmGrain>();
-        
-        }
-        ConfigureFilmGrain();
-    }
-
-    private void ConfigureFilmGrain()
-    {
-        if (filmGrainComponent == null) return;
-        
-
-        // Tipo Custom
-        filmGrainComponent.type.overrideState = true;
-        filmGrainComponent.type.value = FilmGrainLookup.Custom;
-
-        // Texture
-        if (filmGrainTexture != null)
-        {
-            filmGrainComponent.texture.overrideState = true;
-            filmGrainComponent.texture.value = filmGrainTexture;
-        }
-
-        // Intensity
-        filmGrainComponent.intensity.overrideState = true;
-        filmGrainComponent.intensity.value = filmGrainIntensity;
-
-        // Response
-        filmGrainComponent.response.overrideState = true;
-        filmGrainComponent.response.value = filmGrainResponse;
-    }
-
-    // Remover efeito Film Grain
-    public void RemoveFilmGrainEffect()
-    {
-        if (volume == null || volume.profile == null) return;
-
-        if (volume.profile.TryGet<FilmGrain>(out filmGrainComponent))
-        {
-            volume.profile.Remove<FilmGrain>();
-            filmGrainComponent = null;
-        }
-    }
 }

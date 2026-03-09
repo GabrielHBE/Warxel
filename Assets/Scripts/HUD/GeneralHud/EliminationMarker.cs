@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 public class EliminationMarker : MonoBehaviour
 {
+    public static EliminationMarker Instance {get; private set;}
     [SerializeField] private Sprite infantary_kill_image;
     [SerializeField] private Sprite vehicle_kill_image;
     [SerializeField] private float images_distance = 2f;
@@ -20,6 +21,7 @@ public class EliminationMarker : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
         if (images_container == null)
         {
             images_container = transform;

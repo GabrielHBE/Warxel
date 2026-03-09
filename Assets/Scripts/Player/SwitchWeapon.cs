@@ -52,7 +52,6 @@ public class SwitchWeapon : MonoBehaviour
     private readonly Vector3 savePosition = new(0, -30, 1); // Inicializado diretamente
     private readonly Quaternion saveQuaternionRotation = new(4, 0, 0, 1);
 
-    private Settings settings;
 
     private enum WeaponSlot
     {
@@ -62,10 +61,8 @@ public class SwitchWeapon : MonoBehaviour
         Gadget2 = 4
     }
 
-    public void Awake()
+    public void Initialize()
     {
-
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
 
         playerController = GetComponentInParent<PlayerController>();
         playerProperties = GetComponentInParent<PlayerProperties>();
@@ -91,6 +88,13 @@ public class SwitchWeapon : MonoBehaviour
         if (primary != null)
         {
             GameObject g = Instantiate(primary, weapons_parent);
+            AttatchmentManager attManager = g.GetComponent<AttatchmentManager>();
+            if (attManager != null)
+            {
+                attManager.InitializeAttachments();
+                attManager.LoadAttachmentsFromPlayerPrefs();
+            }
+
             primary = g;
         }
     }
@@ -100,6 +104,15 @@ public class SwitchWeapon : MonoBehaviour
         if (secondary != null)
         {
             GameObject g = Instantiate(secondary, weapons_parent);
+
+            // Inicializa e carrega attachments salvos
+            AttatchmentManager attManager = g.GetComponent<AttatchmentManager>();
+            if (attManager != null)
+            {
+                attManager.InitializeAttachments();
+                attManager.LoadAttachmentsFromPlayerPrefs();
+            }
+
             secondary = g;
             g.SetActive(false);
         }
@@ -127,7 +140,7 @@ public class SwitchWeapon : MonoBehaviour
     void Update()
     {
 
-        if (settings.is_menu_settings_active) return;
+        if (SettingsHUD.Instance.is_menu_settings_active) return;
         HandleWeaponSwitchInput();
 
         if (_switch)

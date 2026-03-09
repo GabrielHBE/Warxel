@@ -25,7 +25,7 @@ public class C4Detonator : Gadget
 
     void Update()
     {
-        if (Input.GetKeyDown(gadgetComponents.keyBinds.PLAYER_interactKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey))
         {
             TryPickUpC4();
         }
@@ -36,12 +36,12 @@ public class C4Detonator : Gadget
         gadgetComponents.left_hand.transform.position = detonator_position.position;
         gadgetComponents.right_hand.transform.position = right_hand_pos.transform.position;
 
-        if (c4_qtd > 0 && Input.GetKeyDown(gadgetComponents.keyBinds.GADGET_throwC4Key))
+        if (c4_qtd > 0 && Input.GetKeyDown(Settings.Instance._keybinds.GADGET_throwC4Key))
         {
             Throw_C4();
         }
 
-        if (Input.GetKeyDown(gadgetComponents.keyBinds.GADGET_detonateC4Key) && !isDetonating)
+        if (Input.GetKeyDown(Settings.Instance._keybinds.GADGET_detonateC4Key) && !isDetonating)
         {
             CleanupDestroyedC4s();
 

@@ -24,7 +24,6 @@ public class MedBox : Gadget
     private LineRenderer circleLineRenderer;
     private GameObject circleVisual;
     private PlayerController playerController;
-    private KeyBinds keyBinds;
     private float lastAimKeyPressTime;
     private int aimKeyPressCount;
     private bool med_box_thrown;
@@ -36,7 +35,6 @@ public class MedBox : Gadget
     {
 
         rb.isKinematic = true;
-        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
         playerController = GetComponentInParent<PlayerController>();
         switchWeapon = gameObject.GetComponentInParent<SwitchWeapon>();
         owner = playerController.gameObject;
@@ -52,19 +50,19 @@ public class MedBox : Gadget
             if (!med_box_thrown)
             {
 
-                if (Input.GetKey(keyBinds.WEAPON_shootKey))
+                if (Input.GetKey(Settings.Instance._keybinds.WEAPON_shootKey))
                 {
                     SelfHeal();
                 }
 
                 // Verifica duplo clique para a tecla de mirar
-                if (Input.GetKeyDown(keyBinds.WEAPON_aimKey))
+                if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
                 {
                     CheckForDoubleClick();
                 }
 
                 // Mantém a funcionalidade normal de curar outros enquanto segura a tecla
-                if (Input.GetKey(keyBinds.WEAPON_aimKey) && aimKeyPressCount < 2)
+                if (Input.GetKey(Settings.Instance._keybinds.WEAPON_aimKey) && aimKeyPressCount < 2)
                 {
                     HealOthers();
                 }
@@ -74,7 +72,7 @@ public class MedBox : Gadget
 
         if(med_box_thrown)
         {
-            if (Input.GetKey(keyBinds.PLAYER_interactKey))
+            if (Input.GetKey(Settings.Instance._keybinds.PLAYER_interactKey))
             {
                 Ray ray = new Ray(playerController.playerCamera.transform.position, playerController.playerCamera.transform.forward);
                 RaycastHit hit;

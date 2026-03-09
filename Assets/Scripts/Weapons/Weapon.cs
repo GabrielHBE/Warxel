@@ -12,7 +12,7 @@ public class Weapon : MonoBehaviour
 
     [Header("HUD")]
     [SerializeField] private SoldierHudManager soldierHudManager;
-    private Settings settings;
+
 
     [Header("Muzzle Flashes")]
     [SerializeField] private List<GameObject> muzzle_flashes = new List<GameObject>();
@@ -20,9 +20,6 @@ public class Weapon : MonoBehaviour
     [Header("Instances")]
     [SerializeField] private ThirdPersonWeapon thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
-    [SerializeField] private KeyBinds keyBinds;
-    [SerializeField] private Controls controls;
-    [SerializeField] private Video video;
     [SerializeField] private Camera player_camera;
     public GameObject ads_position;
     [SerializeField] private SwitchWeapon switchWeapon;
@@ -68,7 +65,6 @@ public class Weapon : MonoBehaviour
     private float time_to_contatenate = 0;
     private GameObject current_muzzle_flash;
     private bool is_aiming;
-    private GeneralHudAlertMessages generalHudAlertMessages;
     private bool moved_mouse_while_firing;
     private bool was_firing_previous_frame;
 
@@ -76,13 +72,8 @@ public class Weapon : MonoBehaviour
 
     void Awake()
     {
-        settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
-        generalHudAlertMessages = settings.GetComponent<GeneralHudAlertMessages>();
-        keyBinds = GameObject.FindGameObjectWithTag("Settings").GetComponent<KeyBinds>();
-        controls = keyBinds.GetComponent<Controls>();
-        video = keyBinds.GetComponent<Video>();
 
-        minFov = video.infantary_fov;
+        minFov = Settings.Instance._video.infantary_fov;
         restarted = false;
     }
 
@@ -91,7 +82,7 @@ public class Weapon : MonoBehaviour
         if (weaponProperties != null)
             Reload();
 
-        if (!restarted || !is_active || settings.is_menu_settings_active || playerProperties.is_in_vehicle)
+        if (!restarted || !is_active || SettingsHUD.Instance.is_menu_settings_active || playerProperties.is_in_vehicle)
         {
             playerProperties.is_firing = false;
             DeleteMuzzle();
@@ -100,13 +91,12 @@ public class Weapon : MonoBehaviour
 
         ConcatenateBullets();
 
-        if (Input.GetKeyDown(keyBinds.WEAPON_reloadKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_reloadKey))
         {
             HandleReload();
         }
 
-        if (soldierHudManager.mag_counter_hud != null && weaponProperties != null)
-            soldierHudManager.mag_counter_hud.UpdateMagCount(0, weaponProperties.mags);
+        if (soldierHudManager.mag_counter_hud != null && weaponProperties != null) soldierHudManager.mag_counter_hud.UpdateMagCount(0, weaponProperties.mags);
 
         aim();
 
@@ -115,7 +105,7 @@ public class Weapon : MonoBehaviour
             shoot();
         }
 
-        if (Input.GetKeyDown(keyBinds.WEAPON_switchFireModeKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey))
         {
             HandleFireModeSwitch();
         }
@@ -222,7 +212,7 @@ public class Weapon : MonoBehaviour
         if (playerProperties.is_firing || playerProperties.is_reloading || playerProperties.roll || reserve_ammo == 0)
         {
             if (reserve_ammo == 0)
-                generalHudAlertMessages.CreateMessage("Cant reload", 2);
+                GeneralHudAlertMessages.Instance.CreateMessage("Cant reload", 2);
             return;
         }
 
@@ -345,15 +335,15 @@ public class Weapon : MonoBehaviour
 
     void shoot()
     {
-        bool hold_shoot = Input.GetKey(keyBinds.WEAPON_shootKey);
-        bool press_shoot = Input.GetKeyDown(keyBinds.WEAPON_shootKey);
+        bool hold_shoot = Input.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
+        bool press_shoot = Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
 
 
         if (ShouldBlockShooting())
         {
-            if (Input.GetKeyDown(keyBinds.WEAPON_shootKey) && weaponProperties.mags[^1] == 0)
+            if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) && weaponProperties.mags[^1] == 0)
             {
-                generalHudAlertMessages.CreateMessage("Not enought ammo", 2);
+                GeneralHudAlertMessages.Instance.CreateMessage("Not enought ammo", 2);
             }
             DeleteMuzzle();
             return;
@@ -773,7 +763,7 @@ public class Weapon : MonoBehaviour
 
     void aim()
     {
-        if (controls.is_aim_on_hold)
+        if (Settings.Instance._controls.is_aim_on_hold)
         {
             AimWithHoldLogic();
         }
@@ -787,7 +777,7 @@ public class Weapon : MonoBehaviour
     {
         bool canAim = CanAim();
 
-        if (canAim && Input.GetKey(keyBinds.WEAPON_aimKey))
+        if (canAim && Input.GetKey(Settings.Instance._keybinds.WEAPON_aimKey))
         {
             StartAiming();
         }
@@ -801,7 +791,7 @@ public class Weapon : MonoBehaviour
     {
         bool canAim = CanAim();
 
-        if (Input.GetKeyDown(keyBinds.WEAPON_aimKey))
+        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
         {
             is_aiming = !is_aiming;
         }
@@ -924,7 +914,7 @@ public class Weapon : MonoBehaviour
             return;
         }
 
-        if (Input.GetKey(keyBinds.WEAPON_composeBulletsKey) &&
+        if (Input.GetKey(Settings.Instance._keybinds.WEAPON_composeBulletsKey) &&
             !playerProperties.is_firing &&
             !playerProperties.is_reloading)
         {

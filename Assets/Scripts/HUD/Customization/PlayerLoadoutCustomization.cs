@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -36,8 +37,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     [Space]
 
     [Header("UI Elements")]
+    [SerializeField] private TextMeshProUGUI current_battle_coins_indicator;
+    [SerializeField] private UnityEngine.UI.Button buy_weapon_button;
     [SerializeField] private Image class_selection_image;
-    [SerializeField] public static Sprite locked_item_image;
     [SerializeField] private Sprite lockedItemImage;
     [SerializeField] private GameObject backButton;
     [SerializeField] private GameObject updateLoadoutButton;
@@ -94,6 +96,29 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     [SerializeField] private float minScrollY = -200f;
     [SerializeField] private float maxScrollYIncreaser = 100f;
 
+    [Header("Sound Effects")]
+    [SerializeField] private AudioSource audio_source;
+    [SerializeField] private AudioClip purchase_item_sfx;
+    [SerializeField] private AudioClip purchase_denial_item_sfx;
+    [SerializeField] private AudioClip select_item_item_sfx;
+
+
+    [Header("Current selection")]
+    public GameObject selected_primary;
+    public GameObject selected_secondary;
+    public GameObject selected_gadget1;
+    public GameObject selected_gadget2;
+
+
+    //Statics
+    [HideInInspector] public static AudioSource reference_audio_source;
+    [HideInInspector] public static AudioClip reference_purchase_item_sfx;
+    [HideInInspector] public static AudioClip reference_purchase_denial_item_sfx;
+    [HideInInspector] public static Sprite locked_item_image;
+    [HideInInspector] public static UnityEngine.UI.Button BuyWeaponButton;
+
+
+
     // Enums
     public enum SelectionStage
     {
@@ -130,12 +155,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     private GameObject _currentItemSelected;
     private GameObject _weaponBeingCustomized;
 
-    private SwitchWeapon _switchWeapon;
-    private PlayerProperties _playerProperties;
     private ClassLoadoutSaver loadoutSaver;
 
 
-    // Adicione no início da classe, junto com as outras variáveis
     private Dictionary<ClassManager.Class, GameObject> _classButtons = new Dictionary<ClassManager.Class, GameObject>();
     private Color _normalButtonColor = Color.white;
     private Color _selectedButtonColor = Color.darkRed; // Você pode escolher a cor que preferir
@@ -161,6 +183,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void Update()
     {
+        current_battle_coins_indicator.text = "Current Battle coins: " + AccountManager.Instance.battle_coins;
         UpdateWeaponStatusDisplay();
         UpdateCameraAndButtonVisibility();
         if (_currentStage == SelectionStage.ClassSelection)
@@ -179,38 +202,27 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void InitializeComponents()
     {
-        locked_item_image = lockedItemImage;
-        foreach (GameObject p in primaryWeapons)
-        {
-            WeaponProperties wp = p.GetComponent<WeaponProperties>();
-            wp.Restart();
-            InitializeAttatchments(wp);
-            p.GetComponent<AttatchmentManager>().InitializeAttachments();
-        }
+        loadoutSaver = gameObject.AddComponent<ClassLoadoutSaver>();
 
-        _switchWeapon = playerPrefab.GetComponentInChildren<SwitchWeapon>();
-        _playerProperties = playerPrefab.GetComponent<PlayerProperties>();
-        _selectedClass = _playerProperties.selected_class;
+        locked_item_image = lockedItemImage;
+        BuyWeaponButton = buy_weapon_button;
+
+        reference_audio_source = audio_source;
+        reference_purchase_item_sfx = purchase_item_sfx;
+        reference_purchase_denial_item_sfx = purchase_denial_item_sfx;
+
+        _selectedClass = AccountManager.Instance.selected_class;
         if (loadoutSaver != null)
         {
+            //loadoutSaver.ResetAllLoadouts();
             loadoutSaver.LoadLoadoutForClass(_selectedClass);
         }
 
         switchLoadoutCamera.enabled = false;
         _originalWeaponsGadgetsPosition = weaponsGadgetsParent.localPosition;
 
-        loadoutSaver = gameObject.AddComponent<ClassLoadoutSaver>();
-
     }
 
-    private void InitializeAttatchments(WeaponProperties wp)
-    {
-        Attatchment[] attatchments = wp.GetComponentsInChildren<Attatchment>(true);
-        foreach (Attatchment a in attatchments)
-        {
-            a.Initialize(wp);
-        }
-    }
 
     private void InitializeUI()
     {
@@ -299,13 +311,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         {
             customization_buttons_parent.SetActive(active);
         }
-        /*
-        if (customizeWeaponButtonBarrel != null) customizeWeaponButtonBarrel.SetActive(active);
-        if (customizeWeaponButtonSight != null) customizeWeaponButtonSight.SetActive(active);
-        if (customizeWeaponButtonMag != null) customizeWeaponButtonMag.SetActive(active);
-        if (customizeWeaponButtonGrip != null) customizeWeaponButtonGrip.SetActive(active);
-        if (customizeWeaponButtonSideGrip != null) customizeWeaponButtonSideGrip.SetActive(active);
-        */
+
     }
 
     private void UpdateSelectionText(string text)
@@ -397,9 +403,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     public void SelectClass(ClassManager.Class @class)
     {
         _selectedClass = @class;
-        _playerProperties.selected_class = @class;
+        AccountManager.Instance.SetClass(@class);
         Gadget gadget2_class = classManager.GetClassGadget(@class);
-        if (gadget2_class != null) _switchWeapon.gadget2 = gadget2_class.gameObject;
+        if (gadget2_class != null) selected_gadget2 = gadget2_class.gameObject;
 
 
         // Carrega o loadout da classe selecionada
@@ -571,7 +577,13 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private bool HasClassAccessToWeapon(WeaponProperties weaponProperties)
     {
-        return weaponProperties.class_weapon.Any(c => c == _selectedClass);
+
+        if (weaponProperties.class_weapon.Any(c => c == _selectedClass))
+        {
+            return true;
+        }
+
+        return false;
     }
 
 
@@ -638,10 +650,18 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (_currentItemSelected != null) Destroy(_currentItemSelected);
 
         _currentItemSelected = Instantiate(item, currentItemParent);
+        //_currentItemSelected.GetComponent<AttatchmentManager>().LoadAttachmentsFromPlayerPrefs();
         SetupItemForCustomization(_currentItemSelected);
 
-        WeaponProperties wp = item.GetComponent<WeaponProperties>();
-        if (wp != null) UpdateWeaponStats(wp);
+        _currentItemSelected.GetComponent<AttatchmentManager>().InitializeAttachments();
+
+        WeaponProperties wp = _currentItemSelected.GetComponent<WeaponProperties>();
+        if (wp != null)
+        {
+
+            //InitializeAttatchments(wp);
+            UpdateWeaponStats(wp);
+        }
     }
 
 
@@ -651,10 +671,17 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (_currentItemSelected != null) Destroy(_currentItemSelected);
 
         _currentItemSelected = Instantiate(item, currentItemParent);
+        //_currentItemSelected.GetComponent<AttatchmentManager>().LoadAttachmentsFromPlayerPrefs();
         SetupItemForCustomization(_currentItemSelected);
 
-        WeaponProperties wp = item.GetComponent<WeaponProperties>();
-        if (wp != null) UpdateWeaponStats(wp);
+        _currentItemSelected.GetComponent<AttatchmentManager>().InitializeAttachments();
+
+        WeaponProperties wp = _currentItemSelected.GetComponent<WeaponProperties>();
+        if (wp != null)
+        {
+            //InitializeAttatchments(wp);
+            UpdateWeaponStats(wp);
+        }
 
         EquipItem(item);
 
@@ -674,6 +701,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void EquipItem(GameObject item)
     {
+        audio_source.clip = select_item_item_sfx;
+        audio_source.Play();
+
         switch (_currentLoadoutOption)
         {
             case LoadoutOption.PrimaryWeapon:
@@ -695,7 +725,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
         if (wp != null)
         {
-            _switchWeapon.primary = weapon;
+            selected_primary = weapon;
         }
     }
 
@@ -704,7 +734,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
         if (wp != null)
         {
-            _switchWeapon.secondary = weapon;
+            selected_secondary = weapon;
         }
     }
 
@@ -713,7 +743,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         Gadget gd = gadget.GetComponent<Gadget>();
         if (gd != null)
         {
-            _switchWeapon.gadget1 = gadget;
+            selected_gadget1 = gadget;
             //_switchWeapon.gadget2 = null; // Garante que gadget2 fica vazio
         }
     }
@@ -759,6 +789,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         SetCustomizeButtonsActive(true);
 
         WeaponProperties wp = _weaponBeingCustomized.GetComponent<WeaponProperties>();
+
         string weaponName = wp != null ? wp.weapon_name : _weaponBeingCustomized.name;
         UpdateSelectionText($"Customizando: {weaponName}");
     }
@@ -868,30 +899,11 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         WeaponProperties weaponProps = weaponBeingCustomized.GetComponent<WeaponProperties>();
         if (weaponProps == null) return;
 
-        // Determina o tipo do attachment baseado no partType
-        Type targetType = null;
-        switch (partType)
-        {
-            case "Mira":
-                targetType = typeof(Sight);
-                break;
-            case "Cano":
-                targetType = typeof(Barrel);
-                break;
-            case "Carregador":
-                targetType = typeof(Mag);
-                break;
-            case "Empunhadura":
-                targetType = typeof(Grip);
-                break;
-            case "Empunhadura Lateral":
-                targetType = typeof(SideGrip);
-                break;
-        }
-
+        // Determina o tipo do attachment
+        Type targetType = GetTargetTypeFromPartType(partType);
         if (targetType == null) return;
 
-        // Primeiro, atualiza o AttachmentManager (igual no método de adicionar)
+        // Atualiza o AttachmentManager na instância
         AttatchmentManager attachmentManager = weaponBeingCustomized.GetComponent<AttatchmentManager>();
 
         if (targetType == typeof(Grip))
@@ -900,16 +912,13 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             attachmentManager.RemoveBarrel(weaponProps);
         else if (targetType == typeof(Sight))
             attachmentManager.RemoveSight(weaponProps);
-        else if (targetType == typeof(Mag))
-            attachmentManager.RemoveMag(weaponProps);
+        //else if (targetType == typeof(Mag))
+        //    attachmentManager.RemoveMag_(weaponProps);
         else if (targetType == typeof(SideGrip))
             attachmentManager.RemoveSideGrip(weaponProps);
 
-        // Atualiza no prefab (seguindo o padrão do UpdateWeaponPartInPrefab)
-        UpdateWeaponPartInPrefabRemove(targetType, weaponProps);
-
-        // Atualiza na instância atual
-        UpdateWeaponPartInInstanceRemove(targetType);
+        // Desativa na instância
+        DisableAttachmentInInstance(targetType, weaponBeingCustomized);
 
         // Atualiza as estatísticas da arma
         UpdateWeaponStats(weaponProps);
@@ -921,76 +930,27 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         SaveCurrentLoadout();
     }
 
-
-    private void UpdateWeaponPartInPrefabRemove(Type targetType, WeaponProperties weaponProps)
+    private Type GetTargetTypeFromPartType(string partType)
     {
-        // Procura nos arrays de armas primárias e secundárias
-        foreach (GameObject weapon in primaryWeapons)
+        return partType switch
         {
-            WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
-            if (wp == null || wp.weapon_name != weaponProps.weapon_name) continue;
+            "Mira" => typeof(Sight),
+            "Cano" => typeof(Barrel),
+            "Carregador" => typeof(Mag),
+            "Empunhadura" => typeof(Grip),
+            "Empunhadura Lateral" => typeof(SideGrip),
+            _ => null
+        };
+    }
 
-            Component[] existingParts = weapon.GetComponentsInChildren(targetType, true);
-            foreach (Component part in existingParts)
-            {
-                part.gameObject.SetActive(false);
-
-                // Atualiza o AttachmentManager no prefab também
-                UpdateAttachmentControllerRemove(part, wp);
-            }
-
-            // Se for a arma primária ou secundária atual, atualiza também no SwitchWeapon
-            if (_switchWeapon.primary != null &&
-                _switchWeapon.primary.GetComponent<WeaponProperties>().weapon_name == weaponProps.weapon_name)
-            {
-                // Recarrega a arma primária com o prefab atualizado
-                _switchWeapon.primary = weapon;
-            }
-            else if (_switchWeapon.secondary != null &&
-                     _switchWeapon.secondary.GetComponent<WeaponProperties>().weapon_name == weaponProps.weapon_name)
-            {
-                // Recarrega a arma secundária com o prefab atualizado
-                _switchWeapon.secondary = weapon;
-            }
-
-            break;
+    private void DisableAttachmentInInstance(Type targetType, GameObject weaponInstance)
+    {
+        Component[] components = weaponInstance.GetComponentsInChildren(targetType, true);
+        foreach (Component comp in components)
+        {
+            comp.gameObject.SetActive(false);
         }
     }
-
-    private void UpdateWeaponPartInInstanceRemove(Type targetType)
-    {
-        if (_weaponBeingCustomized == null) return;
-
-        Component[] existingParts = _weaponBeingCustomized.GetComponentsInChildren(targetType, true);
-        foreach (Component part in existingParts)
-        {
-            part.gameObject.SetActive(false);
-
-            // Atualiza o AttachmentManager na instância também
-            WeaponProperties weaponProps = _weaponBeingCustomized.GetComponent<WeaponProperties>();
-            UpdateAttachmentControllerRemove(part, weaponProps);
-        }
-    }
-
-    private void UpdateAttachmentControllerRemove(Component part, WeaponProperties weaponProps)
-    {
-        // Chama os métodos apropriados do AttachmentManager para remover
-        AttatchmentManager attachmentManager = weaponProps.GetComponent<AttatchmentManager>();
-
-        print("To removendo no prefab");
-
-        if (part is Sight)
-            attachmentManager.RemoveSight(weaponProps);
-        else if (part is Barrel)
-            attachmentManager.RemoveBarrel(weaponProps);
-        else if (part is Mag)
-            attachmentManager.RemoveMag(weaponProps);
-        else if (part is Grip)
-            attachmentManager.RemoveGrip(weaponProps);
-        else if (part is SideGrip)
-            attachmentManager.RemoveSideGrip(weaponProps);
-    }
-
 
     public void UpdateAttachmentOutlines()
     {
@@ -1033,21 +993,24 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         Type targetType = GetTargetTypeFromCustomizationPart();
         WeaponProperties weaponProps = _weaponBeingCustomized.GetComponent<WeaponProperties>();
 
-        bool is_max_points_reached = weaponProps.current_attachment_points + partObject.GetComponent<Attatchment>().attatchment_points == 100;
+        if (_weaponBeingCustomized == null || targetType == null) return;
 
+        // Verifica pontos de attachment
+        Attatchment attachment = partObject.GetComponent<Attatchment>();
+        bool is_max_points_reached = weaponProps.current_attachment_points +
+                                      attachment.attatchment_points > 100;
+        if (is_max_points_reached) return;
 
-        if (_weaponBeingCustomized == null || targetType == null || is_max_points_reached) return;
-
-        // Update in prefab
-        UpdateWeaponPartInPrefab(partObject, targetType, weaponProps);
-
-        // Update in current instance
+        // Atualiza na instância atual - AGORA CHAMA O ATTACHMENT MANAGER
         UpdateWeaponPartInInstance(partObject, targetType);
 
         // Atualiza os outlines dos attachments
         UpdateAttachmentOutlines();
 
-        // Salva o loadout após modificar attachments
+        // Atualiza as estatísticas mostradas
+        UpdateWeaponStats(weaponProps);
+
+        // Salva o loadout
         SaveCurrentLoadout();
     }
 
@@ -1062,38 +1025,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             CustomizationPart.SideGrip => typeof(SideGrip),
             _ => null
         };
-    }
-
-    private void UpdateWeaponPartInPrefab(GameObject partObject, Type targetType, WeaponProperties weaponProps)
-    {
-        foreach (GameObject primary in primaryWeapons)
-        {
-            WeaponProperties primaryProps = primary.GetComponent<WeaponProperties>();
-            if (primaryProps.weapon_name == weaponProps.weapon_name)
-            {
-                Component[] existingParts = primary.GetComponentsInChildren(targetType, true);
-                foreach (Component part in existingParts)
-                {
-                    bool isSelectedPart = part.gameObject.name == partObject.name;
-                    part.gameObject.SetActive(isSelectedPart);
-
-                    if (isSelectedPart)
-                    {
-                        UpdateAttachmentController(part, primaryProps);
-
-                        // Se for a arma primária atual, atualiza também no SwitchWeapon
-                        if (_switchWeapon.primary != null &&
-                            _switchWeapon.primary.GetComponent<WeaponProperties>().weapon_name == weaponProps.weapon_name)
-                        {
-                            EquipPrimaryWeapon(primary);
-                        }
-
-                        UpdateWeaponStats(primaryProps);
-                    }
-                }
-                break;
-            }
-        }
     }
 
     private void UpdateAttachmentController(Component part, WeaponProperties weaponProps)
@@ -1116,10 +1047,22 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void UpdateWeaponPartInInstance(GameObject partObject, Type targetType)
     {
+        if (_weaponBeingCustomized == null) return;
+
+        WeaponProperties weaponProps = _weaponBeingCustomized.GetComponent<WeaponProperties>();
+        AttatchmentManager attachmentManager = _weaponBeingCustomized.GetComponent<AttatchmentManager>();
+
         Component[] existingParts = _weaponBeingCustomized.GetComponentsInChildren(targetType, true);
         foreach (Component part in existingParts)
         {
-            part.gameObject.SetActive(part.gameObject == partObject);
+            bool isSelected = part.gameObject == partObject;
+            part.gameObject.SetActive(isSelected);
+
+            if (isSelected)
+            {
+                // Chama o AttachmentManager para aplicar os stats
+                UpdateAttachmentController(part, weaponProps);
+            }
         }
     }
 
@@ -1192,6 +1135,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     #region Utility Methods
 
+
     private void ClearAllButtons()
     {
         foreach (GameObject button in _buttonsList)
@@ -1255,9 +1199,62 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     }
 
     // Public getters
-    public GameObject GetCurrentPrimaryWeapon() => _switchWeapon.primary;
-    public GameObject GetCurrentSecondaryWeapon() => _switchWeapon.secondary;
-    public GameObject GetCurrentGadget() => _switchWeapon.gadget1; // Renomeado para refletir apenas um gadget
+    // Public getters
+    public GameObject GetCurrentPrimaryWeapon()
+    {
+        if (selected_primary != null)
+            return selected_primary;
+
+        foreach (GameObject weapon in primaryWeapons)
+        {
+            if (weapon == null) continue;
+
+            WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
+            if (wp == null) continue;
+
+            if (HasClassAccessToWeapon(wp))
+            {
+                if (wp.battle_coins_to_unlock == 0 && HasClassAccessToWeapon(wp))
+                {
+                    selected_primary = weapon;
+                    return weapon;
+                }
+            }
+
+
+        }
+
+        return null;
+    }
+
+    public GameObject GetCurrentSecondaryWeapon()
+    {
+        if (selected_secondary != null)
+            return selected_secondary;
+
+        foreach (GameObject weapon in secondaryWeapons)
+        {
+            if (weapon == null) continue;
+
+            WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
+            if (wp == null) continue;
+
+            if (HasClassAccessToWeapon(wp))
+            {
+                if (wp.battle_coins_to_unlock == 0 && HasClassAccessToWeapon(wp))
+                {
+                    selected_secondary = weapon;
+                    return weapon;
+                }
+            }
+
+
+        }
+
+        return null;
+    }
+    public GameObject GetCurrentGadget1() => selected_gadget1; // Renomeado para refletir apenas um gadget
+    public GameObject GetCurrentGadget2() => selected_gadget2; // Renomeado para refletir apenas um gadget
 
     public Sprite GetGadgetIcon(GameObject gadget) => gadget.GetComponent<Gadget>().icon_hud;
     public Sprite GetWeaponIcon(GameObject weapon) => weapon.GetComponent<WeaponProperties>().icon_hud;
@@ -1293,17 +1290,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             Image[] allImages = GetComponentsInChildren<Image>(true);
             if (allImages != null && allImages.Length > 0)
             {
-                /*
-                if (_imageHud == null)
-                {
-                    allImages[allImages.Length - 1].sprite = PlayerLoadoutCustomization.locked_item_image;
-                }
-                else
-                {
-                    allImages[allImages.Length - 1].sprite = _imageHud;
-                }
-                */
-
                 allImages[allImages.Length - 1].sprite = _imageHud;
 
             }
@@ -1345,7 +1331,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         {
             if (_parent == null) return;
 
-            bool isSelected = _parent.GetCurrentGadget() == _gadgetGameObject; // Verifica apenas gadget1
+            bool isSelected = _parent.GetCurrentGadget1() == _gadgetGameObject; // Verifica apenas gadget1
 
             if (_outline != null)
                 _outline.enabled = isSelected;
@@ -1359,6 +1345,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         private WeaponProperties _weaponProperties;
         private PlayerLoadoutCustomization _parent;
         private Outline _outline;
+        private GameObject _buyButton;
+        private bool _isUnlocked;
+        private Image _weaponImage;
 
         public void Initialize(Sprite imageHud, GameObject weaponGameObject, WeaponProperties weaponProperties)
         {
@@ -1366,40 +1355,125 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             _weaponGameObject = weaponGameObject;
             _weaponProperties = weaponProperties;
             _parent = GetComponentInParent<PlayerLoadoutCustomization>();
+            if (weaponProperties.battle_coins_to_unlock == 0)
+            {
+                _isUnlocked = true;
+            }
+            else
+            {
+                _isUnlocked = UnlockedWeapons.CheckWeaponStatus(weaponProperties.weapon_name);
+            }
 
             SetupImage();
             SetupText();
             SetupOutline();
+            SetupBuyButton();
             SetupEvents();
             UpdateOutlineState();
         }
 
         private void SetupImage()
         {
-
             Image[] allImages = GetComponentsInChildren<Image>(true);
             if (allImages != null && allImages.Length > 0)
             {
-                /*
-                if (_imageHud == null)
+                _weaponImage = allImages[allImages.Length - 1];
+
+                if (!_isUnlocked)
                 {
-                    allImages[allImages.Length - 1].sprite = PlayerLoadoutCustomization.locked_item_image;
+                    _weaponImage.sprite = PlayerLoadoutCustomization.locked_item_image;
+                    // Mantém a cor original para não ficar escura
+                    _weaponImage.color = Color.white;
                 }
                 else
                 {
-                    allImages[allImages.Length - 1].sprite = _imageHud;
+                    _weaponImage.sprite = _imageHud;
                 }
-                */
-
-                allImages[allImages.Length - 1].sprite = _imageHud;
-
             }
+        }
+
+        private void SetupBuyButton()
+        {
+            if (_isUnlocked) return;
+
+            // Cria um GameObject para o botão de compra
+            _buyButton = Instantiate(BuyWeaponButton.gameObject, transform);
+            _buyButton.transform.SetParent(transform, false);
+
+            // Configura o RectTransform
+            RectTransform rectTransform = _buyButton.GetComponent<RectTransform>();
+            rectTransform.anchorMin = new Vector2(1, 0.5f);
+            rectTransform.anchorMax = new Vector2(1, 0.5f);
+            rectTransform.pivot = new Vector2(0, 0.5f);
+            rectTransform.anchoredPosition = new Vector2(10, 0); // Posiciona à direita do botão principal
+            rectTransform.sizeDelta = new Vector2(150, 40);
+
+            // Configura a imagem de fundo
+            Image bgImage = _buyButton.GetComponent<Image>();
+            bgImage.color = new Color(0.2f, 0.5f, 0.2f); // Verde escuro
+
+            // Configura o texto
+            TextMeshProUGUI buttonText = _buyButton.GetComponentInChildren<TextMeshProUGUI>();
+            buttonText.text = $"Buy: {_weaponProperties.battle_coins_to_unlock}";
+            buttonText.fontSize = 18;
+            buttonText.alignment = TextAlignmentOptions.Center;
+            buttonText.color = Color.white;
+
+            // Configura o botão
+            UnityEngine.UI.Button button = _buyButton.GetComponent<UnityEngine.UI.Button>();
+            button.onClick.AddListener(OnBuyButtonClicked);
+
+            // Adiciona outline ao texto (opcional)
+            buttonText.outlineWidth = 0.2f;
+            buttonText.outlineColor = Color.black;
+        }
+
+        private void OnBuyButtonClicked()
+        {
+            // Aqui você pode adicionar lógica para verificar se o jogador tem moedas suficientes
+            // Por enquanto, vamos apenas desbloquear diretamente
+            UnlockWeapon();
+        }
+
+        private void UnlockWeapon()
+        {
+            if (AccountManager.Instance.battle_coins < _weaponProperties.battle_coins_to_unlock)
+            {
+                reference_audio_source.clip = reference_purchase_denial_item_sfx;
+                reference_audio_source.Play();
+                return;
+            }
+
+            _isUnlocked = true;
+
+            // Atualiza a imagem
+            if (_weaponImage != null)
+            {
+                _weaponImage.sprite = _imageHud;
+            }
+
+            // Remove o botão de compra
+            if (_buyButton != null)
+            {
+                Destroy(_buyButton);
+            }
+
+            // Reconfigura os eventos para permitir seleção
+            SetupEvents();
+
+            reference_audio_source.clip = reference_purchase_item_sfx;
+            reference_audio_source.Play();
+            AccountManager.Instance.RemoveBattleCoin(_weaponProperties.battle_coins_to_unlock);
+            UnlockedWeapons.UnlockWeapon(_weaponProperties.weapon_name);
         }
 
         private void SetupText()
         {
             TextMeshProUGUI buttonText = GetComponentInChildren<TextMeshProUGUI>();
-            if (buttonText != null) buttonText.text = _weaponProperties.weapon_name;
+            if (buttonText != null)
+            {
+                buttonText.text = _weaponProperties.weapon_name;
+            }
         }
 
         private void SetupOutline()
@@ -1412,15 +1486,23 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
         private void SetupEvents()
         {
-            var eventTrigger = gameObject.AddComponent<EventTrigger>();
+            var eventTrigger = GetComponent<EventTrigger>();
+            if (eventTrigger != null)
+            {
+                Destroy(eventTrigger);
+            }
 
-            AddEventTrigger(eventTrigger, EventTriggerType.PointerEnter,
-                () => _parent?.OnButtonMouseEnter(_weaponGameObject));
-            /*
-            AddEventTrigger(eventTrigger, EventTriggerType.PointerExit,
-                () => _parent?.OnButtonMouseExit());
-            */
-            AddEventTrigger(eventTrigger, EventTriggerType.PointerClick, () => _parent?.OnButtonClicked(_weaponGameObject));
+            // Só adiciona eventos se a arma estiver desbloqueada
+            if (_isUnlocked)
+            {
+                eventTrigger = gameObject.AddComponent<EventTrigger>();
+
+                AddEventTrigger(eventTrigger, EventTriggerType.PointerEnter,
+                    () => _parent?.OnButtonMouseEnter(_weaponGameObject));
+
+                AddEventTrigger(eventTrigger, EventTriggerType.PointerClick,
+                    () => _parent?.OnButtonClicked(_weaponGameObject));
+            }
         }
 
         private void AddEventTrigger(EventTrigger trigger, EventTriggerType type, UnityEngine.Events.UnityAction action)
@@ -1432,7 +1514,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
         public void UpdateOutlineState()
         {
-            if (_parent == null) return;
+            if (_parent == null || !_isUnlocked) return;
 
             bool isSelected = false;
 
@@ -1448,6 +1530,14 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
             if (_outline != null)
                 _outline.enabled = isSelected;
+        }
+
+        private void OnDestroy()
+        {
+            if (_buyButton != null)
+            {
+                Destroy(_buyButton);
+            }
         }
     }
 
@@ -1682,21 +1772,17 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         [SerializeField] private List<ClassLoadoutData> classLoadouts = new List<ClassLoadoutData>();
 
         private PlayerLoadoutCustomization loadoutCustomization;
-        private SwitchWeapon switchWeapon;
+
 
         private void Awake()
         {
-            InitializeLoadouts();
-        }
-
-        private void Start()
-        {
             loadoutCustomization = GetComponent<PlayerLoadoutCustomization>();
-            switchWeapon = loadoutCustomization.playerPrefab.GetComponentInChildren<SwitchWeapon>();
-
-            // Carrega dados salvos ao iniciar
+            InitializeLoadouts();
             LoadFromPlayerPrefs();
+
+
         }
+
 
         private void InitializeLoadouts()
         {
@@ -1721,7 +1807,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         // Salva o loadout atual para a classe selecionada
         public void SaveCurrentLoadout(ClassManager.Class targetClass)
         {
-            if (loadoutCustomization == null || switchWeapon == null) return;
+            if (loadoutCustomization == null) return;
 
             ClassLoadoutData loadoutData = GetLoadoutDataForClass(targetClass);
             if (loadoutData == null)
@@ -1732,29 +1818,29 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             }
 
             // Salva nomes das armas e gadgets
-            if (switchWeapon.primary != null)
+            if (loadoutCustomization.selected_primary != null)
             {
-                WeaponProperties wp = switchWeapon.primary.GetComponent<WeaponProperties>();
-                loadoutData.primaryWeaponName = wp != null ? wp.weapon_name : switchWeapon.primary.name;
+                WeaponProperties wp = loadoutCustomization.selected_primary.GetComponent<WeaponProperties>();
+                loadoutData.primaryWeaponName = wp != null ? wp.weapon_name : loadoutCustomization.selected_primary.name;
             }
             else
             {
                 loadoutData.primaryWeaponName = "";
             }
 
-            if (switchWeapon.secondary != null)
+            if (loadoutCustomization.selected_secondary != null)
             {
-                WeaponProperties wp = switchWeapon.secondary.GetComponent<WeaponProperties>();
-                loadoutData.secondaryWeaponName = wp != null ? wp.weapon_name : switchWeapon.secondary.name;
+                WeaponProperties wp = loadoutCustomization.selected_secondary.GetComponent<WeaponProperties>();
+                loadoutData.secondaryWeaponName = wp != null ? wp.weapon_name : loadoutCustomization.selected_secondary.name;
             }
             else
             {
                 loadoutData.secondaryWeaponName = "";
             }
 
-            if (switchWeapon.gadget1 != null)
+            if (loadoutCustomization.selected_gadget1 != null)
             {
-                loadoutData.gadget1Name = switchWeapon.gadget1.name;
+                loadoutData.gadget1Name = loadoutCustomization.selected_gadget1.name;
             }
             else
             {
@@ -1781,7 +1867,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
                 GameObject weapon = FindWeaponByName(loadoutData.primaryWeaponName, true);
                 if (weapon != null)
                 {
-                    switchWeapon.primary = weapon;
+                    loadoutCustomization.selected_primary = weapon;
                 }
             }
 
@@ -1790,14 +1876,14 @@ public class PlayerLoadoutCustomization : MonoBehaviour
                 GameObject weapon = FindWeaponByName(loadoutData.secondaryWeaponName, false);
                 if (weapon != null)
                 {
-                    switchWeapon.secondary = weapon;
+                    loadoutCustomization.selected_secondary = weapon;
                 }
             }
 
             // Carrega gadgets
             if (!string.IsNullOrEmpty(loadoutData.gadget1Name))
             {
-                switchWeapon.gadget1 = FindGadgetByName(loadoutData.gadget1Name);
+                loadoutCustomization.selected_gadget1 = FindGadgetByName(loadoutData.gadget1Name);
             }
 
             // Garante que gadget2 fica vazio
@@ -1898,6 +1984,39 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         {
             public List<ClassLoadoutData> loadouts;
         }
+    }
+
+    private static class UnlockedWeapons
+    {
+        public static void UnlockWeapon(string weapon_name)
+        {
+            PlayerPrefs.SetInt($"Weapon_Unlocked_{weapon_name}", 1);
+            PlayerPrefs.Save();
+        }
+
+        public static void LockWeapon(string weapon_name)
+        {
+            PlayerPrefs.SetInt($"Weapon_Unlocked_{weapon_name}", 0);
+            PlayerPrefs.Save();
+        }
+
+        public static bool CheckWeaponStatus(string weapon_name)
+        {
+            if (PlayerPrefs.GetInt($"Weapon_Unlocked_{weapon_name}") == 1)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static void RemoveStatus(string weapon_name)
+        {
+            PlayerPrefs.DeleteKey($"Weapon_Unlocked_{weapon_name}");
+            PlayerPrefs.Save();
+        }
+
+
     }
 
     #endregion

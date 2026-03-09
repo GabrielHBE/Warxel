@@ -5,18 +5,19 @@ public class AudioDistanceController : MonoBehaviour
 {
     [Header("Growth Settings")]
     public float initialGrowth = 1f;
-    public float finalGrowth = 500f;
-    public float growthSpeed = 600f;
+    private float finalGrowth;
+    private float growthSpeed = 1000f;
 
     [Header("Audio Settings")]
     private AudioSource audioSource;
     public bool playOnEnter = true;
     public bool stopOnExit = false;
-    public bool preventRepeating = true; // Nova opção
+    public bool preventRepeating = true;
+    [SerializeField] private DistanceSounds[] distanceSounds;
 
     [Header("Detection Settings")]
-    [SerializeField] private LayerMask cameraLayer; // Camera layer
-    public bool useLayerMask = true; // Enable/disable layer filter
+    [SerializeField] private LayerMask cameraLayer;
+    public bool useLayerMask = true;
 
     private SphereCollider sphereCollider;
     private bool isGrowing = false;
@@ -25,37 +26,35 @@ public class AudioDistanceController : MonoBehaviour
     // Lista para rastrear objetos que já tocaram áudio
     private HashSet<GameObject> alreadyPlayedObjects = new HashSet<GameObject>();
 
+    // Dicionário para rastrear qual som está tocando para cada objeto
+    private Dictionary<GameObject, AudioClip> currentSoundForObject = new Dictionary<GameObject, AudioClip>();
+
     void Start()
     {
         audioSource = GetComponent<AudioSource>();
-        // Ensure there's an AudioSource
         if (audioSource == null)
         {
-            audioSource = GetComponent<AudioSource>();
-            if (audioSource != null)
-            {
-                finalGrowth = audioSource.maxDistance;
-            }
-            else
-            {
-                Debug.LogWarning("AudioSource not found. Adding one.");
-                audioSource = gameObject.AddComponent<AudioSource>();
-            }
+        
+            audioSource = gameObject.AddComponent<AudioSource>();
         }
+
+        finalGrowth = audioSource.maxDistance;
+
+        // Configurar o AudioSource para ser 3D
+        audioSource.spatialBlend = 1f; // Áudio totalmente 3D
+        audioSource.rolloffMode = AudioRolloffMode.Linear;
     }
 
     void Update()
     {
         if (isGrowing)
         {
-            // Increase the trigger size
             currentSize += growthSpeed * Time.deltaTime;
             sphereCollider.radius = currentSize;
 
-            // Stop growth when reaching maximum
             if (currentSize >= finalGrowth)
             {
-                Destroy(gameObject, audioSource.clip.length);
+                Destroy(gameObject, audioSource.clip != null ? audioSource.clip.length : 0);
                 isGrowing = false;
             }
         }
@@ -64,30 +63,24 @@ public class AudioDistanceController : MonoBehaviour
     public void StartGrowth()
     {
         transform.SetParent(null);
-        // Ensure there's a SphereCollider
         sphereCollider = GetComponent<SphereCollider>();
         if (sphereCollider == null)
         {
             sphereCollider = gameObject.AddComponent<SphereCollider>();
         }
 
-        // Configure as trigger
         sphereCollider.isTrigger = true;
-
-        // Set initial size
         currentSize = initialGrowth;
         sphereCollider.radius = currentSize;
 
         isGrowing = true;
     }
 
-    // Method to stop growth
     public void StopGrowth()
     {
         isGrowing = false;
     }
 
-    // Method to reset to initial size
     public void ResetSize()
     {
         isGrowing = false;
@@ -98,7 +91,40 @@ public class AudioDistanceController : MonoBehaviour
         }
     }
 
-    // Detect when AudioListener enters the trigger
+    // Método para obter o som apropriado baseado na distância
+    private AudioClip GetSoundForDistance(float distance)
+    {
+        if (distanceSounds == null || distanceSounds.Length == 0)
+            return null;
+
+        // Ordenar os sons por distância mínima (assumindo que estão em ordem)
+        System.Array.Sort(distanceSounds, (a, b) => a.min_distance.CompareTo(b.min_distance));
+
+        AudioClip selectedClip = null;
+        float highestMinDistance = -1;
+
+        foreach (var sound in distanceSounds)
+        {
+            if (distance >= sound.min_distance && distance <= sound.max_distance)
+            {
+                // Se estamos dentro do range deste som, seleciona-o
+                selectedClip = sound.audio;
+            }
+            else if (distance > sound.max_distance)
+            {
+                // Se a distância é maior que o max_distance, ainda podemos usar
+                // este som se não houver outro mais específico
+                if (distance > sound.max_distance && sound.max_distance > highestMinDistance)
+                {
+                    highestMinDistance = sound.max_distance;
+                    selectedClip = sound.audio;
+                }
+            }
+        }
+
+        return selectedClip;
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (!isGrowing) return;
@@ -106,13 +132,11 @@ public class AudioDistanceController : MonoBehaviour
         GameObject targetObject = other.gameObject;
         AudioListener listener = targetObject.GetComponent<AudioListener>();
 
-        // SEMPRE verificar se tem AudioListener (requisito principal)
         if (listener == null || !listener.enabled)
         {
             return;
         }
 
-        // Se useLayerMask estiver ativado, também verificar a camada
         if (useLayerMask)
         {
             if ((cameraLayer.value & (1 << targetObject.layer)) == 0)
@@ -121,22 +145,33 @@ public class AudioDistanceController : MonoBehaviour
             }
         }
 
-        // Check if we should prevent repeating on same object
         if (preventRepeating && alreadyPlayedObjects.Contains(targetObject))
         {
-            //Debug.Log("Audio already played for this object: " + targetObject.name);
             return;
         }
 
-        // If reached here, object is valid and hasn't played before
         if (playOnEnter && audioSource != null)
         {
-            //audioSource.Play();
-            audioSource.PlayOneShot(audioSource.clip);
-            // Add to the list of objects that have played
+            // Calcular a distância do objeto até o centro do trigger
+            float distanceToCenter = Vector3.Distance(transform.position, targetObject.transform.position);
+
+            // Obter o som baseado na distância
+            AudioClip selectedClip = GetSoundForDistance(distanceToCenter);
+
+            if (selectedClip != null)
+            {
+                audioSource.PlayOneShot(selectedClip);
+            }
+            else
+            {
+                audioSource.PlayOneShot(audioSource.clip);
+            }
+
+            // Armazenar qual som foi tocado para este objeto
             if (preventRepeating)
             {
                 alreadyPlayedObjects.Add(targetObject);
+                currentSoundForObject[targetObject] = selectedClip;
             }
         }
     }
@@ -145,24 +180,20 @@ public class AudioDistanceController : MonoBehaviour
     {
         if (!isGrowing) return;
 
-        // Verificar se tem AudioListener
         AudioListener listener = other.GetComponent<AudioListener>();
         if (listener == null)
         {
             return;
         }
 
-        // Se useLayerMask estiver ativado, também verificar a camada
         if (useLayerMask)
         {
-            // Use bitwise AND to check if object's layer is in LayerMask
             if ((cameraLayer.value & (1 << other.gameObject.layer)) == 0)
             {
                 return;
             }
         }
 
-        // If reached here, object has AudioListener and is in correct layer (if using layer mask)
         if (stopOnExit && audioSource != null && audioSource.isPlaying)
         {
             audioSource.Stop();
@@ -170,28 +201,43 @@ public class AudioDistanceController : MonoBehaviour
         }
     }
 
-    // Method to force detection of a specific object (useful for tests)
-    public bool IsInsideTrigger(GameObject targetObject)
+    // Método para verificar se um objeto específico está dentro de um range de distância
+    public bool IsObjectInDistanceRange(GameObject targetObject, float minDistance, float maxDistance)
     {
-        if (sphereCollider == null) return false;
+        if (targetObject == null) return false;
 
         float distance = Vector3.Distance(transform.position, targetObject.transform.position);
-        return distance <= sphereCollider.radius;
+        return distance >= minDistance && distance <= maxDistance;
     }
 
-    // Method for editor visualization
     void OnDrawGizmos()
     {
         if (sphereCollider != null)
         {
+            // Desenhar círculos para cada range de distância
+            if (distanceSounds != null)
+            {
+                foreach (var sound in distanceSounds)
+                {
+                    if (sound != null && sound.audio != null)
+                    {
+                        // Cor diferente para cada range
+                        Color gizmoColor = Color.Lerp(Color.green, Color.red, sound.min_distance / finalGrowth);
+                        Gizmos.color = gizmoColor;
+                        Gizmos.DrawWireSphere(transform.position, sound.max_distance);
+
+                        // Adicionar label com o nome do som
+#if UNITY_EDITOR
+                        UnityEditor.Handles.Label(transform.position + Vector3.up * sound.max_distance,
+                                                $"{sound.audio.name}: {sound.min_distance}-{sound.max_distance}");
+#endif
+                    }
+                }
+            }
+
+            // Desenhar o trigger atual
             Gizmos.color = isGrowing ? Color.red : Color.green;
             Gizmos.DrawWireSphere(transform.position, sphereCollider.radius);
-
-            // Show current radius as text
-#if UNITY_EDITOR
-            UnityEditor.Handles.Label(transform.position + Vector3.up * sphereCollider.radius,
-                                    $"Radius: {sphereCollider.radius:F1}");
-#endif
         }
         else
         {
@@ -200,7 +246,6 @@ public class AudioDistanceController : MonoBehaviour
         }
     }
 
-    // Method to configure layer manually via code
     public void ConfigureCameraLayer(string layerName)
     {
         int layerIndex = LayerMask.NameToLayer(layerName);
@@ -215,16 +260,31 @@ public class AudioDistanceController : MonoBehaviour
         }
     }
 
-    // Clear the played objects list (useful for resetting)
     public void ClearPlayedObjects()
     {
         alreadyPlayedObjects.Clear();
+        currentSoundForObject.Clear();
         Debug.Log("Cleared played objects list");
     }
 
-    // Check if an object has already triggered audio
     public bool HasObjectPlayed(GameObject targetObject)
     {
         return alreadyPlayedObjects.Contains(targetObject);
+    }
+
+    // Método para obter qual som foi tocado para um objeto específico
+    public AudioClip GetPlayedSoundForObject(GameObject targetObject)
+    {
+        if (currentSoundForObject.ContainsKey(targetObject))
+            return currentSoundForObject[targetObject];
+        return null;
+    }
+
+    [System.Serializable]
+    private class DistanceSounds
+    {
+        public AudioClip audio;
+        public float min_distance;
+        public float max_distance;
     }
 }
