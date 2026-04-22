@@ -11,7 +11,7 @@ public class WeaponSounds : MonoBehaviour
     [SerializeField] private AudioSource push_extractor_sound;
 
     private CameraShake cameraShake;
-    void Start()
+    void Awake()
     {
         cameraShake = GetComponentInParent<CameraShake>();
     }
@@ -57,24 +57,37 @@ public class WeaponSounds : MonoBehaviour
 
     public void ShootSound()
     {
+        // 1. Toca instantaneamente para o atirador (Client-Side Prediction)
+        PlayShootSoundLocally(shoot_sound.transform.position);
 
-        // Duplicar o GameObject que tem o audioDistanceController
-        GameObject duplicatedObject = Instantiate(shoot_sound.gameObject, shoot_sound.transform.position, Quaternion.identity);
+        // 2. Procura o Spawner e a Arma para mandar o aviso pela rede
+        PlayerNetworkObjectSpawner spawner = GetComponentInParent<PlayerNetworkObjectSpawner>();
+        WeaponProperties wp = GetComponent<WeaponProperties>();
 
-        // Obter o componente AudioDistanceController do objeto duplicado
+        if (spawner != null && wp != null)
+        {
+            // Manda a string com o nome da arma e a posição exata de onde o som saiu
+            spawner.CmdPlayWeaponSound(wp.gameObject.name, shoot_sound.transform.position);
+        }
+    }
+
+    // Separei a lógica de instanciar numa função própria para ficar mais limpo
+    private void PlayShootSoundLocally(Vector3 position)
+    {
+        shoot_sound.PlayOneShot(shoot_sound.clip);
+        /*
+        GameObject duplicatedObject = Instantiate(shoot_sound.gameObject, position, Quaternion.identity);
         AudioDistanceController duplicatedController = duplicatedObject.GetComponent<AudioDistanceController>();
 
         if (duplicatedController != null)
         {
-            // Chamar a função no objeto duplicado
             duplicatedController.StartGrowth();
         }
         else
         {
-            // Fallback caso não encontre o componente
             shoot_sound.PlayOneShot(shoot_sound.clip);
         }
-
+        */
     }
 
 }

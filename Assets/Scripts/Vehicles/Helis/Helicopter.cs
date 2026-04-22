@@ -1,4 +1,6 @@
 using System;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 
 public class Helicopter : Vehicle
@@ -16,13 +18,10 @@ public class Helicopter : Vehicle
     [SerializeField] protected AudioSource outside_propeller_sound;
     [SerializeField] protected AudioSource fall_alarm;
 
-    [HideInInspector] public bool is_pilot_seat_occupied = false;
-    [HideInInspector] public bool is_gunner_seat_occupied = false;
+    public readonly SyncVar<bool> is_pilot_seat_occupied = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+
 
     protected Transform player_camera;
-
-    [Space]
-    [Space]
 
     #endregion
 
@@ -71,7 +70,7 @@ public class Helicopter : Vehicle
     {
         float deltaTime = Time.fixedDeltaTime;
 
-        if (!is_pilot_seat_occupied)
+        if (is_pilot_seat_occupied.Value == false)
         {
             throttle = 0;
             gravity_force = 5;
@@ -117,7 +116,7 @@ public class Helicopter : Vehicle
             liftDirection.Normalize();
         }
 
-        if (vehicle_destroyed) move_upwards = -1;
+        if (vehicle_destroyed.Value || transform.position.y > MapSettings.Instance.max_altitude) move_upwards = -1;
 
         if (move_upwards > 0)
         {
@@ -232,7 +231,7 @@ public class Helicopter : Vehicle
 
     protected override void OnCollisionEnter(Collision collision)
     {
-        if (!vehicle_destroyed)
+        if (!vehicle_destroyed.Value)
         {
             base.OnCollisionEnter(collision);
         }
@@ -248,9 +247,7 @@ public class Helicopter : Vehicle
             Vector3 contactPoint = contact.point; // Ponto da colisão
             Vector3 contactNormal = contact.normal; // Normal da colisão
 
-            if (playerController != null) playerController.Damage(100);
-
-            ExitVehicle();
+            if (playerController != null) playerController.RequestDamage(100);
 
             // Usando os valores obtidos da colisão
             HandleCollision(collision, 50);
@@ -263,16 +260,15 @@ public class Helicopter : Vehicle
     {
         if (DestroyAnimation_do_once)
         {
+            CmdRequestEnableFireEffects();
             fire_effects_parent.SetActive(true);
             DestroyAnimation_do_once = false;
         }
+
         destroyTimer += Time.fixedDeltaTime;
         rotate_value = Math.Clamp(Mathf.Pow(destroyTimer * 15, 2f), 0, 900);
 
-        if (destroyTimer >= 10)
-        {
-            Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
-        }
+        if (playerController != null) playerController.RequestDamage(destroyTimer);
 
         Ray ray = new Ray(transform.position, Vector3.down);
         RaycastHit hit;
@@ -293,16 +289,30 @@ public class Helicopter : Vehicle
             else
             {
 
-                if (player != null)
-                {
-                    player.GetComponent<PlayerController>().Damage(100);
-                    ExitVehicle();
-                }
-
                 Explode(hit.point, hit.normal, hit.transform.gameObject.layer, 12);
 
             }
         }
+
+
+        if (destroyTimer >= 5)
+        {
+            
+
+            Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
+        }
+    }
+
+    [ServerRpc]
+    private void CmdRequestEnableFireEffects()
+    {
+        RequestEnableFireEffects();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void RequestEnableFireEffects()
+    {
+        fire_effects_parent.SetActive(true);
     }
 
 

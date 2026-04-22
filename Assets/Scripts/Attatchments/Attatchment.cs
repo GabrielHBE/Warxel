@@ -7,12 +7,11 @@ public class Attatchment : MonoBehaviour
     public float weapon_level_to_unlock;
     public Sprite icon_hud;
     public string attachment_name;
-    protected WeaponProperties weaponProperties;
+    [SerializeField] protected WeaponProperties weaponProperties;
     public bool is_attatchment_unlocked;
 
-    public void Initialize(WeaponProperties weaponProperties)
+    public void Initialize()
     {
-        this.weaponProperties = weaponProperties;
-        if (weaponProperties != null) is_attatchment_unlocked = weapon_level_to_unlock >= weaponProperties.weapon_level ? true : false;
+        if (weaponProperties != null) is_attatchment_unlocked = weapon_level_to_unlock >= weaponProperties.weapon_kills ? true : false;
     }
 }

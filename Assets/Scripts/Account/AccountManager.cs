@@ -1,3 +1,5 @@
+using FishNet.Object;
+using TMPro;
 using UnityEngine;
 
 public class AccountManager : MonoBehaviour
@@ -14,11 +16,26 @@ public class AccountManager : MonoBehaviour
     private int current_level_progression;
     private int points_to_level_up = 100;
 
+    //Testing
+    public UnityEngine.UI.Button switch_faction_button;
+
     private void Awake()
     {
+        // Se já existe uma instância e não é esta, destrói o novo objeto para evitar duplicatas
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        LoadData();
+
         Instance = this;
-        LoadData(); // Carrega os dados ao iniciar
+
+        // Opcional: Faz o objeto persistir entre trocas de cena
+        // transform.SetParent(null); 
+        // DontDestroyOnLoad(gameObject);
     }
+
 
     private void Update()
     {
@@ -28,9 +45,17 @@ public class AccountManager : MonoBehaviour
         }
     }
 
+
     public void SetClass(ClassManager.Class @class)
     {
         selected_class = @class;
+        SaveData();
+    }
+
+    public void SetFaction(FactionManager.Faction @faction)
+    {
+        this.faction = @faction;
+        switch_faction_button.GetComponentInChildren<TextMeshProUGUI>().text = this.faction.ToString();
         SaveData();
     }
 
@@ -87,7 +112,6 @@ public class AccountManager : MonoBehaviour
         PlayerPrefs.SetInt("AccountManager_current_level_progression", current_level_progression);
         PlayerPrefs.Save();
 
-        Debug.Log($"Dados salvos com sucesso! Classe: {selected_class}");
     }
 
     // Método para carregar todos os dados
@@ -102,10 +126,10 @@ public class AccountManager : MonoBehaviour
             battle_coins = PlayerPrefs.GetInt("AccountManager_battle_coins", 0);
             faction = (FactionManager.Faction)PlayerPrefs.GetInt("AccountManager_faction", 0);
             current_level_progression = PlayerPrefs.GetInt("AccountManager_current_level_progression", 0);
-            
+
             // Carregar a classe selecionada
             string className = PlayerPrefs.GetString("AccountManager_selected_class", "None");
-            
+
             // Tentar converter a string de volta para enum ClassManager.Class
             if (System.Enum.TryParse(className, out ClassManager.Class loadedClass))
             {
@@ -122,7 +146,7 @@ public class AccountManager : MonoBehaviour
         else
         {
             Debug.Log("Nenhum dado salvo encontrado. Usando valores padrão.");
-            
+
             // Definir valores padrão para um novo jogador
             account_name = "Jogador";
             id = System.Guid.NewGuid().ToString();
@@ -146,7 +170,7 @@ public class AccountManager : MonoBehaviour
         PlayerPrefs.DeleteKey("AccountManager_selected_class");
 
         Debug.Log("Dados do AccountManager resetados com sucesso!");
-        
+
         // Recarregar com valores padrão
         LoadData();
     }

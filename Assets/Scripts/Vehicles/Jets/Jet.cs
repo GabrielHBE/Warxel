@@ -1,5 +1,7 @@
 using System;
-using System.Collections;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
@@ -33,12 +35,13 @@ public class Jet : Vehicle
     #region Public Fields
 
     [Header("State")]
+    [HideInInspector] public readonly SyncVar<bool> is_pilot_seat_occupied = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    [HideInInspector] public bool is_pilot = true; // Jet sempre tem apenas um piloto
     [HideInInspector] public bool isNearGround;
     [HideInInspector] public float mouseX, mouseY;
     [HideInInspector] public float moveForward;
-    [HideInInspector] public int currentCameraIndex;
+
     [HideInInspector] public bool retractLandingGear = false;
-    [HideInInspector] public float speed;
     [HideInInspector] public bool usingMainCannon = true;
     [HideInInspector] public bool isWheelTouchingGround = true;
 
@@ -62,21 +65,18 @@ public class Jet : Vehicle
     private float _currentGravity = 0;
     private float _downwardComponent;
     private float _gForce;
-    private float _maxSpeed = 500;
+    private float _maxSpeed = 700;
     private float _mainCannonRotationValue = 0;
     private float _shootDelayTimer = 0;
-    private Quaternion shoot_pos_original_rotation;
     private float current_spread;
 
     #endregion
 
     #region Unity Lifecycle
 
-    public override void Spawn()
+    public override void Initialize()
     {
-        shoot_pos_original_rotation = _shootPosition.transform.localRotation;
-        base.Spawn();
-        minFov = Settings.Instance._video.jet_fov;
+        base.Initialize();
 
         if (bombsAndMissiles.missile != null) _hudManager.SetImages(_properties.hud_icon, bombsAndMissiles.missile.image_hud, countermeasures.image_icon_hud);
         if (bombsAndMissiles.bombs != null) _hudManager.SetImages(_properties.hud_icon, bombsAndMissiles.bombs.image_hud, countermeasures.image_icon_hud);
@@ -86,23 +86,20 @@ public class Jet : Vehicle
 
         _turbineSmoke.SetActive(false);
         _volume = GetGlobalVolume();
-        currentCameraIndex = 1;
-        acceleration = _properties.aceleration;
     }
 
     protected override void FixedUpdate()
     {
+        if (!IsOwner) return;
 
-        if (!vehicle_destroyed)
+        if (!vehicle_destroyed.Value)
         {
-            if (is_in_vehicle)
+            // Só aplica movimento se o veículo estiver ocupado e o motor ligado
+            if (start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && is_pilot_seat_occupied.Value == true)
             {
-                if (start_engine && !SettingsHUD.Instance.is_menu_settings_active)
-                {
-                    Lean();
-                    Move();
-                    Rotate();
-                }
+                Lean();
+                Move();
+                Rotate();
                 ApplyDiveSpeedBoost();
             }
 
@@ -112,7 +109,7 @@ public class Jet : Vehicle
             if (speed < _maxSpeed)
             {
                 _totalThrottle = throttle + _diveSpeedModifier + _afterburnerSpeedModifier;
-                rb.AddForce(forwardReference * _totalThrottle * _properties.max_throttle);
+                rb.AddForce(transform.forward * _totalThrottle * _properties.max_throttle);
             }
         }
         else
@@ -123,41 +120,28 @@ public class Jet : Vehicle
 
     protected override void Update()
     {
+        if (!IsOwner) return;
 
         speed = rb.linearVelocity.magnitude;
-
-        // Limitar altura
-        if (transform.position.y > MapSettings.Instante.max_altitude)
-        {
-            // Opção A: Impedir movimento para cima
-            Vector3 newPosition = transform.position;
-            newPosition.y = MapSettings.Instante.max_altitude;
-            transform.position = newPosition;
-
-            // Opcional: parar velocidade vertical
-            if (rb.linearVelocity.y > 0)
-            {
-                Vector3 newVelocity = rb.linearVelocity;
-                newVelocity.y = 0;
-                rb.linearVelocity = newVelocity;
-            }
-        }
 
         if (is_in_vehicle)
         {
             player.transform.position = _playerPosition.position;
             player.transform.rotation = _playerPosition.rotation;
-        }
 
-        if (is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active)
-        {
-            if (Input.GetKeyDown(KeyCode.P))
+            if (!SettingsHUD.Instance.is_menu_settings_active)
             {
-                Damage(100);
+                minFov = Settings.Instance._video.jet_fov;
+
+                if (Input.GetKeyDown(KeyCode.P))
+                {
+                    RequestDamage(100);
+                }
+
+                UpdateHUD();
+                PilotBehaviour();
             }
 
-            UpdateHUD();
-            PilotBehaviour();
 
         }
         else
@@ -168,11 +152,13 @@ public class Jet : Vehicle
         current_spread = Math.Clamp(current_spread, 0, _properties.max_spread);
 
         UpdateEngineSound();
+
+
     }
 
     protected void OnCollisionStay(Collision collision)
     {
-        if (vehicle_destroyed && IsInLayerMask(collision.gameObject.layer, collisionLayers))
+        if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers))
         {
             ContactPoint contact = collision.contacts[0]; // Primeiro ponto de contato
             Vector3 contactPoint = contact.point; // Ponto da colisão
@@ -187,21 +173,18 @@ public class Jet : Vehicle
 
         if (isWheelTouchingGround || collision.gameObject.GetComponent<Missiles>() != null) return;
 
-        if (vehicle_destroyed || hp <= 0)
+        if (vehicle_destroyed.Value || hp.Value <= 0)
         {
-            if (playerController != null) playerController.Damage(100);
+            if (playerController != null) playerController.RequestDamage(1000);
             ExitVehicle();
         }
 
-        if (speed < 100)
+        if (speed < 300)
         {
             base.OnCollisionEnter(collision);
         }
         else
         {
-            if (playerController != null) playerController.Damage(100);
-            ExitVehicle();
-
             HandleCollision(collision, 50);
             Explode(collision.contacts[0].point, transform.localEulerAngles.normalized, LayerMask.NameToLayer("Voxel"), 1);
         }
@@ -217,11 +200,8 @@ public class Jet : Vehicle
     protected void PilotBehaviour()
     {
 
-
-        moveForward = Input.GetAxisRaw("Vertical");
-        forwardReference = -transform.right;
+        ThrottleInput();
         _exitCooldown += Time.deltaTime;
-
 
         CameraController();
         FreeLook();
@@ -232,7 +212,7 @@ public class Jet : Vehicle
 
         HandleExitInput();
 
-        if (!vehicle_destroyed)
+        if (!vehicle_destroyed.Value)
         {
             Start_Stop_Engine();
             Shoot();
@@ -240,12 +220,10 @@ public class Jet : Vehicle
 
         }
 
-        if (start_engine)
+        if (start_engine == true)
         {
             HandleLeanInput();
             HandlePassout();
-
-            //_properties.interior_turbine.pitch = Math.Clamp(_properties.interior_turbine.pitch, 0.15f, 2);
             _turbineSmoke.SetActive(true);
             UpdateLandingGear();
         }
@@ -253,6 +231,24 @@ public class Jet : Vehicle
         {
             _turbineSmoke.SetActive(false);
             SlowDownEngine();
+        }
+    }
+
+    private void ThrottleInput()
+    {
+        moveForward = 0;
+
+        if (Input.GetKey(Settings.Instance._keybinds.JET_speedUpKey) && Input.GetKey(Settings.Instance._keybinds.JET_speedDownKey))
+        {
+            moveForward = 0;
+        }
+        else if (Input.GetKey(Settings.Instance._keybinds.JET_speedUpKey))
+        {
+            moveForward = 1;
+        }
+        else if (Input.GetKey(Settings.Instance._keybinds.JET_speedDownKey))
+        {
+            moveForward = -1;
         }
     }
 
@@ -273,11 +269,20 @@ public class Jet : Vehicle
             rb.AddForce(Vector3.up * rb.mass * 20);
         }
 
-        HandleThrottleControl(deltaTime);
+        if (transform.position.y < MapSettings.Instance.max_altitude)
+        {
+            HandleThrottleControl(deltaTime);
+            return;
+        }
+
+        SlowDownEngine();
+
+
     }
 
     protected void HandleThrottleControl(float deltaTime)
     {
+
         if (moveForward > 0 && !_isPassingOut)
         {
             IncreaseThrottle(deltaTime);
@@ -296,7 +301,7 @@ public class Jet : Vehicle
     {
         //_properties.interior_turbine.pitch = Mathf.MoveTowards( _properties.interior_turbine.pitch, 2f, 0.1f * deltaTime);
 
-        throttle += acceleration * deltaTime;
+        throttle += _properties.aceleration * deltaTime;
         throttle = Mathf.Min(throttle, _properties.max_throttle);
     }
 
@@ -304,10 +309,10 @@ public class Jet : Vehicle
     {
         if (isNearGround)
         {
-            if (throttle > -30)
+            if (throttle > -50)
             {
                 //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.1f * deltaTime);
-                throttle -= acceleration * deltaTime * 2;
+                throttle -= _properties.aceleration * deltaTime * 2;
             }
         }
         else
@@ -315,7 +320,7 @@ public class Jet : Vehicle
             if (throttle > 100)
             {
                 //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.1f * deltaTime);
-                throttle -= acceleration * deltaTime;
+                throttle -= _properties.aceleration * deltaTime;
             }
         }
     }
@@ -324,15 +329,14 @@ public class Jet : Vehicle
     {
         if (isNearGround)
         {
-            float decelerationRate = acceleration * 0.8f;
+            float decelerationRate = _properties.aceleration * 0.8f;
             throttle = Mathf.MoveTowards(throttle, 0, decelerationRate * deltaTime);
 
             //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.1f * deltaTime);
         }
         else
         {
-            float decelerationRate = acceleration * 0.1f;
-            throttle = Mathf.MoveTowards(throttle, 0, decelerationRate * deltaTime);
+            throttle = Mathf.MoveTowards(throttle, 0, deltaTime);
 
             //_properties.interior_turbine.pitch = Mathf.MoveTowards(_properties.interior_turbine.pitch, 0.15f, 0.005f * deltaTime);
         }
@@ -394,8 +398,8 @@ public class Jet : Vehicle
 
     protected void ApplyRotationTorque()
     {
-        rb.AddTorque(transform.right * mouseX * speed * _properties.rotation_value * 20);
-        rb.AddTorque(-transform.forward * mouseY * speed * _properties.pitch_value * 7);
+        rb.AddTorque(-transform.forward * mouseX * speed * _properties.rotation_value * 20);
+        rb.AddTorque(-transform.right * mouseY * speed * _properties.pitch_value * 7);
     }
 
     protected void Lean()
@@ -403,24 +407,12 @@ public class Jet : Vehicle
         if (_isPassingOut) return;
 
         float speedFactor = Mathf.Clamp01(speed / _maxSpeed);
-        /*
-        float rotationAmount = isNearGround && (throttle >= 20 || throttle < -10) && throttle <= 50
-            ? leanValue * Time.deltaTime
-            : leanValue * speedFactor * Time.deltaTime;
-
-        if (throttle < 0)
-            rotationAmount *= -1;
-
-        rotationAmount = Mathf.Clamp(rotationAmount, -_properties.max_lean_value, _properties.max_lean_value);
-        transform.Rotate(Vector3.up * rotationAmount, Space.Self);
-
-        */
 
         if (isNearGround && (throttle >= 20 || throttle < -10) && throttle <= 50)
         {
             if (Mathf.Abs(rb.angularVelocity.y) < _properties.max_lean_speed)
             {
-                float turnForce = leanValue * _properties.lean_value * rb.mass * 100;
+                float turnForce = leanValue * _properties.lean_value * rb.mass * 70;
                 rb.AddTorque(transform.up * turnForce, ForceMode.Force);
             }
         }
@@ -458,8 +450,7 @@ public class Jet : Vehicle
 
     protected void ApplyDiveSpeedBoost()
     {
-        Vector3 jetForward = -transform.right;
-        _downwardComponent = -jetForward.y;
+        _downwardComponent = transform.forward.y;
 
         if (_downwardComponent > 0.3f) // Down
         {
@@ -570,25 +561,120 @@ public class Jet : Vehicle
 
         if (readyToShoot)
         {
-            FireMainCannon(deltaTime);
+            // 1. ÁUDIO: Toca o som localmente no PC do piloto usando .Play() para poder ser interrompido
+            if (!_hasPlayedShootSound)
+            {
+                CmdPlayShootSound();
+                _properties.shoot_sound.Play();
+                _hasPlayedShootSound = true;
+            }
+
+            // 2. TEMPO DE TIRO: Calculado perfeitamente no Client
+            if (_nextFireTime <= 0f)
+            {
+                // Calcula o spread da bala localmente
+                float spreadX = UnityEngine.Random.Range(-current_spread, current_spread);
+                float spreadY = UnityEngine.Random.Range(-current_spread, current_spread);
+                float spreadZ = UnityEngine.Random.Range(-current_spread, current_spread);
+                Quaternion spreadRotation = Quaternion.Euler(spreadX / 10, spreadY / 10, spreadZ / 10);
+
+                // Soma a rotação da arma com o spread
+                Quaternion finalRotation = _shootPosition.rotation * spreadRotation;
+
+                // 3. Pede para o servidor criar a bala na rede com a rotação final
+                CmdFireMainCannon(_shootPosition.position, finalRotation);
+
+                current_spread += _properties.spread;
+                _nextFireTime = _properties.interval;
+            }
+
+            _overheatAmount += deltaTime;
+            _mainCannonRotationValue = _properties.fire_rate;
+
+            if (_overheatAmount >= _properties.overheat_time)
+                _isOverheated = true;
         }
         else
         {
+            current_spread = 0;
             CoolDownCannon(deltaTime);
-            // Reseta a flag quando não está atirando
+
+            // 4. Parar o som se o jogador soltou o botão ou a arma superaqueceu
             if (_hasPlayedShootSound)
             {
-                _properties.shoot_sound.Stop();
-                _stopShooting.PlayOneShot(_stopShooting.clip);
+                CmdPlayStopShootSound();
+                _properties.shoot_sound.Stop(); // Interrompe o loop da metralhadora
+                _stopShooting.PlayOneShot(_stopShooting.clip); // Toca o som de "fim de tiro"
                 _hasPlayedShootSound = false;
             }
-
-
         }
 
         _nextFireTime -= deltaTime;
         HandleSecondaryWeapon();
         RotateMainCannon(deltaTime);
+    }
+
+    [ServerRpc]
+    protected void CmdPlayShootSound()
+    {
+        PlayShootSound();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void PlayShootSound()
+    {
+        _properties.shoot_sound.Play();
+    }
+
+    [ServerRpc]
+    protected void CmdPlayStopShootSound()
+    {
+        PlayStopShootSound();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void PlayStopShootSound()
+    {
+        _properties.shoot_sound.Stop();
+        _stopShooting.PlayOneShot(_stopShooting.clip);
+    }
+
+    // Agora o Servidor APENAS spawna a bala, tirando o peso dos cálculos
+    [ServerRpc]
+    protected void CmdFireMainCannon(Vector3 position, Quaternion rotation)
+    {
+        Transform bulletObj = Instantiate(
+            _properties.bullefPref,
+            position,
+            rotation
+        );
+
+        Bullet.BulletData data = new Bullet.BulletData
+        {
+            position = position,
+            rotation = rotation,
+            direction = rotation * Vector3.forward,
+            speed = _properties.muzzle_velocity,
+            dropMultiplier = _properties.bullet_drop,
+            infantaryDamage = _properties.infantary_damage,
+            damageDropoff = _properties.damage_dropoff,
+            damageDropoffTimer = _properties.damage_dropoff_timer,
+            destructionForce = _properties.destruction_force,
+            minimumDamage = _properties.minimum_damage,
+            hsMultiplier = 2,
+            size = 1,
+            canDamageVehicles = true,
+            vehicleDamage = _properties.vehicle_damage
+        };
+
+        Spawn(bulletObj.gameObject, Owner);
+
+        Bullet bullet = bulletObj.GetComponent<Bullet>();
+        if (bullet != null)
+        {
+            // Passa o GameObject do Jato (gameObject) para que a bala ignore a colisão com ele mesmo
+            bullet.CreateBullet(data, transform);
+        }
     }
 
     protected void HandleShootDelay(bool canShoot, float deltaTime)
@@ -603,67 +689,12 @@ public class Jet : Vehicle
         }
     }
 
-    protected void FireMainCannon(float deltaTime)
-    {
-        // Toca o som apenas no primeiro frame
-        if (!_hasPlayedShootSound)
-        {
-            _properties.shoot_sound.PlayOneShot(_properties.shoot_sound.clip);
-            _hasPlayedShootSound = true;
-        }
-
-        if (_nextFireTime <= 0f)
-        {
-            // CORREÇÃO: Aplicar spread como rotação Euler
-            float spreadX = UnityEngine.Random.Range(-current_spread, current_spread);
-            float spreadY = UnityEngine.Random.Range(-current_spread, current_spread);
-            float spreadZ = UnityEngine.Random.Range(-current_spread, current_spread);
-
-            // Aplica o spread como uma rotação adicional à rotação original
-            Quaternion spreadRotation = Quaternion.Euler(spreadX / 10, spreadY / 10, spreadZ / 10);
-            Quaternion finalRotation = _shootPosition.rotation * spreadRotation;
-
-            Transform bulletObj = Instantiate(
-                _properties.bullefPref,
-                _shootPosition.position,
-                finalRotation  // Usa a rotação com spread
-            );
-
-            bulletObj.GetComponent<Bullet>().CreateBullet(
-                finalRotation * Vector3.forward,  // Direção corrigida
-                _properties.muzzle_velocity,
-                _properties.bullet_drop,
-                _properties.damage,
-                _properties.damage_dropoff,
-                _properties.damage_dropoff_timer,
-                _properties.destruction_force,
-                _properties.minimum_damage,
-                2, 2, 0, true,
-                _properties.damage,
-                _properties.bullet_hit_effect,
-                _bulletHitAudio
-            );
-
-            current_spread += _properties.spread;
-            Destroy(bulletObj.gameObject, 10f);
-            _nextFireTime = _properties.interval;
-        }
-
-        _overheatAmount += deltaTime;
-        _mainCannonRotationValue = _properties.fire_rate;
-
-        if (_overheatAmount >= _properties.overheat_time)
-            _isOverheated = true;
-    }
-
-
     protected void CoolDownCannon(float deltaTime)
     {
         _mainCannonRotationValue = Mathf.Lerp(_mainCannonRotationValue, 0f, deltaTime * 3f);
         float coolSpeed = _isOverheated ? (deltaTime / 2f) : deltaTime;
 
         _overheatAmount = Mathf.MoveTowards(_overheatAmount, 0f, coolSpeed);
-        current_spread = Mathf.MoveTowards(current_spread, 0f, 5 * Time.deltaTime);
 
         if (_overheatAmount <= 0)
         {
@@ -679,7 +710,6 @@ public class Jet : Vehicle
 
             if (bombsAndMissiles.missile != null) bombsAndMissiles.missile.Shoot(Settings.Instance._keybinds.JET_shootVehicleKey);
             if (bombsAndMissiles.bombs != null) bombsAndMissiles.bombs.Shoot(Settings.Instance._keybinds.JET_shootVehicleKey);
-
 
         }
 
@@ -719,18 +749,27 @@ public class Jet : Vehicle
     #endregion
 
     #region Player Interaction
-
-    public override void EnterVehicle(GameObject _player)
+    [TargetRpc]
+    public override void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
-        base.EnterVehicle(_player);
+        // Verifica se o assento já está ocupado
+        if (is_pilot_seat_occupied.Value == true) return;
+
+        CallBaseEnterVeicle(conn, _player);
         _exitCooldown = 0;
 
-        //player.transform.SetParent(_playerPosition);
-        //player.transform.localPosition = Vector3.zero;
-        //player.transform.localRotation = Quaternion.identity;
+        is_pilot = true;
+        is_pilot_seat_occupied.Value = true;
 
+        player.transform.position = _playerPosition.position;
+        player.transform.rotation = _playerPosition.rotation;
 
         _turbineSmoke.SetActive(start_engine);
+    }
+
+    private void CallBaseEnterVeicle(NetworkConnection conn, GameObject _player)
+    {
+        base.EnterVehicle(conn, _player);
     }
 
     protected void HandleExitInput()
@@ -748,6 +787,17 @@ public class Jet : Vehicle
                 ExitVehicle();
             }
         }
+    }
+
+    protected override void ExitVehicle()
+    {
+        if (!is_in_vehicle) return;
+
+        base.ExitVehicle();
+
+        // Reseta os estados
+        is_pilot_seat_occupied.Value = false;
+        is_in_vehicle = false;
     }
 
     protected void EjectPlayer()
@@ -789,10 +839,9 @@ public class Jet : Vehicle
             Vector3 ejectDirection = transform.up;
 
             player_rb.AddForce(ejectDirection * 2 * player_rb.mass, ForceMode.Impulse);
-            player_rb.AddForce(forwardReference * player_rb.mass * speed, ForceMode.Impulse);
+            player_rb.AddForce(transform.forward * player_rb.mass * speed, ForceMode.Impulse);
 
         }
-
 
         is_in_vehicle = false;
 
@@ -895,12 +944,8 @@ public class Jet : Vehicle
             if (start_engine)
             {
                 _properties.interior_turbine.Play();
-                //StartCoroutine(IncreasePitch(_properties.interior_turbine, 2));
             }
-            else
-            {
-                //StartCoroutine(DecreasePitch(_properties.interior_turbine, 2));
-            }
+
         }
     }
 
@@ -908,14 +953,14 @@ public class Jet : Vehicle
 
     private void UpdateEngineSound()
     {
-        if (vehicle_destroyed) return;
+        if (vehicle_destroyed.Value) return;
 
         // Mapeia o throttle (0 a _properties.max_throttle) para o pitch (0.01 a 2)
         float t = throttle / _properties.max_throttle;
 
         float targetPitch;
 
-        if (start_engine)
+        if (start_engine == true)
         {
             targetPitch = Mathf.Lerp(0.4f, 2f, t);
         }
@@ -947,35 +992,6 @@ public class Jet : Vehicle
 
         _wasEnginePlaying = shouldBePlaying;
     }
-
-    /*
-
-    IEnumerator IncreasePitch(AudioSource audio, float duration)
-    {
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            audio.pitch += 0.0001f;
-            yield return null;
-        }
-    }
-
-    IEnumerator DecreasePitch(AudioSource audio, float duration)
-    {
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            audio.pitch -= 0.0001f;
-            yield return null;
-        }
-
-        audio.Stop();
-    }
-    */
 
     #endregion
 
@@ -1037,20 +1053,38 @@ public class Jet : Vehicle
     float deltaTime = 0;
     protected override void DestroyAnimation()
     {
-        deltaTime += Time.fixedDeltaTime;
-        if (deltaTime >= 10)
-        {
-            Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
-        }
         if (DestroyAnimation_do_once)
         {
+            CmdRequestEnableFireEffects();
             fire_effects_parent.SetActive(true);
             DestroyAnimation_do_once = false;
         }
 
-        rb.AddForce(forwardReference * _totalThrottle * _properties.max_throttle);
+        deltaTime += Time.fixedDeltaTime;
+
+        if (playerController != null) playerController.RequestDamage(deltaTime);
+
+        if (deltaTime >= 5)
+        {
+            Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
+        }
+
+        rb.AddForce(transform.forward * _totalThrottle * _properties.max_throttle);
         rb.AddTorque(transform.right * 400 * rb.mass);
     }
+
+    [ServerRpc]
+    private void CmdRequestEnableFireEffects()
+    {
+        RequestEnableFireEffects();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void RequestEnableFireEffects()
+    {
+        fire_effects_parent.SetActive(true);
+    }
+
 
     #endregion
 }

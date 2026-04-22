@@ -3,10 +3,11 @@ using VoxelDestructionPro.Tools;
 
 public class Bombs : MonoBehaviour
 {
+    [SerializeField] protected float infantary_damage;
+    [SerializeField] protected float vehicle_damage;
     [SerializeField] protected float time_to_explode;
     [SerializeField] protected Collider bomb_collider;
     [SerializeField] protected VoxCollider voxCollider;
-    [SerializeField] protected float damage;
     [SerializeField] protected float travel_speed;
     [SerializeField] protected AudioSource explosion_sound;
     [SerializeField] protected GameObject explosion_effect;
@@ -19,7 +20,7 @@ public class Bombs : MonoBehaviour
 
     protected bool didShoot;
 
-      #region Unity Lifecycle
+    #region Unity Lifecycle
     protected virtual void Start()
     {
         SetParentVehicle();
@@ -63,7 +64,7 @@ public class Bombs : MonoBehaviour
         AudioDistanceController AudioDistanceController = explosion_sound.GetComponent<AudioDistanceController>();
         AudioDistanceController.StartGrowth();
 
-        voxCollider.SphereExplosion(contact_point, damage);
+        voxCollider.SphereExplosion(contact_point, infantary_damage, vehicle_damage);
         bomb_collider.enabled = false;
 
         if (explosion_effect != null)

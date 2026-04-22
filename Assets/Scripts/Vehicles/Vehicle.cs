@@ -1,19 +1,21 @@
 using System;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
 using VoxelDestructionPro.VoxDataProviders;
 using VoxelDestructionPro.VoxelObjects;
 
-public class Vehicle : MonoBehaviour
+public abstract class Vehicle : NetworkBehaviour, ISspottable
 {
+    public Transform spot_position;
+    
     public string vehicle_name;
+    public FactionManager.Faction vehicle_faction;
 
     [Header("Progression")]
-    public int vehicle_level;
-    public float points_to_up_level;
-    public float vehicle_level_progression;
-    public int level_to_unlock;
-
+    public int vehicle_kills;
 
     [Header("References & Components")]
     [SerializeField] protected VehicleHudManager vehicleHudManager;
@@ -35,8 +37,7 @@ public class Vehicle : MonoBehaviour
     public bool used_locking_countermeasure;
     [HideInInspector] public float throttle;
     [HideInInspector] public bool start_engine = false;
-    protected float acceleration;
-    public bool vehicle_destroyed = false;
+    public readonly SyncVar<bool> vehicle_destroyed = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
 
 
     [Header("Player & Interaction")]
@@ -49,24 +50,22 @@ public class Vehicle : MonoBehaviour
 
     [Header("Health & Damage")]
     public float original_hp;
-    public float hp;
-    protected float resistance;
+    public readonly SyncVar<float> hp = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    public readonly SyncVar<float> resistance = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
 
     [Header("Voxel Systems")]
     VoxDataProvider[] voxelObj;
 
-
     [Header("Physics & Collision")]
     [SerializeField] protected LayerMask collisionLayers;
-    public Vector3 forwardReference;
-
-
-
+    [HideInInspector] public float speed;
 
     #region Unity Lifecycle
     protected virtual void Update() { }
     protected virtual void FixedUpdate() { }
-    public virtual void Spawn()
+
+    [Server]
+    public virtual void Initialize()
     {
 
         is_in_vehicle = false;
@@ -74,17 +73,27 @@ public class Vehicle : MonoBehaviour
         if (vehicleHudManager != null) vehicleHudManager.gameObject.SetActive(false);
         voxelObj = GetComponentsInChildren<VoxDataProvider>();
 
+        foreach (MeshRenderer meshRenderer in GetComponentsInChildren<MeshRenderer>())
+        {
+            meshRenderer.enabled = true;
+        }
+
         if (countermeasures != null)
         {
             countermeasures.SetVehicle(this);
-            countermeasures.SetUseCountermeasureKey(Settings.Instance._keybinds.VEHICLE_countermeasureKey);
         }
     }
 
     protected virtual void OnCollisionEnter(Collision collision)
     {
+        if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
+        {
+            PlayerController pc = collision.gameObject.GetComponent<PlayerController>();
+            pc.RequestDamage(speed * 10);
+        }
+
         PlayerDamage(collision.gameObject);
-        
+
         if (IsInLayerMask(collision.gameObject.layer, collisionLayers))
         {
             HandleCollision(collision, rb.linearVelocity.magnitude);
@@ -100,11 +109,13 @@ public class Vehicle : MonoBehaviour
     protected virtual void Switch_weapon() { }
     #endregion
 
-    #region Player Interaction 
-    public virtual void EnterVehicle(GameObject _player)
+    #region Player Interaction
+    
+    public virtual void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
-        if (vehicleHudManager != null) vehicleHudManager.gameObject.SetActive(true);
         player = _player;
+
+        if (vehicleHudManager != null) vehicleHudManager.gameObject.SetActive(true);
 
         playerProperties = _player.GetComponent<PlayerProperties>();
         playerController = _player.GetComponent<PlayerController>();
@@ -116,6 +127,9 @@ public class Vehicle : MonoBehaviour
 
         playerProperties.is_in_vehicle = true;
         is_in_vehicle = true;
+
+        if (countermeasures != null && Settings.Instance != null) countermeasures.SetUseCountermeasureKey(Settings.Instance._keybinds.VEHICLE_countermeasureKey);
+
     }
 
     protected virtual void ExitVehicle()
@@ -178,29 +192,25 @@ public class Vehicle : MonoBehaviour
         if (gameObject.layer == LayerMask.NameToLayer("Player") && rb.linearVelocity.magnitude != 0)
         {
             PlayerController hit_playerController = gameObject.GetComponent<PlayerController>();
-            if (hit_playerController != null) hit_playerController.Damage(rb.linearVelocity.magnitude);
+            if (hit_playerController != null) hit_playerController.RequestDamage(rb.linearVelocity.magnitude);
         }
     }
 
-    public float Damage(float damage)
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestDamage(float damage)
     {
-        if (ignore_damage)
-        {
-            Debug.Log($"Dano ignorado. Resistance: {resistance}%");
-            return 0;
-        }
+        if (ignore_damage) return;
 
         // Resistência de 0% = dano total, 100% = dano zero
-        float effectiveDamage = damage * ((100f - resistance) / 100f);
+        float effectiveDamage = damage * ((100f - resistance.Value) / 100f);
 
-        hp -= effectiveDamage;
+        hp.Value -= effectiveDamage;
 
-        if (hp <= 0)
+        if (hp.Value <= 0)
         {
-            vehicle_destroyed = true;
+            vehicle_destroyed.Value = true;
         }
 
-        return effectiveDamage;
     }
 
     protected virtual void DestroyAnimation() { }
@@ -214,9 +224,9 @@ public class Vehicle : MonoBehaviour
         voxCollider.destructionRadius = Math.Clamp(destruction_force, 0, 30);
 
 
-        voxCollider.SphereExplosion(contact.point, 1);
+        voxCollider.SphereExplosion(contact.point, 0, 0);
         ApplyFallUpperVoxels(collision, contact, voxCollider.destructionRadius);
-        Damage(voxCollider.destructionRadius / 2);
+        RequestDamage(voxCollider.destructionRadius / 2);
 
     }
 
@@ -230,24 +240,64 @@ public class Vehicle : MonoBehaviour
 
     protected virtual void Explode(Vector3 contact_point, Vector3 contact_normal, LayerMask layer, float explosionForce)
     {
+        if (player != null)
+        {
+            if (playerController != null) playerController.RequestDamage(1000);
+            ExitVehicle();
+        }
+
         if (did_explode) return;
 
         did_explode = true;
 
+        CmdRequestPlayExplosionSound();
         HandleSound(crash_sound);
 
+
+        CmdRequestSpawnExplosionEffect(layer, contact_point);
+
+        RequestDespawn();
+
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdRequestPlayExplosionSound()
+    {
+        PlayExplosionSound();
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void PlayExplosionSound()
+    {
+        HandleSound(crash_sound);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdRequestSpawnExplosionEffect(LayerMask layer, Vector3 pos)
+    {
+        GameObject explosion_effect;
         if (layer == LayerMask.NameToLayer("Ground"))
         {
-            Instantiate(ground_explosion, contact_point, Quaternion.LookRotation(contact_normal));
+            explosion_effect = Instantiate(ground_explosion, pos, Quaternion.identity);
+
         }
         else
         {
-            Instantiate(crash_explosion, contact_point, Quaternion.LookRotation(contact_normal));
+            explosion_effect = Instantiate(crash_explosion, pos, Quaternion.identity);
         }
 
-        Destroy(gameObject);
-
+        Spawn(explosion_effect);
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestDespawn()
+    {
+        if (gameObject != null && gameObject.activeInHierarchy)
+        {
+            Despawn(gameObject);
+        }
+    }
+
     #endregion
 
     #region Countermeasure 
@@ -264,8 +314,8 @@ public class Vehicle : MonoBehaviour
     protected void SetHpProperties(float hp, float resistance)
     {
         original_hp = hp;
-        this.hp = hp;
-        this.resistance = resistance;
+        this.hp.Value = hp;
+        this.resistance.Value = resistance;
     }
 
     protected virtual void RestoreHp()
@@ -279,7 +329,7 @@ public class Vehicle : MonoBehaviour
             }
         }
 
-        hp = original_hp;
+        hp.Value = original_hp;
         //vehicleHudManager.vehicleHpHudManager.UpdateDamage();
     }
     #endregion
@@ -297,16 +347,9 @@ public class Vehicle : MonoBehaviour
     public Quaternion GetLocalRotation() { return transform.localRotation; }
     public Quaternion GetRotation() { return transform.rotation; }
 
-    public void UpgradeVehicleLevel(float points)
+    public void AddKill()
     {
-        vehicle_level_progression += points;
-
-        if (vehicle_level_progression >= points_to_up_level)
-        {
-            vehicle_level += 1;
-            vehicle_level_progression = 0;
-        }
-
+        vehicle_kills += 1;
     }
 
     protected void HandleSound(AudioSource sound)
@@ -333,6 +376,26 @@ public class Vehicle : MonoBehaviour
     protected bool IsInLayerMask(int layer, LayerMask layerMask)
     {
         return layerMask == (layerMask | (1 << layer));
+    }
+
+    public float GetHp()
+    {
+        return hp.Value;
+    }
+
+    public float GetResistance()
+    {
+        return resistance.Value;
+    }
+
+    public FactionManager.Faction GetFaction()
+    {
+        return vehicle_faction;
+    }
+
+    public Transform GetSpotPosition()
+    {
+        return spot_position;
     }
     #endregion
 }

@@ -1,14 +1,29 @@
+using Unity.Transforms;
 using UnityEngine;
 
 public class CursorManager : MonoBehaviour
 {
-    [SerializeField] private PlayerLoadoutCustomization playerLoadoutCustomization;
-    [SerializeField] private PlayerBaseSpawn playerBaseSpawn;
+    public static CursorManager Instance { get; private set; }
 
+
+    void Start()
+    {
+        Instance = this;
+
+        if (PlayerSpawnManager.Instance.GetPlayerSpawnController() == null)
+        {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+
+        }
+
+    }
 
     void Update()
     {
-        if (SettingsHUD.Instance.is_menu_settings_active || playerBaseSpawn.player == null)
+        if (PlayerSpawnManager.Instance.GetPlayerSpawnController()== null) return;
+
+        if (SettingsHUD.Instance.is_menu_settings_active || PlayerSpawnManager.Instance.GetPlayerSpawnController().player_instantiated == null)
         {
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;

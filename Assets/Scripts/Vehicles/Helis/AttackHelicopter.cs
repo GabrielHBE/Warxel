@@ -1,4 +1,7 @@
 using System.Collections;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -17,6 +20,8 @@ public class AttackHelicopter : Helicopter
 
 
     #region Private Variables
+
+    public readonly SyncVar<bool> is_gunner_seat_occupied = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
 
     // Gunner gun
     private float next_time_to_fire = 0;
@@ -47,14 +52,21 @@ public class AttackHelicopter : Helicopter
 
     #region Unity Lifecycle 
 
-    public override void Spawn()
+    public override void Initialize()
     {
+        base.Initialize();
+
+        if (!IsSpawned)
+        {
+            Debug.LogError($"{gameObject.name} : AttackHelicopter not spawned in network yet");
+            return;
+        }
+
         //print("C: " + collisionLayers);
         throttle = 0;
         SetHpProperties(heliProperties.hp, heliProperties.resistance);
-        base.Spawn();
-        helicopterHudManager.helicopterPilotHUD.SetImages(missileManager.main_missile.image_hud, missileManager.secondary_missile.image_hud, countermeasures.image_icon_hud);
 
+        helicopterHudManager.helicopterPilotHUD.SetImages(missileManager.main_missile.image_hud, missileManager.secondary_missile.image_hud, countermeasures.image_icon_hud);
 
     }
 
@@ -62,7 +74,8 @@ public class AttackHelicopter : Helicopter
 
     protected override void FixedUpdate()
     {
-        if (start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && !vehicle_destroyed && is_pilot_seat_occupied)
+
+        if (start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && !vehicle_destroyed.Value && is_pilot_seat_occupied.Value == true)
         {
             Move();
             Rotate();
@@ -70,7 +83,7 @@ public class AttackHelicopter : Helicopter
         }
         else
         {
-            if (vehicle_destroyed)
+            if (vehicle_destroyed.Value)
             {
                 DestroyAnimation();
             }
@@ -84,11 +97,24 @@ public class AttackHelicopter : Helicopter
     {
         //minFov = Settings.Instance._video.helicopter_fov;
 
+        if (player == null)
+        {
+            // Se estiver no veículo mas sem referências válidas, sair
+            if (is_in_vehicle)
+            {
+                Debug.LogWarning("Player reference lost, exiting vehicle");
+                ExitVehicle();
+                ResetVehicleState();
+            }
+            return;
+        }
+
+
         if (!canShootGunnerGun) HandleCooldown(Time.deltaTime);
 
         if (playerProperties != null)
         {
-            if (playerProperties.is_dead)
+            if (playerProperties.is_dead.Value)
             {
                 ExitVehicle();
                 ResetVehicleState();
@@ -112,7 +138,7 @@ public class AttackHelicopter : Helicopter
             SwitchWeapon();
             if (Input.GetKeyDown(KeyCode.P))
             {
-                Damage(100);
+                RequestDamage(100);
             }
 
             minFov = Settings.Instance._video.helicopter_fov;
@@ -131,10 +157,10 @@ public class AttackHelicopter : Helicopter
 
     private void HandleVehicleInput()
     {
-        if (is_pilot && !vehicle_destroyed) Start_Stop_Engine();
+        if (is_pilot && !vehicle_destroyed.Value) Start_Stop_Engine();
         CameraController();
         FreeLook();
-        if (!vehicle_destroyed) Shoot();
+        if (!vehicle_destroyed.Value) Shoot();
 
         if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey))
         {
@@ -146,10 +172,10 @@ public class AttackHelicopter : Helicopter
             RotateGunnerGun();
         }
 
-        if (start_engine)
+        if (start_engine == true)
         {
             PropellerAudioController();
-            if (!vehicle_destroyed) HandleThrottleControls();
+            if (!vehicle_destroyed.Value) HandleThrottleControls();
         }
 
         HandleExitVehicle();
@@ -176,7 +202,7 @@ public class AttackHelicopter : Helicopter
         if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
             start_engine = !start_engine;
-            if (start_engine)
+            if (start_engine == true)
             {
                 inside_propeller_sound.Play();
             }
@@ -220,7 +246,7 @@ public class AttackHelicopter : Helicopter
 
     private void RotateGunnerGun()
     {
-        if(!gunner_gun_camera.enabled) return;
+        if (!gunner_gun_camera.enabled) return;
 
         mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
         mouseY = Input.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
@@ -299,13 +325,13 @@ public class AttackHelicopter : Helicopter
 
 
 
-            heliProperties.shootPos.transform.localRotation = new Quaternion(UnityEngine.Random.Range(-current_spread, current_spread) / 1000, UnityEngine.Random.Range(-current_spread, current_spread) / 1000, UnityEngine.Random.Range(-current_spread, current_spread) / 1000, heliProperties.shootPos.transform.localRotation.w);
+            heliProperties.shootPos.transform.localRotation = new Quaternion(Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, heliProperties.shootPos.transform.localRotation.w);
         }
         else
         {
 
-            current_spread -= Time.deltaTime * 2;
-            heliProperties.shootPos.transform.localRotation = Quaternion.Lerp(heliProperties.shootPos.transform.localRotation, original_shoot_pos_rotation, Time.deltaTime * 2);
+            current_spread = 0;
+            heliProperties.shootPos.transform.localRotation = original_shoot_pos_rotation;
         }
 
         next_time_to_fire -= dt;
@@ -317,6 +343,7 @@ public class AttackHelicopter : Helicopter
     {
         if (next_time_to_fire <= 0f)
         {
+            heliProperties.shoot_sound.PlayOneShot(heliProperties.shoot_sound.clip);
             FireGunnerGun();
             next_time_to_fire = heliProperties.interval;
         }
@@ -327,38 +354,66 @@ public class AttackHelicopter : Helicopter
             overheated = true;
     }
 
+    [ServerRpc]
     private void FireGunnerGun()
     {
-        heliProperties.shoot_sound.PlayOneShot(heliProperties.shoot_sound.clip);
+        // Verificações adicionais de segurança
+        if (!IsSpawned)
+        {
+            Debug.LogError($"NetworkObject not spawned, cannot execute ServerRpc. Object: {gameObject.name}");
+            return;
+        }
+
+        if (!IsServerInitialized)
+        {
+            Debug.LogError("Server not initialized, cannot execute ServerRpc");
+            return;
+        }
+
+        RpcShootMachineGunEffects();
+
+        Bullet.BulletData data = new Bullet.BulletData
+        {
+            position = heliProperties.shootPos.transform.position,
+            rotation = heliProperties.shootPos.transform.rotation,
+            direction = heliProperties.shootPos.transform.forward,
+            speed = heliProperties.muzzle_velocity,
+            dropMultiplier = heliProperties.bullet_drop,
+            infantaryDamage = heliProperties.infantary_damage,
+            damageDropoff = heliProperties.damage_dropoff,
+            damageDropoffTimer = heliProperties.damage_dropoff_timer,
+            destructionForce = heliProperties.destruction_force,
+            minimumDamage = heliProperties.minimum_damage,
+            hsMultiplier = 2,
+            size = 1,
+            canDamageVehicles = true,
+            vehicleDamage = heliProperties.vehicle_damage
+        };
 
         Transform bulletObj = Instantiate(
             heliProperties.bullefPref,
-            heliProperties.shootPos.transform.position,
-            heliProperties.shootPos.transform.rotation
+            data.position,
+            data.rotation
         );
 
-        bulletObj.GetComponent<Bullet>().CreateBullet(
-            heliProperties.shootPos.transform.forward,
-            heliProperties.muzzle_velocity,
-            heliProperties.bullet_drop,
-            heliProperties.damage,
-            heliProperties.damage_dropoff,
-            heliProperties.damage_dropoff_timer,
-            heliProperties.destruction_force,
-            heliProperties.minimum_damage,
-            2,
-            2,
-            0,
-            true,
-            heliProperties.damage,
-            heliProperties.bullet_hit_effect,
-            vehicle: this
-        );
+
+        Spawn(bulletObj.gameObject, Owner);
+
+        Bullet bullet = bulletObj.GetComponent<Bullet>();
+        if (bullet != null)
+        {
+            bullet.CreateBullet(data, transform);
+        }
 
         current_spread += heliProperties.spread;
 
-
         Destroy(bulletObj.gameObject, 10f);
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void RpcShootMachineGunEffects()
+    {
+        HandleSound(heliProperties.shoot_sound);
     }
 
     private void HandleCooldown(float dt)
@@ -517,8 +572,8 @@ public class AttackHelicopter : Helicopter
     }
 
     private void ApplyGunnerLookRotation()
-    {   
-        if(gunner_gun_camera.enabled) return;
+    {
+        if (gunner_gun_camera.enabled) return;
 
         mouseY = Input.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
         mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
@@ -595,12 +650,12 @@ public class AttackHelicopter : Helicopter
     #endregion
 
     #region Vehicle Entry/Exit 
-
-    public override void EnterVehicle(GameObject _player)
+    [TargetRpc]
+    public override void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
-        if (is_pilot_seat_occupied && is_gunner_seat_occupied) return;
+        if (is_pilot_seat_occupied.Value == true && is_gunner_seat_occupied.Value == true) return;
 
-        base.EnterVehicle(_player);
+        CallBaseEnterVehicle(conn, _player);
         vehicle_camera = player.GetComponent<PlayerController>().playerCamera;
         player_camera = vehicle_camera.transform;
 
@@ -608,21 +663,22 @@ public class AttackHelicopter : Helicopter
 
         InitializeVehicleEntry();
 
-        if ((!is_pilot_seat_occupied && !is_gunner_seat_occupied) ||
-            (!is_pilot_seat_occupied && is_gunner_seat_occupied))
+        if (is_pilot_seat_occupied.Value == false && is_gunner_seat_occupied.Value == true || (is_pilot_seat_occupied.Value == false && is_gunner_seat_occupied.Value == false))
         {
             helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(true);
             helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(false);
             EnterPilotSeat();
         }
-        else if (is_pilot_seat_occupied && !is_gunner_seat_occupied)
+        else if (is_pilot_seat_occupied.Value == true && is_gunner_seat_occupied.Value == false)
         {
             helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(true);
             helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(false);
             EnterGunnerSeat();
         }
-
-
+    }
+    private void CallBaseEnterVehicle(NetworkConnection conn, GameObject _player)
+    {
+        base.EnterVehicle(conn, _player);
     }
 
     private void InitializeVehicleEntry()
@@ -634,7 +690,8 @@ public class AttackHelicopter : Helicopter
     private void EnterPilotSeat()
     {
         is_pilot = true;
-        is_pilot_seat_occupied = true;
+        UpdateServerPilotSeatsStatus(true);
+        //is_pilot_seat_occupied.Value = true;
         SnapPlayerToSeat(pilot_position);
         SetPlayerAndHUDActive(false, true);
     }
@@ -642,7 +699,8 @@ public class AttackHelicopter : Helicopter
     private void EnterGunnerSeat()
     {
         is_pilot = false;
-        is_gunner_seat_occupied = true;
+        UpdateServerGunnerSeatsStatus(true);
+        //is_gunner_seat_occupied.Value = true;
         SnapPlayerToSeat(gunner_position);
         SetPlayerAndHUDActive(false, true);
     }
@@ -679,13 +737,14 @@ public class AttackHelicopter : Helicopter
 
     private void SwitchToGunnerSeat()
     {
-        if (!is_gunner_seat_occupied)
+        if (is_gunner_seat_occupied.Value == false)
         {
             SnapPlayerToSeat(gunner_position);
             helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(true);
             helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(false);
-            is_gunner_seat_occupied = true;
-            is_pilot_seat_occupied = false;
+            UpdateServerSwitchSeatsStatus(is_gunner_seat_occupied: true, is_pilot_seat_occupied: false);
+            //is_gunner_seat_occupied.Value = true;
+            //is_pilot_seat_occupied.Value = false;
             is_pilot = false;
             current_camera = 1;
         }
@@ -693,18 +752,39 @@ public class AttackHelicopter : Helicopter
 
     private void SwitchToPilotSeat()
     {
-        if (!is_pilot_seat_occupied)
+        if (is_pilot_seat_occupied.Value == false)
         {
             SnapPlayerToSeat(pilot_position);
             helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(true);
             helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(false);
             gunner_gun_camera.enabled = false;
             vehicle_camera.enabled = true;
-            is_gunner_seat_occupied = false;
-            is_pilot_seat_occupied = true;
+            UpdateServerSwitchSeatsStatus(is_gunner_seat_occupied: false, is_pilot_seat_occupied: true);
+            //is_gunner_seat_occupied.Value = false;
+            //is_pilot_seat_occupied.Value = true;
             is_pilot = true;
             current_camera = 1;
         }
+    }
+
+    [ServerRpc]
+    private void UpdateServerPilotSeatsStatus(bool status)
+    {
+        this.is_pilot_seat_occupied.Value = status;
+    }
+
+    [ServerRpc]
+    private void UpdateServerGunnerSeatsStatus(bool status)
+    {
+        this.is_gunner_seat_occupied.Value = status;
+    }
+
+    [ServerRpc]
+    private void UpdateServerSwitchSeatsStatus(bool is_gunner_seat_occupied, bool is_pilot_seat_occupied)
+    {
+        this.is_gunner_seat_occupied.Value = is_gunner_seat_occupied;
+        this.is_pilot_seat_occupied.Value = is_pilot_seat_occupied;
+
     }
 
 
@@ -712,11 +792,11 @@ public class AttackHelicopter : Helicopter
     {
         if (is_pilot)
         {
-            is_pilot_seat_occupied = false;
+            UpdateServerPilotSeatsStatus(false);
         }
         else
         {
-            is_gunner_seat_occupied = false;
+            UpdateServerGunnerSeatsStatus(false);
         }
 
         is_in_vehicle = false;
@@ -737,12 +817,13 @@ public class AttackHelicopter : Helicopter
 
     }
 
+
     private void PropellerRotation()
     {
         float deltaTime = Time.deltaTime;
-        float targetSpeed = start_engine ? heliProperties.max_lift_force : 0f;
+        float targetSpeed = start_engine == true ? heliProperties.max_lift_force : 0f;
 
-        float smoothTime = start_engine ? propellerAccelerationTime : propellerDecelerationTime;
+        float smoothTime = start_engine == true ? propellerAccelerationTime : propellerDecelerationTime;
         float t = Mathf.Clamp01(deltaTime / smoothTime);
 
         currentPropellerSpeed = Mathf.Lerp(currentPropellerSpeed, targetSpeed, t);
@@ -777,7 +858,7 @@ public class AttackHelicopter : Helicopter
         helicopterHudManager.helicopterPilotHUD.UpdateDamage();
         helicopterHudManager.helicopterPilotHUD.UpdateRotationX(transform.eulerAngles.x);
         helicopterHudManager.helicopterPilotHUD.UpdateRotationY(transform.eulerAngles.y);
-        helicopterHudManager.helicopterPilotHUD.UpdateAltitude(transform.position.y / 3);
+        helicopterHudManager.helicopterPilotHUD.UpdateAltitude(transform.position.y);
         helicopterHudManager.helicopterPilotHUD.UpdateSpeed(rb.linearVelocity.magnitude);
         helicopterHudManager.helicopterPilotHUD.UpdateThrottle(throttle);
 

@@ -1,12 +1,13 @@
 
 using UnityEngine;
 using VoxelDestructionPro.Tools;
-public class Missiles : MonoBehaviour
+public abstract class Missiles : MonoBehaviour
 {
+    [SerializeField] protected float infantary_damage;
+    [SerializeField] protected float vehicle_damage;
     [SerializeField] protected float time_to_explode;
     [SerializeField] protected Collider missile_collider;
     [SerializeField] protected VoxCollider voxCollider;
-    [SerializeField] protected float damage;
     [SerializeField] protected float travel_speed;
     [SerializeField] protected AudioSource explosion_sound;
     [SerializeField] protected GameObject explosion_effect;
@@ -58,12 +59,20 @@ public class Missiles : MonoBehaviour
                 Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
                 if (vehicle != null)
                 {
-                    if (!vehicle.vehicle_destroyed)
+                    if (!vehicle.vehicle_destroyed.Value)
                     {
-                        DamageMarker.Instance.UpdateDamage(vehicle.Damage(damage));
-                        if (vehicle.vehicle_destroyed)
+                        float target_resistance = vehicle.GetResistance();
+                        float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
+
+                        vehicle.RequestDamage(vehicle_damage);
+
+                        if (vehicle.vehicle_destroyed.Value)
                         {
                             EliminationMarker.Instance.InstantiateVehicleImage();
+                        }
+                        else
+                        {
+                            DamageMarker.Instance.UpdateDamage(final_actual_damage);
                         }
                     }
                 }
@@ -73,17 +82,25 @@ public class Missiles : MonoBehaviour
             {
                 PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
                 PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
-                DamageMarker.Instance.UpdateDamage(player.Damage(damage));
-                if (player_properties.is_dead)
+                player.RequestDamage(infantary_damage);
+                float target_resistance = player.GetResistance();
+                float final_actual_damage = infantary_damage * ((100f - target_resistance) / 100f);
+
+
+                if (player_properties.is_dead.Value)
                 {
                     AccountManager.Instance.status.AddKill();
                     EliminationMarker.Instance.InstantiateVehicleImage();
+                }
+                else
+                {
+                    DamageMarker.Instance.UpdateDamage(final_actual_damage);
                 }
 
             }
             else
             {
-                voxCollider.SphereExplosion(collision.contacts[0].point, damage);
+                voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage);
                 missile_collider.enabled = false;
             }
 

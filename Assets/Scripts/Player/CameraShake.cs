@@ -71,7 +71,7 @@ public class CameraShake : MonoBehaviour
 
     void CalculateWalkBob()
     {
-        if (playerProperties.isGrounded && !playerProperties.is_dead && !playerProperties.is_in_vehicle &&
+        if (playerProperties.isGrounded && !playerProperties.is_dead.Value && !playerProperties.is_in_vehicle &&
             (Mathf.Abs(playerController.moveHorizontal) > .1f || Mathf.Abs(playerController.moveForward) > 0.1f))
         {
             timer += Time.deltaTime * bobSpeed;
@@ -106,6 +106,8 @@ public class CameraShake : MonoBehaviour
 
     public void RequestShake(ShakeType type, float intensity = 1f, float duration = 0.1f)
     {
+        if (!gameObject.activeSelf) return;
+        
         // Usa valores padrão baseados no tipo se não especificados
         if (type == ShakeType.Jump)
         {

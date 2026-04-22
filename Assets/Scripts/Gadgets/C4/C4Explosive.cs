@@ -7,7 +7,8 @@ using VoxelDestructionPro.VoxelObjects;
 
 public class C4Explosive : MonoBehaviour
 {
-    [SerializeField] private float damage;
+    [SerializeField] private float infantary_damage;
+    [SerializeField] private float vehicle_damage;
     [SerializeField] VoxCollider voxCollider;
     [SerializeField] private GameObject smokeEffect;
     [SerializeField] private C4Detonator c4;
@@ -27,7 +28,7 @@ public class C4Explosive : MonoBehaviour
 
     public void Detonate()
     {
-        voxCollider.SphereExplosion(transform.position, damage);
+        voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
 
         Instantiate(smokeEffect, transform.position, Quaternion.identity);
 

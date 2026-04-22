@@ -166,7 +166,7 @@ public class SwayNBobScript : MonoBehaviour
 
 
         // Verificar se o jogador está morto
-        if (playerProperties.is_dead || playerProperties.isProneTransition || playerProperties.is_composing_bullets || playerProperties.is_in_vehicle)
+        if (playerProperties.is_dead.Value || playerProperties.isProneTransition || playerProperties.is_composing_bullets || playerProperties.is_in_vehicle)
         {
             // Apenas aplicar rotação de morte
             Quaternion deadRotation = Quaternion.Euler(40f, 0f, 0f);

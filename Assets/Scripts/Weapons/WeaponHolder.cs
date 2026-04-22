@@ -26,7 +26,7 @@ public class WeaponHolder : MonoBehaviour
     //float moveTime = 0.7f;
     float moveTime;
 
-    void Start()
+    void Awake()
     {
         playerProperties = GetComponentInParent<PlayerProperties>();
         cameraShake = GetComponentInParent<CameraShake>();
@@ -60,7 +60,7 @@ public class WeaponHolder : MonoBehaviour
     void Update()
     {
 
-        if (func == 0 || !playerProperties.is_reloading)
+        if (func == 0)
         {
 
             can_save_left_hand_position = true;
@@ -113,7 +113,7 @@ public class WeaponHolder : MonoBehaviour
         }
         else if (func == 3) //Mão direita arma para extrator
         {
-
+            print("Func 3");
             MoveTimer += Time.deltaTime;
 
             if (MoveTimer <= moveTime)
@@ -153,7 +153,7 @@ public class WeaponHolder : MonoBehaviour
         }
         else if (func == 5) //Mão esquerda, arma para extrator
         {
-
+            
             MoveTimer += Time.deltaTime;
 
             if (MoveTimer <= moveTime)
@@ -271,6 +271,13 @@ public class WeaponHolder : MonoBehaviour
         }
 
 
+    }
+
+    public void SetHands()
+    {
+        WeaponAnimation weaponAnimation = GetComponentInParent<WeaponAnimation>();
+        leftHand_origin = weaponAnimation.left_hand;
+        rightHand_origin = weaponAnimation.right_hand;
     }
 
     public void LeftHand_WeaponToMag(float moveTime)

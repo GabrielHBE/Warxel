@@ -18,10 +18,10 @@ public class CameraFollower : MonoBehaviour
     private bool wasDead = false;
 
 
-    void Update()
+    void LateUpdate()
     {
 
-        bool setparent = playerProperties.roll || playerProperties.is_dead;
+        bool setparent = playerProperties.roll || playerProperties.is_dead.Value;
 
         // Verifica se o estado mudou
         if (setparent && !(wasRolling || wasDead))
@@ -45,7 +45,7 @@ public class CameraFollower : MonoBehaviour
 
         // Atualiza os estados anteriores
         wasRolling = playerProperties.roll;
-        wasDead = playerProperties.is_dead;
+        wasDead = playerProperties.is_dead.Value;
 
     }
 

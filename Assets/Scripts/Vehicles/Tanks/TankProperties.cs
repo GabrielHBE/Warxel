@@ -20,9 +20,11 @@ public class TankProperties : MonoBehaviour
     public float turret_max_rotation_value;
 
     [Header("Bullet")]
+    public float infantary_damage;
+    public float vehicle_damage;
     public float muzzle_velocity;
     public float minimum_damage;
-    public float bullet_dropoff;
+    public float bullet_drop;
     public float damage_dropoff;
     public float damage_dropoff_timer;
     public float destruction_force;
@@ -33,7 +35,6 @@ public class TankProperties : MonoBehaviour
     public float interval;
     public float zoom;
     public float overheat_time;
-    public float damage;
     public AudioSource shoot_shound;
 
     void Start()

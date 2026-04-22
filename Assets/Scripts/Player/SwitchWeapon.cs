@@ -25,6 +25,11 @@ public class SwitchWeapon : MonoBehaviour
     [Header("Instances")]
     public Reticle reticle;
     public Transform save;
+    [SerializeField] private PlayerController playerController;
+    [SerializeField] private PlayerProperties playerProperties;
+    [SerializeField] private WeaponAnimation weaponAnimation;
+    [SerializeField] private SwayNBobScript sway;
+    [SerializeField] private Weapon weapon;
 
     [Header("Timing")]
     [SerializeField] private float switchDuration = 0.6f;
@@ -36,13 +41,10 @@ public class SwitchWeapon : MonoBehaviour
     private bool isReturning = false;
     private float switchTimer = 0f;
     private bool setupOnce = true;
-
-    private Weapon weapon;
-    private SwayNBobScript sway;
-    private WeaponAnimation weaponAnimation;
+    
+    
     private WeaponProperties weaponProperties;
-    private PlayerController playerController;
-    private PlayerProperties playerProperties;
+    
     private WeaponHolder weaponHolder;
     private Shell shell;
 
@@ -60,17 +62,9 @@ public class SwitchWeapon : MonoBehaviour
         Gadget1 = 3,
         Gadget2 = 4
     }
-
+    
     public void Initialize()
     {
-
-        playerController = GetComponentInParent<PlayerController>();
-        playerProperties = GetComponentInParent<PlayerProperties>();
-
-        weaponAnimation = GetComponentInChildren<WeaponAnimation>();
-        weapon = GetComponentInChildren<Weapon>();
-        sway = GetComponentInChildren<SwayNBobScript>();
-
 
         InstantiatePrimaryWeapon();
         InstantiateSecodnaryWeapon();
@@ -156,7 +150,7 @@ public class SwitchWeapon : MonoBehaviour
 
     private void HandleWeaponSwitchInput()
     {
-        if (_switch || playerProperties.is_reloading || playerProperties.is_firing || playerProperties.is_dead)
+        if (_switch || playerProperties.is_reloading || playerProperties.is_firing || playerProperties.is_dead.Value)
             return;
 
         Vector2 scrollDelta = Mouse.current.scroll.ReadValue();

@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class JetGunship : Jet
 {
-    private bool is_pilot;
     [SerializeField] private Gunners[] gunners;
 
     protected override void Update()
@@ -18,7 +17,7 @@ public class JetGunship : Jet
         {
             UpdateHUD();
 
-            if (start_engine)
+            if (start_engine == true)
             {
             }
             else

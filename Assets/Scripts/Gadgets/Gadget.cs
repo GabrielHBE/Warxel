@@ -3,7 +3,8 @@ using UnityEngine.UI;
 
 public class Gadget : MonoBehaviour
 {   
-    [Header("Progression / Category")]
+    [Header("Progression / Category / Settings")]
+    public GameObject third_person_prefab;
     public ClassManager.Class[] class_gadget;
     public int gadget_level;
     public float points_to_up_level;
@@ -27,8 +28,11 @@ public class Gadget : MonoBehaviour
     public float[] vector3Values;
     public float[] quaternionValues;
 
-    void Start()
+    protected PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
+
+    void Awake()
     {
+        playerNetworkObjectSpawner = GetComponentInParent<PlayerNetworkObjectSpawner>();
         gadgetComponents = GetComponentInParent<GadgetComponents>();
     }
 

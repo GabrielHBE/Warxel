@@ -2,7 +2,9 @@ using UnityEngine;
 
 public class MapSettings : MonoBehaviour
 {
-    public static MapSettings Instante {get; private set;}
+    public static MapSettings Instance {get; private set;}
+    public MapSize map_size;
+    public string map_name;
     public float max_altitude;
     public int max_jets;
     public int max_tanks;
@@ -10,7 +12,14 @@ public class MapSettings : MonoBehaviour
     
     void Awake()
     {
-        Instante = this;
+        Instance = this;
     }
 
+}
+
+public enum MapSize
+{
+    Small,
+    Medium,
+    Large
 }

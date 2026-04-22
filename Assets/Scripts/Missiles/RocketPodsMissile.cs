@@ -4,7 +4,6 @@ public class RocketPodsMissile : Missiles
 {
     [Header("Properties")]
     [SerializeField] private float bulletDropMultiplier;
-    [SerializeField] private float rotationSpeed = 5f; // Velocidade de rotação suave
 
     private Vector3 gravityForce;
 

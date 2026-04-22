@@ -71,13 +71,13 @@ public class Shell : MonoBehaviour
                 {
                     weaponProperties.reload_time += -1;
                     weaponProperties.spread_increaser += 10;
-                    weaponProperties.damage += 8;
+                    weaponProperties.infantary_damage += 8;
                 }
                 else if (current_shell.name.Contains("Light"))
                 {
                     weaponProperties.reload_time += 1;
                     weaponProperties.spread_increaser += -5;
-                    weaponProperties.damage += -8;
+                    weaponProperties.infantary_damage += -8;
                 }
 
                 break;

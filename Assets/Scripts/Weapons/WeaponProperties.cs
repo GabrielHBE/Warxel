@@ -5,15 +5,14 @@ using UnityEngine;
 
 public class WeaponProperties : MonoBehaviour
 {
-    [Header("Progression / Category")]
+    [Header("Progression / Category / Settings")]
+    public GameObject third_person_prefab;
     public ClassManager.Class[] class_weapon;
     public FactionManager.Faction[] faction;
+    public WeaponCategory category;
     public int battle_coins_to_unlock;
-    public int weapon_level;
-    private float points_to_up_level = 100;
-    public float weapon_level_progression;
+    public int weapon_kills;
     public float current_attachment_points;
-    public string category;
 
     [Header("Weapon properties")]
     public bool can_damage_vehicles;
@@ -27,13 +26,11 @@ public class WeaponProperties : MonoBehaviour
     public float speed_change;
     public float zoom;
     public float time_to_transfer_bullets;
-
     public Vector3 ads_position;
     public List<string> fire_modes = new List<string>();
 
     [Header("HUD")]
     public Sprite icon_hud;
-
 
     [Header("Destruction")]
     public float destruction_force;
@@ -51,7 +48,7 @@ public class WeaponProperties : MonoBehaviour
     public int shells;
 
     [Header("Damage")]
-    public float damage;
+    public float infantary_damage;
     public float vehicle_damage;
     public float minimum_damage;
     public float headshot_multiplier;
@@ -67,6 +64,7 @@ public class WeaponProperties : MonoBehaviour
     public float time_between_bursts;
 
     [Header("Spread")]
+    public float base_spread;
     public float spread_increaser;
     public float max_spread;
 
@@ -113,11 +111,43 @@ public class WeaponProperties : MonoBehaviour
     public Quaternion inicial_rotation;
     private BulletExtractor bulletExtractor;
 
+    public enum WeaponCategory
+    {
+        AssaultRifle,
+        SniperRifle,
+        SubmachineGun,
+        LightMachineGun,
+        Shotgun,
+        Pistol,
+        Launcher
+    }
+
     public void Initialize()
     {
+        weapon_kills = PlayerPrefs.GetInt($"WeaponProperties_weapon_kills_{weapon_name}");
+        SetClassBenefits();
         bulletExtractor = GetComponentInChildren<BulletExtractor>();
         FillMags();
         Restart();
+    }
+
+    private void SetClassBenefits()
+    {
+        if (AccountManager.Instance.selected_class == ClassManager.Class.Assault)
+        {
+            reload_time *= 1.2f;
+
+            first_shoot_increaser *= 0.9f;
+            for (int i = 0; i < vertical_recoil.Length; i++)
+            {
+                vertical_recoil[i] *= 0.9f;
+            }
+
+            for (int i = 0; i < horizontal_recoil.Length; i++)
+            {
+                horizontal_recoil[i] *= 0.9f;
+            }
+        }
     }
 
     public void Restart()
@@ -128,8 +158,11 @@ public class WeaponProperties : MonoBehaviour
 
         if (!manual_calculate_recoil)
         {
+            //weapon_reset_recoil_speed = interval * 0.75f;  // 75% do interval
+            //weapon_apply_recoil_speed = interval * 0.25f;  // 25% do interval
             weapon_reset_recoil_speed = interval / 2;
             weapon_apply_recoil_speed = interval / 2;
+
         }
 
         //if (reset_recoil_speed == 0) auto_reset_recoil_speed = interval / 2;
@@ -198,28 +231,18 @@ public class WeaponProperties : MonoBehaviour
         bulletExtractor.CreateBullet();
     }
 
-    public void UpgradeWeaponLevel(float points)
+    public void AddKill()
     {
-        weapon_level_progression += points;
-
-        if (weapon_level_progression >= points_to_up_level)
-        {
-            weapon_level += 1;
-            weapon_level_progression = 0;
-        }
-
-        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", weapon_level_progression);
-        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", weapon_level);
-        PlayerPrefs.Save();
+        weapon_kills += 1;
+        //PlayerPrefs.SetFloat($"WeaponProperties_weapon_kills_{weapon_name}", weapon_kills);
+        //PlayerPrefs.Save();
 
     }
 
     public void ResetWeaponlevel()
     {
-        weapon_level = 0;
-        weapon_level_progression = 0;
-        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", weapon_level_progression);
-        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", weapon_level);
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", 0);
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", 0);
         PlayerPrefs.Save();
     }
 

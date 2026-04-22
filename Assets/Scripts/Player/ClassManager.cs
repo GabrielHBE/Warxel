@@ -8,10 +8,11 @@ public class ClassManager : MonoBehaviour
     {
         public Class classType;
         public string className;
+        [TextArea(1, 8)]
+        public string classDescription;
         public Sprite classIcon;
         public Gadget gadget;
     }
-
 
     public enum Class
     {
@@ -45,6 +46,18 @@ public class ClassManager : MonoBehaviour
             if (classInfo.classType == classType)
             {
                 return classInfo.className;
+            }
+        }
+        return null;
+    }
+
+    public string GetClassDescription(Class classType)
+    {
+        foreach (var classInfo in classes)
+        {
+            if (classInfo.classType == classType)
+            {
+                return classInfo.classDescription;
             }
         }
         return null;

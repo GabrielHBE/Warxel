@@ -1,6 +1,9 @@
+using System.Collections;
+using FishNet.Object;
 using UnityEngine;
+using VoxelDestructionPro.VoxDataProviders;
 
-public class VehicleSpawner : MonoBehaviour
+public class VehicleSpawner : NetworkBehaviour
 {
 
     [SerializeField] private GameObject vehiclePrefab;
@@ -13,18 +16,16 @@ public class VehicleSpawner : MonoBehaviour
 
     void Start()
     {
-
         original_spawn_interval = spawnInterval;
         spawnPoint = transform;
-        /*
-        currentVehicle = Instantiate(vehiclePrefab, spawnPoint.position, spawnPoint.rotation);
-        currentVehicle.GetComponent<Vehicle>().Spawn();
-        currentVehicle.GetComponent<NetworkObject>().Spawn();
-        */
     }
 
     void Update()
     {
+        // Apenas o servidor executa a lógica de spawn
+        if (!IsServerInitialized)
+            return;
+
         if (currentVehicle != null)
         {
             return;
@@ -36,19 +37,32 @@ public class VehicleSpawner : MonoBehaviour
         {
             SpawnVehicle();
         }
-
     }
 
+    [Server]
     void SpawnVehicle()
     {
-        // Instancia o prefab
+        // Apenas servidor instancia e spawna o veículo
         GameObject vehicleObj = Instantiate(vehiclePrefab, spawnPoint.position, spawnPoint.rotation);
-        // Configura o veículo ANTES de spawnar
-        vehicleObj.GetComponent<Vehicle>().Spawn();
 
-        currentVehicle = vehicleObj;
-        spawnInterval = original_spawn_interval;
+        if (vehicleObj.GetComponent<NetworkObject>() != null)
+        {
+
+
+            Spawn(vehicleObj);
+
+            var vehicle = vehicleObj.GetComponent<Vehicle>();
+            if (vehicle != null && vehicle.IsSpawned)
+            {
+                vehicle.Initialize();
+                currentVehicle = vehicleObj;
+                spawnInterval = original_spawn_interval;
+            }
+            else
+            {
+                Debug.LogError("Vehicle not properly spawned in network");
+            }
+        }
     }
-
 
 }

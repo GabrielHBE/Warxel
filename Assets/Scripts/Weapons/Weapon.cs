@@ -1,7 +1,8 @@
-using System;
+
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
+using FishNet;
+using FishNet.Object;
 using UnityEngine;
 
 public class Weapon : MonoBehaviour
@@ -18,7 +19,8 @@ public class Weapon : MonoBehaviour
     [SerializeField] private List<GameObject> muzzle_flashes = new List<GameObject>();
 
     [Header("Instances")]
-    [SerializeField] private ThirdPersonWeapon thirdPersonWeapon;
+    [SerializeField] private PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
+    [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private Camera player_camera;
     public GameObject ads_position;
@@ -65,20 +67,19 @@ public class Weapon : MonoBehaviour
     private float time_to_contatenate = 0;
     private GameObject current_muzzle_flash;
     private bool is_aiming;
-    private bool moved_mouse_while_firing;
-    private bool was_firing_previous_frame;
+
 
     #region Unity Lifecycle Methods
 
     void Awake()
     {
-
         minFov = Settings.Instance._video.infantary_fov;
         restarted = false;
     }
 
     void Update()
     {
+
         if (weaponProperties != null)
             Reload();
 
@@ -109,14 +110,6 @@ public class Weapon : MonoBehaviour
         {
             HandleFireModeSwitch();
         }
-
-        if (!playerProperties.is_firing)
-        {
-            moved_mouse_while_firing = false;
-        }
-
-        // Atualiza o estado do frame atual para o próximo frame
-        was_firing_previous_frame = playerProperties.is_firing;
     }
 
 
@@ -376,7 +369,7 @@ public class Weapon : MonoBehaviour
     {
         return playerProperties.is_reloading ||
                playerProperties.roll ||
-               playerProperties.is_dead ||
+               playerProperties.is_dead.Value ||
                weaponProperties.mags[^1] == 0;
     }
 
@@ -468,7 +461,7 @@ public class Weapon : MonoBehaviour
         recoil_position_in_array = 0;
         playerProperties.is_firing = false;
         is_first_shot = false;
-        current_spread = 0;
+        current_spread = weaponProperties.base_spread;
     }
 
     private void StartBurst()
@@ -562,55 +555,28 @@ public class Weapon : MonoBehaviour
 
     private void SpawnBullet()
     {
-        Transform bulletObj = Instantiate(
-            weaponProperties.bulletPref,
-            weaponProperties.barrel.transform.position,
-            weaponProperties.barrel.transform.rotation
-        );
-
-        Destroy(bulletObj.gameObject, 10f);
-
-        Bullet bullet = bulletObj.GetComponent<Bullet>();
-
-        if (weaponProperties.bullet_hit_effect != null)
+        // 1. Pack the data
+        Bullet.BulletData data = new Bullet.BulletData
         {
-            bullet.CreateBullet(
-                weaponProperties.barrel.transform.forward,
-                weaponProperties.muzzle_velocity,
-                weaponProperties.bullet_drop,
-                weaponProperties.damage,
-                weaponProperties.damage_dropoff,
-                weaponProperties.damage_dropoff_timer,
-                weaponProperties.destruction_force,
-                weaponProperties.minimum_damage,
-                weaponProperties.headshot_multiplier,
-                weaponProperties.bullet_size,
-                0.05f,
-                weaponProperties.can_damage_vehicles,
-                weaponProperties.vehicle_damage,
-                weaponProperties.bullet_hit_effect,
-                weaponProperties: weaponProperties
-            );
-        }
-        else
-        {
-            bullet.CreateBullet(
-                weaponProperties.barrel.transform.forward,
-                weaponProperties.muzzle_velocity,
-                weaponProperties.bullet_drop,
-                weaponProperties.damage,
-                weaponProperties.damage_dropoff,
-                weaponProperties.damage_dropoff_timer,
-                weaponProperties.destruction_force,
-                weaponProperties.minimum_damage,
-                weaponProperties.headshot_multiplier,
-                weaponProperties.bullet_size,
-                0.05f,
-                weaponProperties.can_damage_vehicles,
-                weaponProperties.vehicle_damage,
-                weaponProperties: weaponProperties
-            );
-        }
+            position = weaponProperties.barrel.transform.position,
+            rotation = weaponProperties.barrel.transform.rotation,
+            direction = weaponProperties.barrel.transform.forward,
+            speed = weaponProperties.muzzle_velocity,
+            dropMultiplier = weaponProperties.bullet_drop,
+            infantaryDamage = weaponProperties.infantary_damage,
+            damageDropoff = weaponProperties.damage_dropoff,
+            damageDropoffTimer = weaponProperties.damage_dropoff_timer,
+            destructionForce = weaponProperties.destruction_force,
+            minimumDamage = weaponProperties.minimum_damage,
+            hsMultiplier = weaponProperties.headshot_multiplier,
+            size = weaponProperties.bullet_size,
+            canDamageVehicles = weaponProperties.can_damage_vehicles,
+            vehicleDamage = weaponProperties.vehicle_damage
+        };
+
+        // 2. Send it to the Server
+        NetworkObject shooterNetObj = playerController.GetComponent<NetworkObject>();
+        playerNetworkObjectSpawner.ServerSpawnBullet(weaponProperties.bulletPref.gameObject, data, shooterNetObj, weaponProperties.gameObject.name);
     }
 
     private void UpdateSpread()
@@ -624,7 +590,7 @@ public class Weapon : MonoBehaviour
             current_spread += weaponProperties.spread_increaser * 1.5f;
         }
 
-        current_spread = Mathf.Clamp(current_spread, 0, weaponProperties.max_spread);
+        current_spread = Mathf.Clamp(current_spread, weaponProperties.base_spread, weaponProperties.max_spread);
     }
 
     IEnumerator ApplyVisualRecoilOffset()
@@ -815,7 +781,7 @@ public class Weapon : MonoBehaviour
                !switchWeapon._switch &&
                !playerProperties.isProneTransition &&
                !playerProperties.roll &&
-               !playerProperties.is_dead;
+               !playerProperties.is_dead.Value;
     }
 
     void StartAiming()
@@ -890,7 +856,7 @@ public class Weapon : MonoBehaviour
         {
             int randomIndex = UnityEngine.Random.Range(0, muzzle_flashes.Count);
             current_muzzle_flash = Instantiate(muzzle_flashes[randomIndex], weaponProperties.barrel.transform);
-            thirdPersonWeapon.CreateMuzzle(current_muzzle_flash);
+            //thirdPersonWeapon.CreateMuzzle(current_muzzle_flash);
         }
     }
 
@@ -899,7 +865,7 @@ public class Weapon : MonoBehaviour
         if (current_muzzle_flash != null)
         {
             Destroy(current_muzzle_flash);
-            thirdPersonWeapon.DeleteMuzzle();
+            //thirdPersonWeapon.DeleteMuzzle();
         }
     }
 

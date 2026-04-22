@@ -28,13 +28,14 @@ public class JetProperties : MonoBehaviour
     public GameObject bullet_hit_effect;
 
     [Header("MainCannon")]
+    public float infantary_damage;
+    public float vehicle_damage;
     public Sprite hud_icon;
     public Transform bullefPref;
     public float fire_rate;
     public float interval;
     public float zoom;
     public float overheat_time;
-    public float damage;
     public float damage_dropoff;
     public float damage_dropoff_timer;
     public float destruction_force;

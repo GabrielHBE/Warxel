@@ -1,20 +1,27 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkBehaviour, ISspottable
 {
     #region Serialized Fields
 
+    public Transform spot_position;
+
     [Header("Multiplayer / Player")]
+    [SerializeField] private BoxCollider[] player_hit_colliders;
+    public static PlayerController Instance { get; private set; }
     [SerializeField] private AudioListener camera_audio;
-    [SerializeField] private GameObject first_person_player;
+    [SerializeField] private GameObject first_person_player_components;
     [SerializeField] private MeshRenderer[] hideToOwnerItems;
-    [SerializeField] private GameObject[] hideToNotOwnerItems;
-    [SerializeField] private GameObject[] body_parts;
+    public GameObject[] body_parts;
+    [SerializeField] private GameObject fist_person;
+    [SerializeField] private GameObject firt_person_canvas;
 
     [Header("Body")]
     public GameObject playerHead;
@@ -48,35 +55,25 @@ public class PlayerController : MonoBehaviour
     [HideInInspector] public float moveForward;
     [HideInInspector] public float moveHorizontal;
 
-    [Header("Stairs")]
-    [SerializeField] GameObject stepRayUpper;
-    [SerializeField] GameObject stepRayLower;
-    [SerializeField] float stepHeight = 0.3f;
-    [SerializeField] float stepSmooth = 2f;
-
-
     [Header("Slope Handling")]
     public float maxSlopeAngle;
     private RaycastHit slopeHit;
     private bool exitingSlope;
-
-    [Header("Air Control Settings")]
-    [SerializeField] private float airSpeedDecayRate = 0.5f;
-    [SerializeField] private float minAirSpeed = 1f;
 
     [Header("Ground Detection")]
     [SerializeField] private float ground_detection_raycastDistance;
     public LayerMask groundLayer;
 
     [Header("Private References")]
-    [SerializeField] private float footstepSound_interval;
+    [SerializeField] private float footstepSound_interval = 0.45f;
     [SerializeField] private CameraShake cameraShake;
     [SerializeField] private FootstepSound footstepSound;
     [SerializeField] private Weapon weapon;
     [SerializeField] private SoldierHudManager soldierHudManager;
     [SerializeField] private SwayNBobScript SwayNBob;
-    [SerializeField] private ThirdPersonWeapon thirdPersonWeapon;
-    [SerializeField] private PlayerProperties playerProperties;
+    [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
+    public PlayerProperties playerProperties;
+    [SerializeField] private PlayerAnimation playerAnimation;
 
     [Header("Volumes")]
     [SerializeField] private Volume nightVision_volume;
@@ -88,27 +85,28 @@ public class PlayerController : MonoBehaviour
 
     // Components
     public Rigidbody rb;
-    
 
-    //Volume
+    // Volume
     private Vignette nightVision_vignette;
     private ColorAdjustments nightVision_Color_adjustments;
     private FilmGrain nightVision_filmGrain;
     private Vignette damageTaken_vignette;
 
-    // Movement - Tutorial Style
+    // Movement 
     public float currentMoveSpeed;
     private float original_sprint_speed;
     private float original_walk_speed;
     private float original_crouch_speed;
     private bool readyToJump;
-
     private Vector3 moveDirection;
 
     // Legacy
     private float original_footstepSound_interval;
     private float death_timer;
     private float colliders_difference;
+    private float altitude;
+    private float cold_damage_timer = 0;
+    private float damage_dealt;
 
     // Camera & Recoil
     private float verticalRotation;
@@ -120,113 +118,112 @@ public class PlayerController : MonoBehaviour
     private float horizontalRecoilTarget;
     private float horizontalRecoilCurrent;
     private float horizontalRecoilVelocity;
-
-    // Recoil Z-axis
     private float currentRecoilZ;
     private float recoilResetVelocity;
     private float targetRecoilZ;
     private float recoilZVelocity;
+    private float resetRecoilSpeed;
+    private float applyRecoilSpeed;
+    private float targetVignetteIntensity;
+    private float currentVignetteIntensity;
+    private float vignetteVelocity;
+    private float yaw;
 
     // Ground Check
     private bool wasGroundedLastFrame;
     private bool grounded;
 
-    // Recoil Timing
-    private float resetRecoilSpeed;
-    private float applyRecoilSpeed;
-
-    // Roll Double-click
-    private float lastClickTime = 0f;
-    private int clickCount = 0;
-    private const float DOUBLE_CLICK_TIME = 0.3f;
-
-    // Interaction
+    // Interaction & Caching
     public const float INTERACT_DISTANCE = 10f;
+    private int interactivesLayer;
+    private int vehicleLayer;
+    private int playerLayer;
+    
+    // Performance: Array cache para Physics.OverlapSphereNonAlloc
+    private Collider[] medicCollidersCache = new Collider[6];
+    private Coroutine current_DealDamageOverTime;
 
-    private float yaw;
+    // Syncvars
+    private readonly SyncVar<bool> is_dead = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    private readonly SyncVar<bool> is_in_vehicle = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    private readonly SyncVar<bool> is_proned = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    private readonly SyncVar<bool> crouched = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    private readonly SyncVar<bool> roll = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
 
     #endregion
 
     #region Unity Lifecycle
 
-    public void InitializePlayer()
+    public override void OnStartClient()
     {
-        //if (!IsOwner) return;
-        camera_audio.enabled = true;
-        stepRayUpper.transform.position = new Vector3(stepRayUpper.transform.position.x, stepHeight, stepRayUpper.transform.position.z);
+        base.OnStartClient();
 
-        original_footstepSound_interval = footstepSound_interval;
-
-        colliders_difference = stand_collider.height - crouch_collider.height;
-        original_sprint_speed = sprintSpeed;
-        original_walk_speed = walkSpeed;
-        original_crouch_speed = crouchSpeed;
-
-        InitializeComponents();
-        SetupPhysics();
-
-        playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-        playerProperties.selected_class =  AccountManager.Instance.selected_class;
-
-        InitializeVolume();
-        HideOwnerItems(true);
-
-        readyToJump = true;
+        if (IsOwner)
+        {
+            ConfigureOwner();
+        }
+        else
+        {
+            Destroy(fist_person);
+            Destroy(firt_person_canvas);
+        }
     }
 
     void Update()
     {
+        if (!IsOwner) return;
 
-        HandleDebugInput();
+        UpdateSyncVars();
+        UpdateColliderStateLocal();
 
-        UpdateDamageVignette();
+        UpdateColliderStateServer(
+            playerProperties.is_dead.Value,
+            playerProperties.is_in_vehicle,
+            playerProperties.is_proned,
+            playerProperties.crouched,
+            playerProperties.roll
+        );
+
+        // Se estiver em um veículo, roda a lógica do veículo e aborta o resto
         if (playerProperties.is_in_vehicle)
         {
-            first_person_player.SetActive(false);
+            DisableColliders();
+            if (first_person_player_components.activeSelf) first_person_player_components.SetActive(false);
             UpdateHeadRotation();
             return;
         }
 
-        first_person_player.SetActive(true);
+        HandleDebugInput();
+        UpdateDamageVignette();
+
+        if (!first_person_player_components.activeSelf) first_person_player_components.SetActive(true);
 
         FootstepSound();
-        UpdateColliderState();
         UpdateGroundCheck();
         UpdateFOV();
 
-        if (playerProperties.is_dead)
+        if (playerProperties.is_dead.Value)
         {
             HandleDeathState();
             return;
         }
 
-        soldierHudManager.deadPlayerHud.gameObject.SetActive(false);
+        if (soldierHudManager.deadPlayerHud.gameObject.activeSelf) soldierHudManager.deadPlayerHud.gameObject.SetActive(false);
         death_timer = 0;
 
         HandleInteractionInput();
         HandlePlayerInput();
         RotateCamera();
         UpdateRecoil();
-
-        // Jump handling
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded && !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
-        {
-            readyToJump = false;
-            Jump();
-            Invoke(nameof(ResetJump), jumpCooldown);
-        }
-
-        // Handle drag
-        if (grounded)
-            rb.linearDamping = groundDrag;
-        else
-            rb.linearDamping = 1;
+        HandleJumpInput();
+        HandleEnvironmentEffects();
     }
 
     void FixedUpdate()
     {
+        if (!IsOwner) return;
 
-        if (playerProperties.is_dead || playerProperties.is_in_vehicle)
+        if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle)
         {
             moveForward = 0;
             moveHorizontal = 0;
@@ -234,30 +231,55 @@ public class PlayerController : MonoBehaviour
         }
 
         UpdateMouseSensitivity();
-        stepClimb();
         MovePlayer();
-
-        // Better jump physics
-        if (rb.linearVelocity.y < 0)
-        {
-            rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
-        }
+        ApplyCustomGravity();
+        ApplyWindPhysics();
     }
 
     #endregion
 
     #region Initialization
 
-    private void InitializeComponents()
+    [Client]
+    public void ConfigureOwner()
     {
-        foreach (GameObject part in body_parts)
+        Instance = this;
+        HideOwnerItems(true);
+        
+        playerAnimation.can_update_animation = true;
+        playerCamera.enabled = true;
+        playerCamera.GetComponent<AudioListener>().enabled = true;
+        soldierHudManager.hud.gameObject.SetActive(true);
+        fist_person.SetActive(true);
+        enabled = true;
+        
+        playerProperties.faction.Value = AccountManager.Instance.faction;
+        playerProperties.selected_class = AccountManager.Instance.selected_class;
+
+        foreach (BoxCollider c in player_hit_colliders)
         {
-            part.gameObject.tag = "OwnerPlayer";
+            c.enabled = false;
         }
 
-        rb = GetComponent<Rigidbody>();
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        rb.freezeRotation = true;
+        camera_audio.enabled = true;
+        footstepSound_interval = footstepSound_interval <= 0 ? 0.45f : footstepSound_interval;
+        original_footstepSound_interval = footstepSound_interval;
+        
+        colliders_difference = stand_collider.height - crouch_collider.height;
+        original_sprint_speed = sprintSpeed;
+        original_walk_speed = walkSpeed;
+        original_crouch_speed = crouchSpeed;
+
+        // Caching das layers para performance
+        interactivesLayer = LayerMask.GetMask("Interactives");
+        vehicleLayer = LayerMask.GetMask("Vehicle");
+        playerLayer = LayerMask.GetMask("Player");
+
+        SetupPhysics();
+        playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+        InitializeVolume();
+        
+        readyToJump = true;
     }
 
     private void SetupPhysics()
@@ -278,7 +300,6 @@ public class PlayerController : MonoBehaviour
         {
             damageTaken_volume.profile.TryGet(out damageTaken_vignette);
         }
-
     }
 
     #endregion
@@ -287,15 +308,8 @@ public class PlayerController : MonoBehaviour
 
     private void HandleDebugInput()
     {
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            Revive();
-        }
-
-        if (Input.GetKeyDown(KeyCode.G))
-        {
-            Damage(100);
-        }
+        if (Input.GetKeyDown(KeyCode.K)) Revive();
+        if (Input.GetKeyDown(KeyCode.G)) RequestDamage(100);
     }
 
     private void HandleInteractionInput()
@@ -315,34 +329,7 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            moveHorizontal = 0;
-            moveForward = 0;
-
-            if ((Input.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey) && Input.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey)) || SettingsHUD.Instance.is_menu_settings_active)
-            {
-                moveForward = 0;
-            }
-            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey))
-            {
-                moveForward = 1;
-            }
-            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey))
-            {
-                moveForward = -1;
-            }
-
-            if ((Input.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey) && Input.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey)) || SettingsHUD.Instance.is_menu_settings_active)
-            {
-                moveHorizontal = 0;
-            }
-            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey))
-            {
-                moveHorizontal = -1;
-            }
-            else if (Input.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey))
-            {
-                moveHorizontal = 1;
-            }
+            UpdateMovementInput();
         }
 
         HandleNightVision();
@@ -354,6 +341,38 @@ public class PlayerController : MonoBehaviour
             HandleCrouch();
             HandleProne();
             UpdateMovementSpeed();
+        }
+    }
+
+    private void UpdateMovementInput()
+    {
+        moveHorizontal = 0;
+        moveForward = 0;
+
+        bool moveFwd = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey);
+        bool moveBck = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey);
+        bool moveLft = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey);
+        bool moveRgt = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey);
+
+        if ((moveFwd && moveBck) || SettingsHUD.Instance.is_menu_settings_active)
+            moveForward = 0;
+        else if (moveFwd) moveForward = 1;
+        else if (moveBck) moveForward = -1;
+
+        if ((moveLft && moveRgt) || SettingsHUD.Instance.is_menu_settings_active)
+            moveHorizontal = 0;
+        else if (moveLft) moveHorizontal = -1;
+        else if (moveRgt) moveHorizontal = 1;
+    }
+
+    private void HandleJumpInput()
+    {
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded && 
+            !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
+        {
+            readyToJump = false;
+            Jump();
+            Invoke(nameof(ResetJump), jumpCooldown);
         }
     }
 
@@ -370,33 +389,22 @@ public class PlayerController : MonoBehaviour
         Vector3 origin_ = playerHead.transform.position;
         float distance = colliders_difference * 4.5f;
 
-        if (!Settings.Instance._controls.is_sprint_on_hold && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_sprintKey))
+        bool isSprintingKeyHit = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_sprintKey);
+        bool isSprintOnHold = Settings.Instance._controls.is_sprint_on_hold;
+
+        if ((!isSprintOnHold && isSprintingKeyHit) || isSprintOnHold)
         {
             if (playerProperties.crouched)
             {
-                Debug.DrawLine(origin_, origin_ + Vector3.up * distance, Color.red, 2);
-
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
                     GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                     return;
                 }
             }
-            ToggleSprint();
-        }
-        else if (Settings.Instance._controls.is_sprint_on_hold)
-        {
-            if (playerProperties.crouched)
-            {
-                Debug.DrawLine(origin_, origin_ + Vector3.up * distance, Color.red, 2);
 
-                if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
-                {
-                    GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
-                    return;
-                }
-            }
-            UpdateHoldSprint();
+            if (isSprintOnHold) UpdateHoldSprint();
+            else ToggleSprint();
         }
     }
 
@@ -427,25 +435,19 @@ public class PlayerController : MonoBehaviour
         Vector3 origin_ = transform.position;
         float distance = 7f;
 
-        if (!Settings.Instance._controls.is_prone_on_hold && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_proneKey))
+        bool isProneKeyHit = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_proneKey);
+        bool isProneOnHold = Settings.Instance._controls.is_prone_on_hold;
+
+        if ((!isProneOnHold && isProneKeyHit) || isProneOnHold)
         {
             if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer) && playerProperties.is_proned)
             {
-                Debug.Log(hit.transform.gameObject.name);
                 GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                 return;
             }
 
-            ToggleProne();
-        }
-        else if (Settings.Instance._controls.is_prone_on_hold)
-        {
-            if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer) && playerProperties.is_proned)
-            {
-                GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
-                return;
-            }
-            UpdateHoldProne();
+            if (isProneOnHold) UpdateHoldProne();
+            else ToggleProne();
         }
     }
 
@@ -455,11 +457,8 @@ public class PlayerController : MonoBehaviour
 
         if (playerProperties.is_proned)
         {
-            if (playerProperties.sprinting)
-            {
-                ApplyProneTransitionImpulse();
-            }
-
+            if (playerProperties.sprinting) ApplyProneTransitionImpulse();
+            
             playerProperties.sprinting = false;
             playerProperties.crouched = false;
         }
@@ -485,24 +484,16 @@ public class PlayerController : MonoBehaviour
     private void HandleCrouch()
     {
         bool crouchInput = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_crouchKey);
-        bool jumpWhileCrouched = playerProperties.crouched &&
-                                 Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey);
+        bool jumpWhileCrouched = playerProperties.crouched && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey);
+        bool isCrouchOnHold = Settings.Instance._controls.is_crouch_on_hold;
 
-        Vector3 origin_ = playerHead.transform.position;
-        float distance = colliders_difference * 4.5f;
+        Vector3 origin_ = playerProperties.is_proned ? transform.position : playerHead.transform.position;
+        float distance = playerProperties.is_proned ? 3f : colliders_difference * 4.5f;
 
-        if (!Settings.Instance._controls.is_crouch_on_hold && (crouchInput || jumpWhileCrouched))
+        if ((!isCrouchOnHold && (crouchInput || jumpWhileCrouched)) || isCrouchOnHold)
         {
-            if (playerProperties.is_proned)
+            if (playerProperties.crouched || playerProperties.is_proned || isCrouchOnHold)
             {
-                origin_ = transform.position;
-                distance = 3;
-            }
-
-            if (playerProperties.crouched || playerProperties.is_proned)
-            {
-                Debug.DrawLine(origin_, origin_ + Vector3.up * distance, Color.red, 2);
-
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
                     GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
@@ -510,24 +501,8 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
-            ToggleCrouch();
-        }
-        else if (Settings.Instance._controls.is_crouch_on_hold)
-        {
-            if (playerProperties.is_proned)
-            {
-                origin_ = transform.position;
-                distance = 3;
-            }
-            Debug.DrawLine(origin_, origin_ + Vector3.up * distance, Color.red, 2);
-
-            if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
-            {
-                GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
-                return;
-            }
-
-            UpdateHoldCrouch();
+            if (isCrouchOnHold) UpdateHoldCrouch();
+            else ToggleCrouch();
         }
     }
 
@@ -559,12 +534,10 @@ public class PlayerController : MonoBehaviour
     {
         timeBetweenRolls -= Time.deltaTime;
 
-        if (CanRoll())
+        if (CanRoll() && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey))
         {
-            CheckForDoubleClickRoll();
+            ExecuteRoll();
         }
-
-        ClearOldClickCount();
     }
 
     private bool CanRoll()
@@ -575,48 +548,15 @@ public class PlayerController : MonoBehaviour
                timeBetweenRolls <= 0;
     }
 
-    private void CheckForDoubleClickRoll()
-    {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey))
-        {
-            float currentTime = Time.time;
-
-            if (currentTime - lastClickTime <= DOUBLE_CLICK_TIME)
-            {
-                clickCount++;
-
-                if (clickCount >= 2)
-                {
-                    ExecuteRoll();
-                    clickCount = 0;
-                }
-            }
-            else
-            {
-                clickCount = 1;
-            }
-
-            lastClickTime = currentTime;
-        }
-    }
-
     private void ExecuteRoll()
     {
         playerProperties.roll = true;
         timeBetweenRolls = 3f;
     }
 
-    private void ClearOldClickCount()
-    {
-        if (Time.time - lastClickTime > DOUBLE_CLICK_TIME * 2)
-        {
-            clickCount = 0;
-        }
-    }
-
     #endregion
 
-    #region Movement
+    #region Movement & Physics
 
     private void UpdateMovementSpeed()
     {
@@ -639,66 +579,79 @@ public class PlayerController : MonoBehaviour
 
     private void MovePlayer()
     {
-        // calculate movement direction
         moveDirection = orientation.forward * moveForward + orientation.right * moveHorizontal;
 
-        // on slope
         if (OnSlope() && !exitingSlope)
         {
             float state_multiplier = 10;
 
             if (!playerProperties.sprinting && !playerProperties.crouched && !playerProperties.is_proned)
-            {
                 state_multiplier = 18.5f;
-            }
             else if (playerProperties.sprinting && !playerProperties.crouched && !playerProperties.is_proned)
-            {
                 state_multiplier = 12;
-            }
             else if (!playerProperties.sprinting && playerProperties.crouched && !playerProperties.is_proned)
-            {
                 state_multiplier = 20;
-            }
 
             rb.AddForce(GetSlopeMoveDirection() * currentMoveSpeed * state_multiplier * rb.mass, ForceMode.Force);
-
 
             if (rb.linearVelocity.y > 0)
                 rb.AddForce(Vector3.down * 80f * rb.mass, ForceMode.Force);
         }
-
-        // on ground
         else if (grounded)
+        {
             rb.AddForce(moveDirection.normalized * currentMoveSpeed * 10 * rb.mass, ForceMode.Force);
-
-        // in air
+        }
         else if (!grounded)
+        {
             rb.AddForce(moveDirection.normalized * currentMoveSpeed * 10 * airMultiplier * rb.mass, ForceMode.Force);
+        }
 
-        // turn gravity off while on slope
         rb.useGravity = !OnSlope();
+    }
+
+    private void ApplyCustomGravity()
+    {
+        if (rb.linearVelocity.y < 0)
+        {
+            rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
+        }
+    }
+
+    private void ApplyWindPhysics()
+    {
+        if (WeatherStateManager.Instance != null && 
+            WeatherStateManager.Instance.ActiveWeatherType.Value == WeatherStateManager.WeatherType.Hurricane)
+        {
+            rb.AddForce(Vector3.forward.normalized * 15f * rb.mass, ForceMode.Force);
+        }
+    }
+
+    private void HandleEnvironmentEffects()
+    {
+        if (WeatherStateManager.Instance.ActiveWeatherType.Value == WeatherStateManager.WeatherType.Snow)
+        {
+            cold_damage_timer += Time.deltaTime;
+            if (cold_damage_timer > 5)
+            {
+                cold_damage_timer = 0;
+                RequestDamage(5);
+            }
+        }
+
+        rb.linearDamping = grounded ? groundDrag : 1;
     }
 
     private void FootstepSound()
     {
         if ((moveForward != 0 || moveHorizontal != 0) && !playerProperties.is_proned && !playerProperties.roll && grounded)
         {
-            if (playerProperties.sprinting)
-            {
-                footstepSound_interval -= Time.deltaTime * 2f;
-            }
-            else if (playerProperties.crouched)
-            {
-                footstepSound_interval -= Time.deltaTime * 0.5f;
-            }
-            else
-            {
-                footstepSound_interval -= Time.deltaTime;
-            }
+            if (playerProperties.sprinting) footstepSound_interval -= Time.deltaTime * 2f;
+            else if (playerProperties.crouched) footstepSound_interval -= Time.deltaTime * 0.5f;
+            else footstepSound_interval -= Time.deltaTime;
 
             if (footstepSound_interval <= 0)
             {
-                footstepSound.PlayStepSound();
+                footstepSound.CmdPlayStepSound();
                 footstepSound_interval = original_footstepSound_interval;
             }
         }
@@ -711,13 +664,8 @@ public class PlayerController : MonoBehaviour
     private void Jump()
     {
         cameraShake.RequestShake(CameraShake.ShakeType.Jump, 2);
-
-        // Reset y velocity
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-
-        // Apply jump force
         rb.AddForce(transform.up * jumpForce * rb.mass, ForceMode.Impulse);
-
         grounded = false;
         playerProperties.isGrounded = false;
     }
@@ -727,93 +675,64 @@ public class PlayerController : MonoBehaviour
         readyToJump = true;
     }
 
-    float raycast_distance = 0.1f;
-    float raycast_distance_upper = 0.2f;
-    private void stepClimb()
+    private void UpdateGroundCheck()
     {
-        // Cores diferentes para cada raycast
-        Color rayColorForward = Color.green;
-        Color rayColor45 = Color.blue;
-        Color rayColorMinus45 = Color.yellow;
-        Color hitColor = Color.red;
+        bool is_holding_roll = Input.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
+        Vector3 rayOrigin = transform.position + Vector3.up;
 
-        // Forward direction (0 graus)
-        RaycastHit hitLower;
-        Vector3 forwardDir = transform.TransformDirection(Vector3.forward);
-        Debug.DrawRay(stepRayLower.transform.position, forwardDir * raycast_distance, rayColorForward);
+        grounded = Physics.SphereCast(
+            rayOrigin,
+            stand_collider.radius,
+            Vector3.down,
+            out RaycastHit hitInfo,
+            ground_detection_raycastDistance,
+            groundLayer
+        );
 
-        if (Physics.Raycast(stepRayLower.transform.position, forwardDir, out hitLower, raycast_distance, LayerMask.NameToLayer("Voxel")))
+        playerProperties.isGrounded = grounded;
+
+        if (wasGroundedLastFrame && !grounded)
         {
-            // Desenha o ponto de impacto
-            Debug.DrawLine(stepRayLower.transform.position, hitLower.point, hitColor);
-            Debug.DrawRay(hitLower.point, hitLower.normal * raycast_distance, Color.magenta);
-
-            Vector3 upperStart = stepRayUpper.transform.position;
-            Debug.DrawRay(upperStart, forwardDir * raycast_distance_upper, rayColorForward);
-
-            RaycastHit hitUpper;
-            if (!Physics.Raycast(upperStart, forwardDir, out hitUpper, raycast_distance_upper, LayerMask.NameToLayer("Voxel")))
-            {
-                // Desenha o movimento de subida
-                Debug.DrawLine(stepRayLower.transform.position, stepRayLower.transform.position + Vector3.up * stepSmooth * Time.deltaTime, Color.white);
-                rb.position -= new Vector3(0f, -stepSmooth * Time.deltaTime, 0f);
-            }
-            else
-            {
-                // Se hitUpper detectou algo, desenha em vermelho
-                Debug.DrawLine(upperStart, hitUpper.point, Color.red);
-            }
+            altitude = transform.position.y;
         }
 
-        // 45 graus direction
-        RaycastHit hitLower45;
-        Vector3 dir45 = transform.TransformDirection(1.5f, 0, 1).normalized;
-        Debug.DrawRay(stepRayLower.transform.position, dir45 * raycast_distance, rayColor45);
-
-        if (Physics.Raycast(stepRayLower.transform.position, dir45, out hitLower45, raycast_distance, LayerMask.NameToLayer("Voxel")))
+        if (!wasGroundedLastFrame && grounded)
         {
-            Debug.DrawLine(stepRayLower.transform.position, hitLower45.point, hitColor);
-            Debug.DrawRay(hitLower45.point, hitLower45.normal * raycast_distance, Color.magenta);
+            footstepSound.CmdPlayStepSound();
+            float fall_damage = HandleFallDamage();
 
-            Vector3 upperStart = stepRayUpper.transform.position;
-            Debug.DrawRay(upperStart, dir45 * raycast_distance_upper, rayColor45);
+            if (is_holding_roll && fall_damage > 0)
+            {
+                fall_damage /= 2;
+                ExecuteRoll();
+            }
 
-            RaycastHit hitUpper45;
-            if (!Physics.Raycast(upperStart, dir45, out hitUpper45, raycast_distance_upper, LayerMask.NameToLayer("Voxel")))
-            {
-                Debug.DrawLine(stepRayLower.transform.position, stepRayLower.transform.position + Vector3.up * stepSmooth * Time.deltaTime, Color.white);
-                rb.position -= new Vector3(0f, -stepSmooth * Time.deltaTime, 0f);
-            }
-            else
-            {
-                Debug.DrawLine(upperStart, hitUpper45.point, Color.red);
-            }
+            if (fall_damage != 0) RequestDamage(fall_damage);
+            cameraShake.RequestShake(CameraShake.ShakeType.Jump, 2);
         }
 
-        // -45 graus direction
-        RaycastHit hitLowerMinus45;
-        Vector3 dirMinus45 = transform.TransformDirection(-1.5f, 0, 1).normalized;
-        Debug.DrawRay(stepRayLower.transform.position, dirMinus45 * raycast_distance, rayColorMinus45);
+        wasGroundedLastFrame = grounded;
+    }
 
-        if (Physics.Raycast(stepRayLower.transform.position, dirMinus45, out hitLowerMinus45, raycast_distance, LayerMask.NameToLayer("Voxel")))
+    private float HandleFallDamage()
+    {
+        float distance = altitude - transform.position.y;
+        return distance < 10 ? 0 : distance * 2;
+    }
+
+    private bool OnSlope()
+    {
+        if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
         {
-            Debug.DrawLine(stepRayLower.transform.position, hitLowerMinus45.point, hitColor);
-            Debug.DrawRay(hitLowerMinus45.point, hitLowerMinus45.normal * raycast_distance, Color.magenta);
-
-            Vector3 upperStart = stepRayUpper.transform.position;
-            Debug.DrawRay(upperStart, dirMinus45 * raycast_distance_upper, rayColorMinus45);
-
-            RaycastHit hitUpperMinus45;
-            if (!Physics.Raycast(upperStart, dirMinus45, out hitUpperMinus45, raycast_distance_upper, LayerMask.NameToLayer("Voxel")))
-            {
-                Debug.DrawLine(stepRayLower.transform.position, stepRayLower.transform.position + Vector3.up * stepSmooth * Time.deltaTime, Color.white);
-                rb.position -= new Vector3(0f, -stepSmooth * Time.deltaTime, 0f);
-            }
-            else
-            {
-                Debug.DrawLine(upperStart, hitUpperMinus45.point, Color.red);
-            }
+            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
+            return angle < maxSlopeAngle && angle != 0;
         }
+        return false;
+    }
+
+    private Vector3 GetSlopeMoveDirection()
+    {
+        return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
     }
 
     #endregion
@@ -825,52 +744,28 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision))
         {
             is_night_vision_active = !is_night_vision_active;
-
-            if (is_night_vision_active)
-            {
-                EnableNightVision();
-            }
-            else
-            {
-                DisableNightVision();
-            }
+            
+            if (nightVision_filmGrain != null) nightVision_filmGrain.active = is_night_vision_active;
+            if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = is_night_vision_active;
+            if (nightVision_vignette != null) nightVision_vignette.active = is_night_vision_active;
         }
     }
-
-    private float targetVignetteIntensity;
-    private float currentVignetteIntensity;
-    private float vignetteVelocity;
 
     private void UpdateDamageVignette()
     {
         if (damageTaken_vignette == null) return;
 
-        float hpPercentage = playerProperties.hp / playerProperties.max_hp;
+        float hpPercentage = playerProperties.hp.Value / playerProperties.max_hp;
         targetVignetteIntensity = 1f - hpPercentage;
 
-        // Transição suave usando SmoothDamp
         currentVignetteIntensity = Mathf.SmoothDamp(
             currentVignetteIntensity,
             targetVignetteIntensity,
             ref vignetteVelocity,
-            0.2f // Tempo de transição em segundos
+            0.2f
         );
 
         damageTaken_vignette.intensity.value = currentVignetteIntensity;
-    }
-
-    private void EnableNightVision()
-    {
-        nightVision_filmGrain.active = true;
-        nightVision_Color_adjustments.active = true;
-        nightVision_vignette.active = true;
-    }
-
-    private void DisableNightVision()
-    {
-        nightVision_filmGrain.active = false;
-        nightVision_Color_adjustments.active = false;
-        nightVision_vignette.active = false;
     }
 
     private void RotateCamera()
@@ -884,7 +779,9 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateMouseSensitivity()
     {
-        currentMouseSensitivity = playerProperties.is_aiming ? Settings.Instance._controls.infantary_aim_sensibility : Settings.Instance._controls.infantary_sensibility;
+        currentMouseSensitivity = playerProperties.is_aiming ? 
+            Settings.Instance._controls.infantary_aim_sensibility : 
+            Settings.Instance._controls.infantary_sensibility;
     }
 
     private void HandleHorizontalRotation()
@@ -900,7 +797,6 @@ public class PlayerController : MonoBehaviour
 
         yaw += mouseX + horizontalRecoilCurrent;
         transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-
         horizontalRecoilTarget = 0f;
     }
 
@@ -912,47 +808,20 @@ public class PlayerController : MonoBehaviour
             mouseVertical *= -1;
         }
 
-        recoilVerticalCurrent = Mathf.SmoothDamp(recoilVerticalCurrent, recoilVerticalTarget,
-                                                 ref recoilVerticalVelocity, applyRecoilSpeed);
+        recoilVerticalCurrent = Mathf.SmoothDamp(recoilVerticalCurrent, recoilVerticalTarget, ref recoilVerticalVelocity, applyRecoilSpeed);
 
         verticalRotation -= mouseVertical + recoilVerticalCurrent;
-        verticalRotation = GetClampedVerticalRotation();
+        verticalRotation = playerProperties.is_proned ? Mathf.Clamp(verticalRotation, -20f, 80f) : Mathf.Clamp(verticalRotation, -80f, 70f);
 
         recoilVerticalTarget = 0f;
     }
 
-    private float GetClampedVerticalRotation()
-    {
-        if (playerProperties.is_proned)
-        {
-            return Mathf.Clamp(verticalRotation, -20f, 80f);
-        }
-        return Mathf.Clamp(verticalRotation, -80f, 70f);
-    }
-
     private void ApplyCameraRotation()
     {
-        UpdateRecoilZ();
-
-        playerCamera.transform.localEulerAngles = new Vector3(
-            verticalRotation,
-            0,
-            currentRecoilZ
-        );
-
+        currentRecoilZ = Mathf.SmoothDamp(currentRecoilZ, targetRecoilZ, ref recoilZVelocity, applyRecoilSpeed);
+        
+        playerCamera.transform.localEulerAngles = new Vector3(verticalRotation, 0, currentRecoilZ);
         UpdateHeadRotation();
-    }
-
-    private void UpdateRecoilZ()
-    {
-        float smoothedRecoilZ = Mathf.SmoothDamp(
-            currentRecoilZ,
-            targetRecoilZ,
-            ref recoilZVelocity,
-            applyRecoilSpeed
-        );
-
-        currentRecoilZ = smoothedRecoilZ;
     }
 
     private void UpdateHeadRotation()
@@ -965,12 +834,7 @@ public class PlayerController : MonoBehaviour
     {
         if (Mathf.Abs(currentRecoilZ) > 0.01f)
         {
-            currentRecoilZ = Mathf.SmoothDamp(
-                currentRecoilZ,
-                0f,
-                ref recoilResetVelocity,
-                resetRecoilSpeed
-            );
+            currentRecoilZ = Mathf.SmoothDamp(currentRecoilZ, 0f, ref recoilResetVelocity, resetRecoilSpeed);
         }
     }
 
@@ -978,12 +842,12 @@ public class PlayerController : MonoBehaviour
     {
         if (!playerProperties.is_aiming)
         {
-            float lerpSpeed = 10f * Time.deltaTime;
-            playerCamera.fieldOfView = Mathf.Lerp(
-                playerCamera.fieldOfView,
-                Settings.Instance._video.infantary_fov,
-                lerpSpeed
-            );
+            float targetFov = Settings.Instance._video.infantary_fov;
+            // Só interpola se houver diferença considerável para economizar cálculos do renderizador
+            if (Mathf.Abs(playerCamera.fieldOfView - targetFov) > 0.1f)
+            {
+                playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFov, 10f * Time.deltaTime);
+            }
         }
     }
 
@@ -992,11 +856,10 @@ public class PlayerController : MonoBehaviour
         recoilVerticalTarget += verticalRecoil;
         horizontalRecoilTarget += horizontalRecoil;
 
-        WeaponProperties weaponProperties = GetComponentInChildren<WeaponProperties>();
-        if (weaponProperties != null)
+        // Otimização: Acesso direto à propriedade em cache ao invés de buscar via GetComponent todo frame
+        if (weapon != null && weapon.weaponProperties != null)
         {
-            float range = (weaponProperties.horizontal_recoil_media +
-                          weaponProperties.vertical_recoil_media) * 2;
+            float range = (weapon.weaponProperties.horizontal_recoil_media + weapon.weaponProperties.vertical_recoil_media) * 2;
             currentRecoilZ = UnityEngine.Random.Range(-range, range);
             recoilResetVelocity = 0f;
         }
@@ -1019,8 +882,7 @@ public class PlayerController : MonoBehaviour
 
     private void TryInteractWithButton(Vector3 origin, Vector3 direction)
     {
-        RaycastHit hit;
-        if (Physics.Raycast(origin, direction, out hit, INTERACT_DISTANCE, LayerMask.GetMask("Interactives")))
+        if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, interactivesLayer))
         {
             Button button = hit.collider.GetComponent<Button>();
             button?.Interact();
@@ -1029,11 +891,10 @@ public class PlayerController : MonoBehaviour
 
     private void TryInteractWithVehicle(Vector3 origin, Vector3 direction)
     {
-        RaycastHit hit;
-        if (Physics.Raycast(origin, direction, out hit, INTERACT_DISTANCE, LayerMask.GetMask("Vehicle")))
+        if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, vehicleLayer))
         {
-            Vehicle vehicle = hit.collider.GetComponent<Vehicle>() ??
-                             hit.collider.GetComponentInParent<Vehicle>();
+            Vehicle vehicle = hit.collider.GetComponent<Vehicle>() ?? hit.collider.GetComponentInParent<Vehicle>();
+            
             if (vehicle != null)
             {
                 if (playerProperties.selected_class != ClassManager.Class.Pilot)
@@ -1042,138 +903,181 @@ public class PlayerController : MonoBehaviour
                     return;
                 }
 
-                DisableNightVision();
+                if (is_night_vision_active)
+                {
+                    is_night_vision_active = false;
+                    if (nightVision_filmGrain != null) nightVision_filmGrain.active = false;
+                    if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = false;
+                    if (nightVision_vignette != null) nightVision_vignette.active = false;
+                }
+
                 playerProperties.is_reloading = false;
                 weapon.can_shoot = true;
-
                 weapon.weaponProperties.weapon.transform.localPosition = weapon.weaponProperties.initial_potiion;
                 weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.inicial_rotation;
                 weapon.weaponAnimation.FinishReloadAnimation();
-                DisableColliders();
+
                 HideOwnerItems(false);
-                vehicle.EnterVehicle(gameObject);
+
+                if (gameObject == null || !gameObject.activeSelf) return;
+
+                playerProperties.is_in_vehicle = true;
+                RequestEnterVehicle(vehicle, gameObject);
             }
         }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestEnterVehicle(Vehicle vehicle, GameObject player)
+    {
+        if (vehicle == null || player == null || !vehicle.IsSpawned || !player.activeInHierarchy) return;
+
+        vehicle.NetworkObject.GiveOwnership(Owner);
+        vehicle.EnterVehicle(Owner, player);
     }
 
     #endregion
 
     #region State Management
 
-    private void UpdateColliderState()
+    private void UpdateSyncVars()
     {
-        if (playerProperties.is_dead)
-        {
-            DisableColliders();
-            return;
-        }
+        // Otimização: Só atualiza a SyncVar se o valor realmente mudou para reduzir o uso da rede
+        if (is_dead.Value != playerProperties.is_dead.Value) is_dead.Value = playerProperties.is_dead.Value;
+        if (is_in_vehicle.Value != playerProperties.is_in_vehicle) is_in_vehicle.Value = playerProperties.is_in_vehicle;
+        if (is_proned.Value != playerProperties.is_proned) is_proned.Value = playerProperties.is_proned;
+        if (crouched.Value != playerProperties.crouched) crouched.Value = playerProperties.crouched;
+        if (roll.Value != playerProperties.roll) roll.Value = playerProperties.roll;
+    }
 
-        if (playerProperties.is_proned)
-        {
-            EnableProneCollider();
-        }
-        else if (playerProperties.crouched || playerProperties.roll)
-        {
-            EnableCrouchCollider();
-        }
-        else
-        {
-            EnableStandCollider();
-        }
+    [ServerRpc]
+    private void UpdateColliderStateServer(bool isDead, bool isInVehicle, bool isProned, bool isCrouched, bool isRolling)
+    {
+        if (isDead || isInVehicle) DisableColliders();
+        else if (isProned) EnableProneCollider();
+        else if (isCrouched || isRolling) EnableCrouchCollider();
+        else EnableStandCollider();
+    }
+
+    private void UpdateColliderStateLocal()
+    {
+        if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle) DisableColliders();
+        else if (playerProperties.is_proned) EnableProneCollider();
+        else if (playerProperties.crouched || playerProperties.roll) EnableCrouchCollider();
+        else EnableStandCollider();
     }
 
     private void EnableStandCollider()
     {
-        stand_collider.enabled = true;
-        prone_collider.enabled = false;
-        crouch_collider.enabled = false;
+        if (!stand_collider.enabled) stand_collider.enabled = true;
+        if (prone_collider.enabled) prone_collider.enabled = false;
+        if (crouch_collider.enabled) crouch_collider.enabled = false;
     }
 
     private void EnableCrouchCollider()
     {
-        stand_collider.enabled = false;
-        prone_collider.enabled = false;
-        crouch_collider.enabled = true;
+        if (stand_collider.enabled) stand_collider.enabled = false;
+        if (prone_collider.enabled) prone_collider.enabled = false;
+        if (!crouch_collider.enabled) crouch_collider.enabled = true;
     }
 
     private void EnableProneCollider()
     {
-        stand_collider.enabled = false;
-        prone_collider.enabled = true;
-        crouch_collider.enabled = false;
+        if (stand_collider.enabled) stand_collider.enabled = false;
+        if (!prone_collider.enabled) prone_collider.enabled = true;
+        if (crouch_collider.enabled) crouch_collider.enabled = false;
     }
 
     public void DisableColliders()
     {
-        stand_collider.enabled = false;
-        prone_collider.enabled = false;
-        crouch_collider.enabled = false;
+        if (stand_collider.enabled) stand_collider.enabled = false;
+        if (prone_collider.enabled) prone_collider.enabled = false;
+        if (crouch_collider.enabled) crouch_collider.enabled = false;
     }
 
     private void DisableDeathCollier()
     {
-        deah_collider.enabled = false;
+        if (deah_collider.enabled) deah_collider.enabled = false;
     }
 
     private void EnableDeathCollier()
     {
         DisableColliders();
-        deah_collider.enabled = true;
+        if (!deah_collider.enabled) deah_collider.enabled = true;
+    }
+
+    [Client]
+    public void SetCollidersState(bool enabled)
+    {
+        if (stand_collider != null) stand_collider.enabled = enabled;
+        if (crouch_collider != null) crouch_collider.enabled = enabled;
+        if (prone_collider != null) prone_collider.enabled = enabled;
+
+        if (deah_collider != null && !enabled)
+        {
+            deah_collider.enabled = false;
+        }
     }
 
     private void HandleDeathState()
     {
-        soldierHudManager.deadPlayerHud.gameObject.SetActive(true);
+        if (!soldierHudManager.deadPlayerHud.gameObject.activeSelf) soldierHudManager.deadPlayerHud.gameObject.SetActive(true);
+
         HandleMecidProximity();
         death_timer += Time.deltaTime;
 
         float deathProgress = Mathf.Clamp01(death_timer / playerProperties.death_timer);
 
         if (deathProgress >= 1)
-        {   
+        {
             AccountManager.Instance.status.AddDeath();
             AccountManager.Instance.RemoveBattleCoin(10);
+            PlayerSpawnManager.Instance.GetPlayerSpawnController().Reestart();
 
-            nightVision_vignette.intensity.value = 0;
-            Destroy(gameObject);
+            if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
+            
+            if (IsSpawned) RequestDespawn();
+            else Destroy(gameObject);
+
             return;
         }
 
         if (nightVision_vignette != null)
         {
-            float maxVignetteIntensity = 1;
-            nightVision_vignette.intensity.value = deathProgress * maxVignetteIntensity;
+            nightVision_vignette.intensity.value = deathProgress;
         }
 
         HideOwnerItems(false);
 
         Quaternion targetRotation = new Quaternion(0, 0, 0, playerHead.transform.localRotation.w);
-        playerHead.transform.localRotation = Quaternion.Lerp(
-            playerHead.transform.localRotation,
-            targetRotation,
-            Time.deltaTime * 2
-        );
+        playerHead.transform.localRotation = Quaternion.Lerp(playerHead.transform.localRotation, targetRotation, Time.deltaTime * 2);
+    }
+
+    [ServerRpc(RequireOwnership = true)]
+    private void RequestDespawn()
+    {
+        Despawn(gameObject);
     }
 
     private void HandleMecidProximity()
     {
-        Collider[] colliders = Physics.OverlapSphere(transform.position, 50, LayerMask.NameToLayer("Player"));
+        // Otimização: Uso de NonAlloc para evitar geração excessiva de lixo no GC a cada frame
+        int hitCount = Physics.OverlapSphereNonAlloc(transform.position, 50f, medicCollidersCache, playerLayer);
 
-        List<PlayerInfo> jogadoresDetectados = new List<PlayerInfo>();
+        List<PlayerInfo> jogadoresDetectados = new List<PlayerInfo>(hitCount);
 
-        foreach (Collider col in colliders)
+        for (int i = 0; i < hitCount; i++)
         {
-            PlayerProperties p = col.GetComponent<PlayerProperties>();
+            PlayerProperties p = medicCollidersCache[i].GetComponent<PlayerProperties>();
 
-            if (p.selected_class == ClassManager.Class.Medic)
+            if (p != null && p.selected_class == ClassManager.Class.Medic)
             {
-                float distancia = Vector3.Distance(transform.position, col.transform.position);
-                jogadoresDetectados.Add(new PlayerInfo(col.gameObject, p.player_name, distancia));
+                float distancia = Vector3.Distance(transform.position, medicCollidersCache[i].transform.position);
+                jogadoresDetectados.Add(new PlayerInfo(medicCollidersCache[i].gameObject, p.player_name, distancia));
             }
         }
 
         jogadoresDetectados.Sort((a, b) => a.distance.CompareTo(b.distance));
-
         soldierHudManager.deadPlayerHud.UpdateCloseMedics(jogadoresDetectados);
     }
 
@@ -1197,79 +1101,28 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, 50);
     }
 
-    private float altitude;
-
-    private void UpdateGroundCheck()
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdUpdateServerHP(float hp)
     {
-        bool is_holding_roll = Input.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
-
-        Vector3 rayOrigin = transform.position + Vector3.up;
-
-        grounded = Physics.SphereCast(
-            rayOrigin,
-            stand_collider.radius,
-            Vector3.down,
-            out RaycastHit hitInfo,
-            ground_detection_raycastDistance,
-            groundLayer
-        );
-
-        playerProperties.isGrounded = grounded;
-
-        if (wasGroundedLastFrame && !grounded)
-        {
-            altitude = transform.position.y;
-        }
-
-        if (!wasGroundedLastFrame && grounded)
-        {
-            footstepSound.PlayStepSound();
-            float fall_damage = HandleFallDamage();
-
-            if (is_holding_roll && fall_damage > 0)
-            {
-                fall_damage /= 2;
-                ExecuteRoll();
-            }
-
-            if (fall_damage != 0) Damage(fall_damage);
-            cameraShake.RequestShake(CameraShake.ShakeType.Jump, 2);
-        }
-
-        wasGroundedLastFrame = grounded;
+        playerProperties.hp.Value = hp;
     }
 
-    private float HandleFallDamage()
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdUpdateServerIsDead(bool is_dead)
     {
-        float distance = altitude - transform.position.y;
-
-        if (distance < 10) return 0;
-
-        return distance * 2;
-    }
-
-    private bool OnSlope()
-    {
-        if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
-        {
-            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
-            return angle < maxSlopeAngle && angle != 0;
-        }
-
-        return false;
-    }
-
-    private Vector3 GetSlopeMoveDirection()
-    {
-        return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
+        playerProperties.is_dead.Value = is_dead;
     }
 
     #endregion
 
     #region Public Methods
 
-    public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed,
-                                       float resetRecoilSpeed)
+    public float GetDamageDealt()
+    {
+        return damage_dealt;
+    }
+
+    public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
     {
         this.applyRecoilSpeed = applyRecoilSpeed;
         this.resetRecoilSpeed = resetRecoilSpeed;
@@ -1280,32 +1133,45 @@ public class PlayerController : MonoBehaviour
         UpdateMovementSpeed();
     }
 
-    public float Damage(float damage)
+    public void RequestDamage(float rawDamage, string player_who_dealt_damage = null)
     {
-        float dmg = damage * ((100f - playerProperties.resistance) / 100f);
-        playerProperties.hp -= dmg;
-
-        cameraShake.RequestShake(CameraShake.ShakeType.Damage, dmg, 0.3f);
-        if (dmg > 40) soldierHudManager.screenBlood.TriggerBlood();
-        soldierHudManager.soldierHudHpManager.UpdateHp();
-
-        if (playerProperties.hp <= 0)
-        {
-            playerProperties.hp = 0;
-            playerProperties.is_dead = true;
-            if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
-            EnableDeathCollier();
-        }
-
-
-        return dmg;
+        if (playerProperties.is_dead.Value) return;
+        CmdApplyDamage(rawDamage);
     }
 
-    private Coroutine current_DealDamageOverTime;
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdApplyDamage(float rawDamage)
+    {
+        TargetReceiveDamage(Owner, rawDamage);
+    }
+
+    [TargetRpc]
+    private void TargetReceiveDamage(NetworkConnection conn, float dmg)
+    {
+        damage_dealt = dmg * ((100f - playerProperties.resistance.Value) / 100f);
+        playerProperties.hp.Value -= damage_dealt;
+
+        CmdUpdateServerHP(playerProperties.hp.Value);
+
+        cameraShake.RequestShake(CameraShake.ShakeType.Damage, damage_dealt, 0.3f);
+        if (damage_dealt > 40) soldierHudManager.screenBlood.TriggerBlood();
+        soldierHudManager.soldierHudHpManager.UpdateHp();
+
+        if (playerProperties.hp.Value <= 0)
+        {
+            playerProperties.hp.Value = 0;
+            playerProperties.is_dead.Value = true;
+            
+            CmdUpdateServerHP(0);
+            CmdUpdateServerIsDead(true);
+            EnableDeathCollier();
+        }
+    }
 
     public void DamageOverTime(float damage, float duration, float damage_rate)
     {
-        if (current_DealDamageOverTime != null) current_DealDamageOverTime = StartCoroutine(DealDamageOverTime(damage, duration, damage_rate));
+        if (current_DealDamageOverTime != null) return;
+        current_DealDamageOverTime = StartCoroutine(DealDamageOverTime(damage, duration, damage_rate));
     }
 
     private IEnumerator DealDamageOverTime(float damage, float duration, float damage_rate)
@@ -1320,7 +1186,7 @@ public class PlayerController : MonoBehaviour
 
             if (damage_timer >= damage_rate)
             {
-                Damage(damage);
+                RequestDamage(damage);
                 damage_timer = 0;
             }
 
@@ -1331,10 +1197,15 @@ public class PlayerController : MonoBehaviour
 
     public void Revive()
     {
+        CmdUpdateServerHP(100);
+        CmdUpdateServerIsDead(false);
         HideOwnerItems(true);
+        
         if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
-        playerProperties.is_dead = false;
-        playerProperties.hp = 100;
+        
+        playerProperties.is_dead.Value = false;
+        playerProperties.hp.Value = 100;
+        
         soldierHudManager.soldierHudHpManager.UpdateHp();
         transform.rotation = new Quaternion(transform.rotation.z, transform.rotation.y, 0, transform.rotation.w);
         DisableDeathCollier();
@@ -1342,39 +1213,47 @@ public class PlayerController : MonoBehaviour
 
     public void Regenerate(float hp)
     {
-        playerProperties.hp += hp;
-        if (playerProperties.hp > playerProperties.max_hp)
+        playerProperties.hp.Value += hp;
+        if (playerProperties.hp.Value > playerProperties.max_hp)
         {
-            playerProperties.hp = playerProperties.max_hp;
+            playerProperties.hp.Value = playerProperties.max_hp;
         }
         soldierHudManager.soldierHudHpManager.UpdateHp();
     }
 
+    [Client]
     public void HideOwnerItems(bool hide)
     {
+        if (!IsOwner)
+        {
+            thirdPersonWeapon.ShowWeapon();
+            return;
+        }
+
         foreach (MeshRenderer item in hideToOwnerItems)
         {
             if (item != null)
             {
-                if (!hide)
-                {
-                    item.shadowCastingMode = ShadowCastingMode.On;
-                }
-                else
-                {
-                    item.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-                }
+                item.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
             }
         }
 
-        if (!hide)
-        {
-            thirdPersonWeapon.ShowWeapon();
-        }
-        else
-        {
-            thirdPersonWeapon.HideWeapon();
-        }
+        if (!hide) thirdPersonWeapon.ShowWeapon();
+        else thirdPersonWeapon.HideWeapon();
+    }
+
+    public float GetHp() => playerProperties.hp.Value;
+    public float GetResistance() => playerProperties.resistance.Value;
+    public bool IsPlayerDead() => is_dead.Value;
+
+    public FactionManager.Faction GetFaction() 
+    {
+        return playerProperties.faction.Value;
+    }
+
+    public Transform GetSpotPosition() 
+    {
+        return spot_position;
     }
 
     #endregion

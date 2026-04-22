@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using FishNet;
+using FishNet.Object;
 using TMPro;
 using UnityEngine;
 
-public class MissileController : MonoBehaviour
+public abstract class MissileController : MonoBehaviour
 {
     [SerializeField] protected TextMeshProUGUI rockets_left_hud;
     public Sprite image_hud;
@@ -44,6 +46,7 @@ public class MissileController : MonoBehaviour
         {
             GameObject currentItem;
             currentItem = Instantiate(missile, spawnPoint);
+            //InstanceFinder.NetworkManager.ServerManager.Spawn(currentItem.GetComponent<NetworkObject>());
             currentItem.GetComponent<Rigidbody>().isKinematic = true;
             //currentItem.GetComponent<NetworkObject>().Spawn();
 

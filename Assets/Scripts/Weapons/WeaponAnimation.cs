@@ -1,12 +1,11 @@
-using System;
 using UnityEngine;
 
 public class WeaponAnimation : MonoBehaviour
 {
 
     [Header("Hand Positions")]
-    [SerializeField] private GameObject left_hand;
-    [SerializeField] private GameObject right_hand;
+    public GameObject left_hand;
+    public GameObject right_hand;
     [HideInInspector] public AnimationClip fireClip;
     private AnimationClip reloadClip;
 
@@ -21,22 +20,9 @@ public class WeaponAnimation : MonoBehaviour
 
     bool restarted;
 
-    void Start()
+    void Awake()
     {
         restarted = false;
-        SetHandsOnWeapon();
-    }
-
-    void SetHandsOnWeapon()
-    {
-        WeaponHolder[] weaponHolders = GetComponentsInChildren<WeaponHolder>(true);
-        foreach (WeaponHolder holder in weaponHolders)
-        {
-
-            holder.leftHand_origin = left_hand;
-            holder.rightHand_origin = right_hand;
-            //holder.prone_transition_position = prone_posiion;
-        }
     }
 
     void Update()
@@ -130,7 +116,6 @@ public class WeaponAnimation : MonoBehaviour
 
     public void FinishReloadAnimation()
     {
-
         anim.SetBool("Is_reloading", false);
     }
 
@@ -144,7 +129,6 @@ public class WeaponAnimation : MonoBehaviour
     private System.Collections.IEnumerator ExecuteFireAnimationDelayed()
     {
         yield return new WaitForSeconds(weaponProperties.delay_to_shoot_animation);
-
         anim.SetBool("Is_firing", true);
         is_in_fire_animation = true;
         elapsed = 0f;

@@ -1,12 +1,13 @@
 using System.Collections.Generic;
+using FishNet.Object;
 using UnityEngine;
 
 public class AudioDistanceController : MonoBehaviour
 {
     [Header("Growth Settings")]
-    public float initialGrowth = 1f;
+
     private float finalGrowth;
-    private float growthSpeed = 1000f;
+    private float growthSpeed = 2000f;
 
     [Header("Audio Settings")]
     private AudioSource audioSource;
@@ -29,12 +30,14 @@ public class AudioDistanceController : MonoBehaviour
     // Dicionário para rastrear qual som está tocando para cada objeto
     private Dictionary<GameObject, AudioClip> currentSoundForObject = new Dictionary<GameObject, AudioClip>();
 
-    void Start()
+    private float initialGrowth = 0;
+
+    void Awake()
     {
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
         {
-        
+
             audioSource = gameObject.AddComponent<AudioSource>();
         }
 

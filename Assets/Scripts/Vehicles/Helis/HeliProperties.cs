@@ -30,6 +30,8 @@ public class HeliProperties : MonoBehaviour
     public GameObject bullet_hit_effect;
 
     [Header("Cannon")]
+    public float infantary_damage;
+    public float vehicle_damage;
     public Transform bullefPref;
     public GameObject shootPos;
     public float spread;
@@ -38,7 +40,6 @@ public class HeliProperties : MonoBehaviour
     public float interval;
     public float zoom;
     public float overheat_time;
-    public float damage;
     public float damage_dropoff;
     public float damage_dropoff_timer;
     public float destruction_force;
