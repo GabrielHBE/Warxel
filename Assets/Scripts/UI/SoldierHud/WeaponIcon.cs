@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,13 +18,16 @@ public class WeaponIcon : MonoBehaviour
     [SerializeField] private Outline secondary_outline;
     [SerializeField] private Outline gadget1_outline;
     [SerializeField] private Outline gadget2_outline;
-    void Start()
+
+
+    public IEnumerator Initialize()
     {
+        yield return null;
+        
         if (switchWeapon.primary != null) primary_slot.sprite = switchWeapon.primary.GetComponent<WeaponProperties>().icon_hud;
         if (switchWeapon.secondary != null) secondary_slot.sprite = switchWeapon.secondary.GetComponent<WeaponProperties>().icon_hud;
-        if (switchWeapon.gadget1 != null ) gadget1_slot.sprite = switchWeapon.gadget1.GetComponent<Gadget>().icon_hud;
-        if (switchWeapon.gadget2 != null ) gadget2_slot.sprite = switchWeapon.gadget2.GetComponent<Gadget>().icon_hud;
-
+        if (switchWeapon.gadget1 != null) gadget1_slot.sprite = switchWeapon.gadget1.GetComponent<Gadget>().icon_hud;
+        if (switchWeapon.gadget2 != null) gadget2_slot.sprite = switchWeapon.gadget2.GetComponent<Gadget>().icon_hud;
     }
 
     void Update()

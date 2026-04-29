@@ -5,6 +5,7 @@ using System.Collections;
 using FishNet;
 using FishNet.Managing;
 using FishNet.Connection;
+using System.Drawing;
 
 public class PlayerSpawnController : NetworkBehaviour
 {
@@ -15,6 +16,7 @@ public class PlayerSpawnController : NetworkBehaviour
     [SerializeField] private float dragSpeed = 50f;
     [SerializeField] private Vector2 boundsX = new Vector2(-5000f, 5000f);
     [SerializeField] private Vector2 boundsZ = new Vector2(-5000f, 5000f);
+    [SerializeField] private GameObject canvas;
 
     [Header("Camera Settings")]
     public Camera spawn_camera;
@@ -31,6 +33,16 @@ public class PlayerSpawnController : NetworkBehaviour
     private bool isInitialized = false;
 
     private Transform map_spawn_camera_pos;
+    private CurrentSpawnType currentSpawnType;
+
+    private GameObject[] infantary_spawn_flags;
+    private GameObject[] vehicle_spawn_flags;
+
+    private enum CurrentSpawnType
+    {
+        Infantary,
+        Vehicle,
+    }
     public override void OnStartClient()
     {
         base.OnStartClient();
@@ -38,9 +50,16 @@ public class PlayerSpawnController : NetworkBehaviour
         map_spawn_camera_pos = GameObject.FindWithTag("SpawnCameraPos").transform;
         transform.position = map_spawn_camera_pos.position;
         transform.rotation = map_spawn_camera_pos.rotation;
+        currentSpawnType = CurrentSpawnType.Infantary;
 
         if (IsOwner)
         {
+            infantary_spawn_flags = GameObject.FindGameObjectsWithTag("InfantarySpawnFlags");
+            vehicle_spawn_flags = GameObject.FindGameObjectsWithTag("VehicleSpawnFlags");
+
+            ToggleFlagsVisibility(vehicle_spawn_flags, false);
+
+            spawn_camera.enabled = true;
             InitializeForOwner();
         }
         else
@@ -48,6 +67,8 @@ public class PlayerSpawnController : NetworkBehaviour
             InitializeForNonOwner();
         }
     }
+
+
 
     private void InitializeForOwner()
     {
@@ -70,13 +91,7 @@ public class PlayerSpawnController : NetworkBehaviour
 
     private void InitializeForNonOwner()
     {
-        // Desativa a câmera para não-owners
-        if (spawn_camera != null)
-        {
-            spawn_camera.enabled = false;
-            spawn_camera.GetComponent<AudioListener>().enabled = false;
-        }
-        enabled = false; // Desativa o Update para não-owners
+        gameObject.SetActive(false);
     }
 
     private IEnumerator InitializeInstance()
@@ -163,12 +178,10 @@ public class PlayerSpawnController : NetworkBehaviour
         }
     }
 
-    public void InitializeSpawnPlayer(Transform spawn_point)
+    public void InitializeSpawnVehicle(Vehicle vehicle, Transform spawn_point)
     {
         // Só permite spawn se for owner
         if (!IsOwner) return;
-
-        if (is_respawning) return;
 
         if (reespawn_delay > 0)
         {
@@ -176,19 +189,44 @@ public class PlayerSpawnController : NetworkBehaviour
             return;
         }
 
-        if (PlayerLoadoutCustomization.Instance.selected_primary == null)
+        DisableItens();
+
+        is_respawning = true;
+        StartCoroutine(SpawnSequence(spawn_point, CurrentSpawnType.Vehicle, vehicle));
+    }
+
+    public void InitializeSpawnPlayer(Transform spawn_point)
+    {
+        // Só permite spawn se for owner
+        if (!IsOwner) return;
+
+        if (reespawn_delay > 0)
         {
-            GeneralHudAlertMessages.Instance.CreateMessage("Select a primary gun to deploy");
+            GeneralHudAlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
             return;
         }
 
-        if (PlayerLoadoutCustomization.Instance != null)
-        {
-            PlayerLoadoutCustomization.Instance.gameObject.SetActive(false);
-        }
+        DisableItens();
 
         is_respawning = true;
-        StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
+        StartCoroutine(SpawnSequence(spawn_point, CurrentSpawnType.Infantary));
+    }
+
+    // Criamos essa Coroutine Mestre para gerenciar a ordem dos acontecimentos
+    private IEnumerator SpawnSequence(Transform spawn_point, CurrentSpawnType currentSpawnType, Vehicle vehicle = null)
+    {
+        if (currentSpawnType == CurrentSpawnType.Infantary)
+        {
+            yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
+            SpawnPlayer(spawn_point.position, spawn_point.rotation);
+        }
+        else
+        {
+            yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
+            SpawnPlayer(spawn_point.position, spawn_point.rotation);
+            SpawnVehicle(spawn_point.position, spawn_point.rotation, vehicle);
+        }
+
     }
 
     private IEnumerator TransitionCameraToSpawnPoint(Transform spawn_point)
@@ -216,8 +254,42 @@ public class PlayerSpawnController : NetworkBehaviour
         spawn_camera.transform.position = targetPosition;
         spawn_camera.transform.rotation = targetRotation;
 
-        // Passa posição e rotação em vez do Transform
-        SpawnPlayer(spawn_point.position, spawn_point.rotation);
+    }
+
+    [ServerRpc]
+    private void SpawnVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehicle)
+    {
+        NetworkManager manager = InstanceFinder.NetworkManager;
+
+        GameObject spawnedObject = Instantiate(vehicle.gameObject, spawnPosition, spawnRotation);
+        NetworkObject spawnedNetworkObject = spawnedObject.GetComponent<NetworkObject>();
+
+        manager.ServerManager.Spawn(spawnedNetworkObject, Owner);
+
+        var vehicleSpawed = spawnedObject.GetComponent<Vehicle>();
+        if (vehicleSpawed != null && vehicleSpawed.IsSpawned)
+        {
+            vehicleSpawed.Initialize();
+
+            // EM VEZ DE FORÇAR NO SERVIDOR, AVISAMOS O CLIENTE PARA ENTRAR
+            TargetEnterVehicle(Owner, vehicleSpawed);
+        }
+        else
+        {
+            Debug.LogError("Vehicle not properly spawned in network");
+        }
+    }
+
+    // Essa função é enviada do Servidor direto para a tela do Dono (Owner)
+    [TargetRpc]
+    private void TargetEnterVehicle(NetworkConnection conn, Vehicle spawnedVehicle)
+    {
+        if (player_instantiated != null)
+        {
+            // Agora sim, o código de interação roda na tela do jogador, 
+            // processando a UI corretamente e chamando o servidor no final!
+            player_instantiated.GetComponent<PlayerController>().InteractWithVehicle(spawnedVehicle);
+        }
     }
 
     [ServerRpc]
@@ -233,17 +305,13 @@ public class PlayerSpawnController : NetworkBehaviour
 
         player_instantiated = spawnedObject;
 
-
-
         // NOTIFICA APENAS O OWNER usando TargetRpc
-        TargetOnSpawnComplete(Owner, spawnedNetworkObject.gameObject);
-
+        TargetOnSpawnPlayerComplete(Owner, spawnedNetworkObject.gameObject);
 
     }
 
-
     [TargetRpc]
-    private void TargetOnSpawnComplete(NetworkConnection conn, GameObject spawnedPlayer)
+    private void TargetOnSpawnPlayerComplete(NetworkConnection conn, GameObject spawnedPlayer)
     {
         // Este método só executa no cliente alvo (o owner)
         // O parâmetro conn é o NetworkConnection do cliente alvo
@@ -266,7 +334,7 @@ public class PlayerSpawnController : NetworkBehaviour
 
         if (playerController != null)
         {
-            playerController.GetComponent<PlayerProperties>().player_name = AccountManager.Instance.account_name;
+            playerController.GetComponent<PlayerProperties>().player_name.Value = AccountManager.Instance.account_name;
             WeaponProperties[] weaponProperties = player_instantiated.GetComponentsInChildren<WeaponProperties>(true);
             foreach (WeaponProperties wp in weaponProperties)
             {
@@ -280,6 +348,42 @@ public class PlayerSpawnController : NetworkBehaviour
         {
             spawn_camera.enabled = false;
             spawn_camera.GetComponent<AudioListener>().enabled = false;
+        }
+    }
+
+    private void DisableItens()
+    {
+        if (is_respawning) return;
+
+        if (reespawn_delay > 0)
+        {
+            GeneralHudAlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
+            return;
+        }
+
+        if (PlayerLoadoutCustomization.Instance.selected_primary == null)
+        {
+            GeneralHudAlertMessages.Instance.CreateMessage("Select a primary gun to deploy");
+            return;
+        }
+
+        if (PlayerLoadoutCustomization.Instance != null)
+        {
+            PlayerLoadoutCustomization.Instance.gameObject.SetActive(false);
+        }
+
+        if (VehicleLoadoutCustomization.Instance != null)
+        {
+            VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
+        }
+
+        if (canvas != null)
+        {
+            canvas.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("Falha crítica: Canvas não encontrado no Cliente!");
         }
     }
 
@@ -299,5 +403,90 @@ public class PlayerSpawnController : NetworkBehaviour
         {
             PlayerLoadoutCustomization.Instance.gameObject.SetActive(true);
         }
+
+        if (canvas != null)
+        {
+            canvas.SetActive(true);
+        }
     }
+    private Coroutine fov_transition_coroutine;
+    public void EnablePlayerCustomization()
+    {
+        if (!IsOwner) return; // Proteção para rodar apenas localmente
+
+        ToggleFlagsVisibility(vehicle_spawn_flags, false);
+        ToggleFlagsVisibility(infantary_spawn_flags, true);
+
+        PlayerLoadoutCustomization.Instance.gameObject.SetActive(true);
+        VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
+
+        currentSpawnType = CurrentSpawnType.Infantary;
+
+        if (fov_transition_coroutine != null) StopCoroutine(fov_transition_coroutine);
+
+        fov_transition_coroutine = StartCoroutine(CameraFOVChange(80));
+    }
+
+    public void EnableVehicleCustomization()
+    {
+        if (!IsOwner) return; // Proteção para rodar apenas localmente
+
+        ToggleFlagsVisibility(vehicle_spawn_flags, true);
+        ToggleFlagsVisibility(infantary_spawn_flags, false);
+
+        PlayerLoadoutCustomization.Instance.gameObject.SetActive(false);
+        VehicleLoadoutCustomization.Instance.gameObject.SetActive(true);
+
+        currentSpawnType = CurrentSpawnType.Vehicle;
+
+        if (fov_transition_coroutine != null) StopCoroutine(fov_transition_coroutine);
+
+        fov_transition_coroutine = StartCoroutine(CameraFOVChange(120));
+    }
+
+    // A função corrigida que não usa SetActive no GameObject principal
+    private void ToggleFlagsVisibility(GameObject[] flags, bool state)
+    {
+        if (flags == null) return;
+
+        foreach (GameObject flag in flags)
+        {
+            if (flag == null) continue;
+
+            // Liga/Desliga apenas a malha 3D (para esconder visualmente)
+            UnityEngine.UI.Image[] images = flag.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            foreach (UnityEngine.UI.Image i in images)
+            {
+                i.enabled = state;
+            }
+
+            // Liga/Desliga a colisão (para não permitir o clique)
+            Collider[] colliders = flag.GetComponentsInChildren<Collider>(true);
+            foreach (Collider c in colliders)
+            {
+                c.enabled = state;
+            }
+        }
+    }
+
+    private IEnumerator CameraFOVChange(float targetFov)
+    {
+        float timer = 0f;
+        float duration = 1f;
+        float startFov = spawn_camera.fieldOfView;
+
+        while (timer < duration)
+        {
+            timer += Time.deltaTime;
+
+            float t = transitionCurve.Evaluate(timer / duration);
+            spawn_camera.fieldOfView = Mathf.Lerp(startFov, targetFov, t);
+
+            yield return null;
+        }
+        spawn_camera.fieldOfView = targetFov;
+
+        fov_transition_coroutine = null;
+    }
+
 }

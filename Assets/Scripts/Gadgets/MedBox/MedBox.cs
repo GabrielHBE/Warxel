@@ -31,9 +31,9 @@ public class MedBox : Gadget
     private SwitchWeapon switchWeapon;
 
 
-    void Awake()
+    protected override void  Awake()
     {
-
+        base.Awake();
         rb.isKinematic = true;
         playerController = GetComponentInParent<PlayerController>();
         switchWeapon = gameObject.GetComponentInParent<SwitchWeapon>();

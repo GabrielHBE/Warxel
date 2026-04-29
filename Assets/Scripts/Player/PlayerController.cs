@@ -65,6 +65,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
     public LayerMask groundLayer;
 
     [Header("Private References")]
+    [SerializeField] private WeaponIcon weaponIcon;
     [SerializeField] private float footstepSound_interval = 0.45f;
     [SerializeField] private CameraShake cameraShake;
     [SerializeField] private FootstepSound footstepSound;
@@ -138,7 +139,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
     private int interactivesLayer;
     private int vehicleLayer;
     private int playerLayer;
-    
+
     // Performance: Array cache para Physics.OverlapSphereNonAlloc
     private Collider[] medicCollidersCache = new Collider[6];
     private Coroutine current_DealDamageOverTime;
@@ -243,16 +244,17 @@ public class PlayerController : NetworkBehaviour, ISspottable
     [Client]
     public void ConfigureOwner()
     {
+
         Instance = this;
         HideOwnerItems(true);
-        
+
         playerAnimation.can_update_animation = true;
         playerCamera.enabled = true;
         playerCamera.GetComponent<AudioListener>().enabled = true;
         soldierHudManager.hud.gameObject.SetActive(true);
         fist_person.SetActive(true);
         enabled = true;
-        
+
         playerProperties.faction.Value = AccountManager.Instance.faction;
         playerProperties.selected_class = AccountManager.Instance.selected_class;
 
@@ -264,7 +266,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
         camera_audio.enabled = true;
         footstepSound_interval = footstepSound_interval <= 0 ? 0.45f : footstepSound_interval;
         original_footstepSound_interval = footstepSound_interval;
-        
+
         colliders_difference = stand_collider.height - crouch_collider.height;
         original_sprint_speed = sprintSpeed;
         original_walk_speed = walkSpeed;
@@ -278,8 +280,10 @@ public class PlayerController : NetworkBehaviour, ISspottable
         SetupPhysics();
         playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
         InitializeVolume();
-        
+
         readyToJump = true;
+
+        StartCoroutine(weaponIcon.Initialize());
     }
 
     private void SetupPhysics()
@@ -367,7 +371,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     private void HandleJumpInput()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded && 
+        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded &&
             !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
         {
             readyToJump = false;
@@ -458,7 +462,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
         if (playerProperties.is_proned)
         {
             if (playerProperties.sprinting) ApplyProneTransitionImpulse();
-            
+
             playerProperties.sprinting = false;
             playerProperties.crouched = false;
         }
@@ -619,7 +623,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     private void ApplyWindPhysics()
     {
-        if (WeatherStateManager.Instance != null && 
+        if (WeatherStateManager.Instance != null &&
             WeatherStateManager.Instance.ActiveWeatherType.Value == WeatherStateManager.WeatherType.Hurricane)
         {
             rb.AddForce(Vector3.forward.normalized * 15f * rb.mass, ForceMode.Force);
@@ -744,7 +748,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
         if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision))
         {
             is_night_vision_active = !is_night_vision_active;
-            
+
             if (nightVision_filmGrain != null) nightVision_filmGrain.active = is_night_vision_active;
             if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = is_night_vision_active;
             if (nightVision_vignette != null) nightVision_vignette.active = is_night_vision_active;
@@ -779,8 +783,8 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     private void UpdateMouseSensitivity()
     {
-        currentMouseSensitivity = playerProperties.is_aiming ? 
-            Settings.Instance._controls.infantary_aim_sensibility : 
+        currentMouseSensitivity = playerProperties.is_aiming ?
+            Settings.Instance._controls.infantary_aim_sensibility :
             Settings.Instance._controls.infantary_sensibility;
     }
 
@@ -819,7 +823,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
     private void ApplyCameraRotation()
     {
         currentRecoilZ = Mathf.SmoothDamp(currentRecoilZ, targetRecoilZ, ref recoilZVelocity, applyRecoilSpeed);
-        
+
         playerCamera.transform.localEulerAngles = new Vector3(verticalRotation, 0, currentRecoilZ);
         UpdateHeadRotation();
     }
@@ -894,7 +898,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
         if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, vehicleLayer))
         {
             Vehicle vehicle = hit.collider.GetComponent<Vehicle>() ?? hit.collider.GetComponentInParent<Vehicle>();
-            
+
             if (vehicle != null)
             {
                 if (playerProperties.selected_class != ClassManager.Class.Pilot)
@@ -903,28 +907,40 @@ public class PlayerController : NetworkBehaviour, ISspottable
                     return;
                 }
 
-                if (is_night_vision_active)
-                {
-                    is_night_vision_active = false;
-                    if (nightVision_filmGrain != null) nightVision_filmGrain.active = false;
-                    if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = false;
-                    if (nightVision_vignette != null) nightVision_vignette.active = false;
-                }
-
-                playerProperties.is_reloading = false;
-                weapon.can_shoot = true;
-                weapon.weaponProperties.weapon.transform.localPosition = weapon.weaponProperties.initial_potiion;
-                weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.inicial_rotation;
-                weapon.weaponAnimation.FinishReloadAnimation();
-
-                HideOwnerItems(false);
-
-                if (gameObject == null || !gameObject.activeSelf) return;
-
-                playerProperties.is_in_vehicle = true;
-                RequestEnterVehicle(vehicle, gameObject);
+                InteractWithVehicle(vehicle);
             }
         }
+    }
+
+    public void InteractWithVehicle(Vehicle vehicle)
+    {
+        if (is_night_vision_active)
+        {
+            is_night_vision_active = false;
+            if (nightVision_filmGrain != null) nightVision_filmGrain.active = false;
+            if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = false;
+            if (nightVision_vignette != null) nightVision_vignette.active = false;
+        }
+
+        playerProperties.is_reloading = false;
+
+        rb.isKinematic = true;
+        rb.interpolation = RigidbodyInterpolation.None;
+        if (weapon.weaponProperties != null)
+        {
+            weapon.can_shoot = true;
+            weapon.weaponProperties.weapon.transform.localPosition = weapon.weaponProperties.initial_potiion;
+            weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.inicial_rotation;
+            weapon.weaponAnimation.FinishReloadAnimation();
+
+        }
+
+        HideOwnerItems(false);
+
+        if (gameObject == null || !gameObject.activeSelf) return;
+
+        playerProperties.is_in_vehicle = true;
+        RequestEnterVehicle(vehicle, gameObject);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -1035,7 +1051,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
             PlayerSpawnManager.Instance.GetPlayerSpawnController().Reestart();
 
             if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
-            
+
             if (IsSpawned) RequestDespawn();
             else Destroy(gameObject);
 
@@ -1073,7 +1089,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
             if (p != null && p.selected_class == ClassManager.Class.Medic)
             {
                 float distancia = Vector3.Distance(transform.position, medicCollidersCache[i].transform.position);
-                jogadoresDetectados.Add(new PlayerInfo(medicCollidersCache[i].gameObject, p.player_name, distancia));
+                jogadoresDetectados.Add(new PlayerInfo(medicCollidersCache[i].gameObject, p.player_name.Value, distancia));
             }
         }
 
@@ -1159,9 +1175,10 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
         if (playerProperties.hp.Value <= 0)
         {
+            if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
             playerProperties.hp.Value = 0;
             playerProperties.is_dead.Value = true;
-            
+
             CmdUpdateServerHP(0);
             CmdUpdateServerIsDead(true);
             EnableDeathCollier();
@@ -1200,12 +1217,12 @@ public class PlayerController : NetworkBehaviour, ISspottable
         CmdUpdateServerHP(100);
         CmdUpdateServerIsDead(false);
         HideOwnerItems(true);
-        
+
         if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
-        
+
         playerProperties.is_dead.Value = false;
         playerProperties.hp.Value = 100;
-        
+
         soldierHudManager.soldierHudHpManager.UpdateHp();
         transform.rotation = new Quaternion(transform.rotation.z, transform.rotation.y, 0, transform.rotation.w);
         DisableDeathCollier();
@@ -1246,12 +1263,12 @@ public class PlayerController : NetworkBehaviour, ISspottable
     public float GetResistance() => playerProperties.resistance.Value;
     public bool IsPlayerDead() => is_dead.Value;
 
-    public FactionManager.Faction GetFaction() 
+    public FactionManager.Faction GetFaction()
     {
         return playerProperties.faction.Value;
     }
 
-    public Transform GetSpotPosition() 
+    public Transform GetSpotPosition()
     {
         return spot_position;
     }

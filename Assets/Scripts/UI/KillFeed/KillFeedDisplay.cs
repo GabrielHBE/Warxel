@@ -10,7 +10,7 @@ public class KillFeedDisplay : NetworkBehaviour
     [SerializeField] private TextMeshProUGUI kill_feed_container_text;
     private List<string> killfeed_list = new List<string>();
 
-    private float timer_to_delete_itens = 1;
+    private float timer_to_delete_itens = 2;
     private float timer;
     private StringBuilder sb = new StringBuilder();
 
@@ -20,7 +20,6 @@ public class KillFeedDisplay : NetworkBehaviour
         Instance = this;
     }
 
-    [Server]
     void Update()
     {
         if (!IsServerInitialized) return;

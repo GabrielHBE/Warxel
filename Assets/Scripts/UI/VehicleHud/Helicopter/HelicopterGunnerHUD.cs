@@ -26,7 +26,7 @@ public class HelicopterGunnerHUD : MonoBehaviour
 
     void Update()
     {
-        float heatPercent = helicopter.overheat / heliProperties.overheat_time;
+        float heatPercent = helicopter.overheat / helicopter.gunner_gun_properties.overheat_time;
         heatPercent = Mathf.Clamp01(heatPercent);
 
         // Atualiza o tamanho da barra

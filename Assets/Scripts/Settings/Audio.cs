@@ -29,7 +29,7 @@ public class Audio : MonoBehaviour
     public bool enable_deth_voip;
     public List<string> in_world_voip_modes = new List<string> { "Off", "Push", "Enabled" };
     public List<string> radio_world_voip_modes = new List<string> { "Off", "Push", "Enabled" };
-    public KeyCode in_world_voip_key;
+    public KeyCode in_world_voip_key = KeyCode.V;
     public KeyCode radio_voip_key;
 
 

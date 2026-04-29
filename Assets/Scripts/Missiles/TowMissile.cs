@@ -1,14 +1,14 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class TowMissile : Missiles
 {
     [SerializeField] private float turnSpeed = 5f;
 
-    private Transform cameraTransform;
+    private TowMissileController controller; // Referência segura de rede
 
     protected override void Update()
     {
-
         if (parent_gameobject == null || !parent_gameobject.gameObject.activeSelf) Explode(transform.position);
         if (!didShoot) return;
         DestroyTimer();
@@ -16,26 +16,36 @@ public class TowMissile : Missiles
         // movimento continua na direção ATUAL do míssil
         transform.position += transform.forward * travel_speed * Time.deltaTime;
 
-        // direção desejada (câmera)
-        Vector3 foward = cameraTransform.forward;
+        // Verifica se o controller e a câmera existem antes de seguir
+        if (controller != null && controller.camera_transform != null)
+        {
+            // direção desejada (câmera)
+            Vector3 foward = controller.camera_transform.forward;
 
-        // suavização (delay real)
-        transform.forward = Vector3.Slerp(
-            transform.forward,
-            foward,
-            turnSpeed * Time.deltaTime
-        );
+            // suavização (delay real)
+            transform.forward = Vector3.Slerp(
+                transform.forward,
+                foward,
+                turnSpeed * Time.deltaTime
+            );
+        }
     }
 
-    public void Shoot(Transform cameraTransform)
+    [ServerRpc(RequireOwnership = false)]
+    public void Shoot(TowMissileController shooterController)
     {
-        trail.gameObject.SetActive(true);
+        CmndShoot(shooterController);
 
-        this.cameraTransform = cameraTransform;
+    }
+
+    [ObserversRpc]
+    private void CmndShoot(TowMissileController shooterController)
+    {
+        controller = shooterController;
         didShoot = true;
 
-        //transform.position = cameraTransform.position;
-        transform.forward = cameraTransform.forward;
+        if (controller != null && controller.camera_transform != null)
+            transform.forward = controller.camera_transform.forward;
 
         CreateSound(shoot_sound);
         missile_collider.enabled = true;
@@ -48,6 +58,6 @@ public class TowMissile : Missiles
             rb.useGravity = false;
         }
 
-
+        trail.gameObject.SetActive(true);
     }
 }

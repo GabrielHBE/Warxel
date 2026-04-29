@@ -21,6 +21,7 @@ public class VehicleLockInMissileController : MissileController
 
 
     float raycast_radius = 1f;
+    /*
 
     protected override void Start()
     {
@@ -130,5 +131,6 @@ public class VehicleLockInMissileController : MissileController
 
         is_shooting = false;
     }
+    */
 
 }

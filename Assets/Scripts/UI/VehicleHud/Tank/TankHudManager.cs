@@ -53,7 +53,7 @@ public class TankHudManager : VehicleHudManager
 
     public void UpdateHeat(float overheat)
     {
-        float heatPercent = Mathf.Clamp01(overheat / tankProperties.overheat_time);
+        float heatPercent = Mathf.Clamp01(overheat / tank.tankPilotGun.overheat_time);
 
         // Atualiza o tamanho da barra
         heat_bar.localScale = new Vector3(heatPercent, 1f, 1f);

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlayerProperties : NetworkBehaviour
 {
-    public string player_name;
+    public readonly SyncVar<string> player_name = new SyncVar<string>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     public ClassManager.Class selected_class;
     public readonly SyncVar<FactionManager.Faction> faction = new SyncVar<FactionManager.Faction>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     public bool crouched;

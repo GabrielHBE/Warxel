@@ -26,9 +26,6 @@ public class FootstepSound : NetworkBehaviour
         if (IsOwner) audioSource.volume = 0.5f;
 
         original_volume = audioSource.volume;
-
-        
-
     }
 
     void Update()

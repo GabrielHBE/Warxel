@@ -1,27 +1,38 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class TowMissileController : MissileController
 {
     public Transform camera_transform;
-    protected override void Start()
+
+    public override void OnStartServer()
     {
-        base.Start();
-        InitializeMissiles<TowMissile>();
-        current_missile = missiles[current_missile_index];
+        base.OnStartServer();
+        InitializeMissilesServer<TowMissile>();
     }
 
     protected override void Update()
     {
         base.Update();
-        
 
         if (missiles.Count == 0 && can_reload_missiles)
         {
+            // O timer desce na tela de todos os clientes para atualizar o HUD localmente
             spawnInterval -= Time.deltaTime;
 
             if (spawnInterval <= 0)
             {
-                ReloadMissiles<TowMissile>();
+                // Se eu sou o piloto controlando a arma, eu peço ao servidor para recarregar
+                if (is_active)
+                {
+                    CmdRequestReloadMissiles();
+                }
+                // Se o veículo estiver vazio (sem dono), o próprio servidor recarrega sozinho
+                else if (IsServerInitialized && !Owner.IsValid)
+                {
+                    ReloadMissilesServer<TowMissile>();
+                }
+
                 spawnInterval = original_spawn_interval;
             }
         }
@@ -35,10 +46,25 @@ public class TowMissileController : MissileController
     {
         if (CanShoot() && Input.GetKeyDown(keyCode))
         {
-            if (only_show_missiles_when_shoot) current_missile.GetComponent<MeshRenderer>().enabled = true;
+            if (only_show_missiles_when_shoot)
+            {
+                CmdEnableMesh(current_missile.gameObject);
+                current_missile.GetComponent<MeshRenderer>().enabled = true;
+            }
+
             shoot_delay = original_shoot_delay;
-            current_missile.GetComponent<TowMissile>().Shoot(camera_transform);
+
+            // Passamos 'this' (o TowMissileController inteiro) em vez do transform
+            current_missile.GetComponent<TowMissile>().Shoot(this);
+
             MoveToNextMissile();
         }
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdRequestReloadMissiles()
+    {
+        ReloadMissilesServer<TowMissile>();
+    }
+
 }

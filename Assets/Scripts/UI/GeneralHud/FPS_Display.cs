@@ -25,7 +25,7 @@ public class FPS_Display : MonoBehaviour
     void GetFps()
     {
         fps = (int)(1f / Time.unscaledDeltaTime);
-        fps_counter_text.text = fps.ToString();
+        fps_counter_text.text = "FPS: " + fps.ToString();
     }
 
 }

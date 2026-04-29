@@ -258,12 +258,16 @@ public class Helicopter : Vehicle
     bool DestroyAnimation_do_once = true;
     protected override void DestroyAnimation()
     {
+        // 1. Visual effects can be triggered locally by everyone when the SyncVar becomes true
         if (DestroyAnimation_do_once)
         {
-            CmdRequestEnableFireEffects();
-            fire_effects_parent.SetActive(true);
+            CmdRequestEnableFireEffects(); // Ensure Server sends RPC
+
             DestroyAnimation_do_once = false;
         }
+
+        // 2. CRITICAL CHANGE: Only the server handles the timer, physics torque, and the final explosion
+        if (!IsServerInitialized) return;
 
         destroyTimer += Time.fixedDeltaTime;
         rotate_value = Math.Clamp(Mathf.Pow(destroyTimer * 15, 2f), 0, 900);
@@ -274,31 +278,23 @@ public class Helicopter : Vehicle
         RaycastHit hit;
         if (Physics.Raycast(ray, out hit, 1000, collisionLayers))
         {
-            //print(hit.distance);
             if (hit.distance >= 5)
             {
                 if (!fall_alarm.isPlaying)
                 {
-                    fall_alarm.Play();
+                    fall_alarm.Play(); // Consider making this an ObserversRpc if you want everyone to hear it
                 }
-
-                //transform.Rotate(0, rotate_value / 4, 0, Space.Self);
 
                 rb.AddTorque(transform.up * rotate_value * rb.mass);
             }
             else
             {
-
                 Explode(hit.point, hit.normal, hit.transform.gameObject.layer, 12);
-
             }
         }
 
-
         if (destroyTimer >= 5)
         {
-            
-
             Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
         }
     }
@@ -309,10 +305,30 @@ public class Helicopter : Vehicle
         RequestEnableFireEffects();
     }
 
-    [ObserversRpc(ExcludeOwner = true)]
+    [ObserversRpc]
     private void RequestEnableFireEffects()
     {
         fire_effects_parent.SetActive(true);
+    }
+
+    protected override void Start_Stop_Engine()
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override void CameraController()
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override void SwitchWeapon()
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override void GetVehicleCustomization()
+    {
+        throw new NotImplementedException();
     }
 
 

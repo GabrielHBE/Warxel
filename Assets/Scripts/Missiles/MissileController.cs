@@ -4,7 +4,7 @@ using FishNet.Object;
 using TMPro;
 using UnityEngine;
 
-public abstract class MissileController : MonoBehaviour
+public abstract class MissileController : NetworkBehaviour
 {
     [SerializeField] protected TextMeshProUGUI rockets_left_hud;
     public Sprite image_hud;
@@ -15,16 +15,17 @@ public abstract class MissileController : MonoBehaviour
     [SerializeField] protected List<Transform> spawnPoints = new List<Transform>();
     [SerializeField] protected float spawnInterval = 10f;
     [SerializeField] protected float shoot_delay = 0.5f;
-    [SerializeField] protected List<Missiles> missiles = new List<Missiles>(); // Lista base
+
+    protected List<Missiles> missiles = new List<Missiles>();
     protected int current_missile_index = 0;
     protected bool is_active;
     protected Missiles current_missile;
     protected float original_shoot_delay;
     protected float original_spawn_interval;
 
-
-    protected virtual void Start()
+    public override void OnStartNetwork()
     {
+        base.OnStartNetwork();
         original_shoot_delay = shoot_delay;
         original_spawn_interval = spawnInterval;
         shoot_delay = 0;
@@ -32,73 +33,138 @@ public abstract class MissileController : MonoBehaviour
 
     protected virtual void Update()
     {
-
         if (Input.GetKeyDown(KeyCode.R) && is_active)
         {
-            DestroyMissiles();
+            RequestDestroyMissiles();
         }
         shoot_delay -= Time.deltaTime;
     }
 
-    protected void InitializeMissiles<T>() where T : Missiles
+    // Apenas o servidor pode inicializar os mísseis na rede
+    [Server]
+    protected void InitializeMissilesServer<T>() where T : Missiles
     {
-        foreach (Transform spawnPoint in spawnPoints)
+        // Cria uma array temporária para guardar todos os mísseis gerados de uma vez
+        Missiles[] newlySpawned = new Missiles[spawnPoints.Count];
+
+        for (int i = 0; i < spawnPoints.Count; i++)
         {
-            GameObject currentItem;
-            currentItem = Instantiate(missile, spawnPoint);
-            //InstanceFinder.NetworkManager.ServerManager.Spawn(currentItem.GetComponent<NetworkObject>());
+            Transform spawnPoint = spawnPoints[i];
+
+            // Instancia sem setar o parent ainda
+            GameObject currentItem = Instantiate(missile, spawnPoint);
             currentItem.GetComponent<Rigidbody>().isKinematic = true;
-            //currentItem.GetComponent<NetworkObject>().Spawn();
 
             T rocket = currentItem.GetComponent<T>();
+            rocket.parent_gameobject = parent_gameobject;
 
-            if (rocket == null)
+            // Spawna na rede
+            ServerManager.Spawn(currentItem, Owner);
+
+            // Adiciona na lista do servidor e na array temporária
+            missiles.Add(rocket);
+            newlySpawned[i] = rocket;
+        }
+
+        if (missiles.Count > 0) current_missile = missiles[0];
+
+        // Manda TODOS os mísseis de uma vez em uma única chamada!
+        ObserversAddAllMissiles(newlySpawned);
+    }
+    // Todos os clientes recebem essa chamada para sincronizar a parte visual e listas locais
+    [ObserversRpc(BufferLast = true)]
+    private void ObserversAddAllMissiles(Missiles[] spawnedMissiles)
+    {
+        // Se for apenas cliente, limpa a lista por segurança antes de repovoar
+        if (!IsServerInitialized)
+        {
+            missiles.Clear();
+        }
+
+        for (int i = 0; i < spawnedMissiles.Length; i++)
+        {
+            if (spawnedMissiles[i] == null) continue;
+
+            Missiles rocket = spawnedMissiles[i];
+
+            // 1. TRAVA A FÍSICA PARA OS CLIENTES
+            rocket.GetComponent<Rigidbody>().isKinematic = true;
+            rocket.GetComponent<Rigidbody>().useGravity = false;
+
+            // 2. Parenteia e reseta posições
+            rocket.transform.SetParent(spawnPoints[i]);
+            //rocket.transform.localPosition = Vector3.zero;
+            //rocket.transform.localRotation = Quaternion.identity;
+            rocket.parent_gameobject = parent_gameobject;
+
+            if (only_show_missiles_when_shoot) rocket.GetComponent<MeshRenderer>().enabled = false;
+
+            // 3. Adiciona na lista local para que o cliente saiba que tem munição
+            if (!IsServerInitialized)
             {
-                Debug.LogError($"Componente do tipo {typeof(T)} não encontrado no prefab do míssil!");
-                continue;
+                missiles.Add(rocket);
             }
+        }
 
-            //rocket.did_shoot = false;
-            missiles.Add(rocket); // Adiciona à lista base
-            current_missile = rocket;
-            current_missile.GetComponent<Missiles>().parent_gameobject = parent_gameobject;
-
-            if (only_show_missiles_when_shoot) current_missile.GetComponent<MeshRenderer>().enabled = false;
-
+        // Atualiza a mira/seleção atual do cliente
+        if (!IsServerInitialized && missiles.Count > 0)
+        {
+            current_missile = missiles[0];
         }
     }
 
-    // Método para obter mísseis de um tipo específico
     public List<T> GetMissilesOfType<T>() where T : Missiles
     {
         List<T> typedMissiles = new List<T>();
-
-        foreach (Missiles missile in missiles)
+        foreach (Missiles m in missiles)
         {
-            if (missile is T typedMissile)
-            {
-                typedMissiles.Add(typedMissile);
-            }
+            if (m is T typedMissile) typedMissiles.Add(typedMissile);
         }
-
         return typedMissiles;
     }
 
+    [ServerRpc]
+    protected void RequestDestroyMissiles()
+    {
+        DestroyMissiles();
+    }
+
+    [Server]
     protected void DestroyMissiles()
     {
         for (int i = 0; i < missiles.Count; i++)
         {
-            Destroy(missiles[i]);
+            if (missiles[i] != null && missiles[i].IsSpawned)
+                ServerManager.Despawn(missiles[i].gameObject);
         }
         missiles.Clear();
+        ObserversClearMissiles();
     }
 
-
-    protected void ReloadMissiles<T>() where T : Missiles
+    [ObserversRpc]
+    private void ObserversClearMissiles()
     {
-        InitializeMissiles<T>();
+        if (!IsServerInitialized) missiles.Clear();
+    }
+
+    [Server]
+    protected void ReloadMissilesServer<T>() where T : Missiles
+    {
+        missiles.Clear();
+        InitializeMissilesServer<T>();
         current_missile_index = 0;
-        current_missile = missiles[current_missile_index];
+        current_missile = missiles.Count > 0 ? missiles[current_missile_index] : null;
+        ObserversResetIndex();
+    }
+
+    [ObserversRpc]
+    private void ObserversResetIndex()
+    {
+        if (!IsServerInitialized)
+        {
+            current_missile_index = 0;
+            current_missile = missiles.Count > 0 ? missiles[0] : null;
+        }
     }
 
     protected void MoveToNextMissile()
@@ -118,24 +184,16 @@ public abstract class MissileController : MonoBehaviour
 
     protected virtual bool CanShoot()
     {
-        if (missiles.Count == 0 || current_missile == null || shoot_delay > 0)
-        {
-            return false;
-        }
-
+        if (missiles.Count == 0 || current_missile == null || shoot_delay > 0) return false;
         return true;
     }
 
     public virtual void Shoot(KeyCode keyCode) { }
 
-    public void SetActive(bool active)
-    {
-        is_active = active;
-    }
+    public void SetActive(bool active) => is_active = active;
 
     protected virtual void UpdateRocketsHUD()
     {
-
         if (rockets_left_hud == null) return;
         if (missiles.Count != 0)
         {
@@ -145,7 +203,27 @@ public abstract class MissileController : MonoBehaviour
         {
             rockets_left_hud.text = "Reloading... " + spawnInterval.ToString("F1");
         }
+    }
 
+    // Update ServerRpc to receive the GameObject
+    [ServerRpc(RequireOwnership = false)]
+    protected void CmdEnableMesh(GameObject missileObject)
+    {
+        EnableMesh(missileObject);
+    }
+
+    // Update ObserversRpc to receive the GameObject and apply the change
+    [ObserversRpc(ExcludeOwner = true)]
+    private void EnableMesh(GameObject missileObject)
+    {
+        if (missileObject != null)
+        {
+            MeshRenderer renderer = missileObject.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.enabled = true;
+            }
+        }
     }
 
 }

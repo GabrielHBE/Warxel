@@ -49,7 +49,7 @@ public class ExplosionParticleBehaviour : ParticlesBehaviour
             explosion_light.intensity -= Time.deltaTime * 3500;
             yield return null;
         }
-        RequestDespawn(explosion_light.gameObject);
+        Destroy(explosion_light.gameObject);
     }
 
     private void SetupSpark(Rigidbody spark)
@@ -113,12 +113,29 @@ public class ExplosionParticleBehaviour : ParticlesBehaviour
 
     }
 
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestDespawn()
+    {
+        if (IsSpawned)
+        {
+            Despawn(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     private void RequestDespawn(GameObject gameObject)
     {
         if (IsSpawned)
         {
             Despawn(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
         }
     }
 

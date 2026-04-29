@@ -17,7 +17,7 @@ public class TankMainShell : NetworkBehaviour
     public float recoil_force;
 
     private GameObject ignoreCollision;
-    [HideInInspector]public Sprite image_hud;
+    public Sprite image_hud;
 
     void OnCollisionEnter(Collision collision)
     {

@@ -113,7 +113,6 @@ public class WeaponHolder : MonoBehaviour
         }
         else if (func == 3) //Mão direita arma para extrator
         {
-            print("Func 3");
             MoveTimer += Time.deltaTime;
 
             if (MoveTimer <= moveTime)

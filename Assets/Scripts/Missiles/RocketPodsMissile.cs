@@ -1,3 +1,4 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class RocketPodsMissile : Missiles
@@ -17,15 +18,24 @@ public class RocketPodsMissile : Missiles
     {
         base.FixedUpdate();
 
+        // NOVA TRAVA: Se ainda não atirou, não calcula física de queda!
+        if (!didShoot) return;
+
         // Calcula a força da gravidade
         gravityForce = Vector3.down * bulletDropMultiplier * rb.mass;
         rb.AddForce(gravityForce, ForceMode.Acceleration);
-
     }
 
+    [ServerRpc(RequireOwnership = false)]
     public override void Shoot()
     {
         if (didShoot) return;
+        CmdShoot();
+    }
+
+    [ObserversRpc]
+    private void CmdShoot()
+    {
 
         CreateSound(shoot_sound);
         missile_collider.enabled = true;

@@ -5,6 +5,7 @@ using UnityEngine;
 using FishNet;
 using FishNet.Component.Spawning;
 using Unity.VisualScripting;
+using System.Collections;
 
 public class ClientSingletonManager : NetworkBehaviour
 {
@@ -13,6 +14,16 @@ public class ClientSingletonManager : NetworkBehaviour
     [SerializeField] private GameObject generalHUD;
     [SerializeField] private GameObject settings;
     [SerializeField] private GameObject loadoutCustomization;
+    [SerializeField] private GameObject vehicleLoadoutCustomization;
+
+
+    private GameObject instantiated_player_spawner;
+    private GameObject instantiated_account_manager;
+    private GameObject instantiated_gerenal_hud;
+    private GameObject instantiated_settings;
+    private GameObject instantiated_infantary_loadout_customization;
+    private GameObject instantiated_vehicle_loadout_customization;
+
 
     public override void OnStartClient()
     {
@@ -41,26 +52,51 @@ public class ClientSingletonManager : NetworkBehaviour
 
         // Para objetos sem NetworkBehaviour, instancia normalmente
         if (accountManager != null)
-            Instantiate(accountManager);
+            instantiated_account_manager = Instantiate(accountManager);
 
         if (generalHUD != null)
-            Instantiate(generalHUD);
+            instantiated_gerenal_hud = Instantiate(generalHUD);
 
         if (settings != null)
-            Instantiate(settings);
+            instantiated_settings = Instantiate(settings);
 
         if (loadoutCustomization != null)
-            Instantiate(loadoutCustomization);
+            instantiated_infantary_loadout_customization = Instantiate(loadoutCustomization);
+
+        if (vehicleLoadoutCustomization != null)
+        {
+            instantiated_vehicle_loadout_customization = Instantiate(vehicleLoadoutCustomization);
+            StartCoroutine(DisableVehicleCustomization());
+        }
+            
     }
+
+    private IEnumerator DisableVehicleCustomization()
+    {
+        yield return null;
+        VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
+    }
+
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+        Destroy(instantiated_account_manager);
+        Destroy(instantiated_gerenal_hud);
+        Destroy(instantiated_settings);
+        Destroy(instantiated_infantary_loadout_customization);
+        Destroy(instantiated_vehicle_loadout_customization);
+
+    }
+
 
     [ServerRpc]
     private void SpawnPlayerSpawner()
     {
         PlayerSpawner playerSpawner = InstanceFinder.NetworkManager.GetComponent<PlayerSpawner>();
 
-        GameObject obj = Instantiate(playerSpawnController);
-        obj.transform.position = playerSpawner.Spawns[0].position;
-        Spawn(obj, Owner);
-        
+        instantiated_player_spawner = Instantiate(playerSpawnController);
+        instantiated_player_spawner.transform.position = playerSpawner.Spawns[0].position;
+        Spawn(instantiated_player_spawner, Owner);
+
     }
 }

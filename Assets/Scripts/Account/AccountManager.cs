@@ -21,19 +21,11 @@ public class AccountManager : MonoBehaviour
 
     private void Awake()
     {
-        // Se já existe uma instância e não é esta, destrói o novo objeto para evitar duplicatas
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        
+        Instance = this;
+        print(Instance);
         LoadData();
 
-        Instance = this;
-
-        // Opcional: Faz o objeto persistir entre trocas de cena
-        // transform.SetParent(null); 
-        // DontDestroyOnLoad(gameObject);
     }
 
 
@@ -81,6 +73,13 @@ public class AccountManager : MonoBehaviour
         this.faction = faction;
         SaveData();
     }
+
+    public void SwitchName(string name)
+    {
+        account_name = name;
+        SaveData();
+    }
+
 
     public void AddPointsToLevelUp(int points)
     {

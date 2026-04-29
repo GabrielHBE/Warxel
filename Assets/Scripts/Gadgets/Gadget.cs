@@ -30,7 +30,7 @@ public class Gadget : MonoBehaviour
 
     protected PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
 
-    void Awake()
+    protected virtual void Awake()
     {
         playerNetworkObjectSpawner = GetComponentInParent<PlayerNetworkObjectSpawner>();
         gadgetComponents = GetComponentInParent<GadgetComponents>();

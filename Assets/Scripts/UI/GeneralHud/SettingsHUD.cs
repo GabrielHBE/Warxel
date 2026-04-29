@@ -6,6 +6,8 @@ using UnityEngine.InputSystem;
 using System;
 using UnityEngine.EventSystems;
 using System.Collections;
+using FishNet;
+using UnityEngine.SceneManagement;
 
 public class SettingsHUD : MonoBehaviour
 {
@@ -241,8 +243,8 @@ public class SettingsHUD : MonoBehaviour
 
     float scrollSpeed = 3000f;
     void Update()
-    {   
-        if(Settings.Instance==null) return;
+    {
+        if (Settings.Instance == null) return;
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -416,7 +418,24 @@ public class SettingsHUD : MonoBehaviour
 
     public void SelectReturnToMenuTab()
     {
+        // 1. Encerra o Servidor se você for o Host
+        if (InstanceFinder.IsServerStarted)
+        {
+            InstanceFinder.ServerManager.StopConnection(true);
+        }
 
+        // 2. Encerra o Cliente se você estiver conectado
+        if (InstanceFinder.IsClientStarted)
+        {
+            InstanceFinder.ClientManager.StopConnection();
+        }
+
+        // 3. Carrega a cena do Menu localmente no seu PC usando a Unity
+        SceneManager.LoadScene("Menu");
+
+        // Destrava o mouse caso ele estivesse travado no meio do jogo
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     public void SelectQuitGameTab()

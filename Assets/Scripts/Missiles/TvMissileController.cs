@@ -1,14 +1,15 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class TvMissileController : MissileController
 {
     public Camera original_camera;
 
-    protected override void Start()
+    public override void OnStartServer()
     {
-        base.Start();
-        InitializeMissiles<TvMissile>();
-
+        base.OnStartServer();
+        InitializeMissilesServer<TvMissile>();
+        /*
         // Garante que a câmera seja aplicada a todos os mísseis já existentes
         if (original_camera != null)
         {
@@ -23,6 +24,7 @@ public class TvMissileController : MissileController
         }
 
         current_missile = missiles[current_missile_index];
+        */
     }
 
     protected override void Update()
@@ -31,14 +33,26 @@ public class TvMissileController : MissileController
 
         if (missiles.Count == 0 && can_reload_missiles)
         {
+            // O timer desce na tela de todos os clientes para atualizar o HUD localmente
             spawnInterval -= Time.deltaTime;
 
             if (spawnInterval <= 0)
             {
-                ReloadMissiles<TvMissile>();
+                // Se eu sou o piloto controlando a arma, eu peço ao servidor para recarregar
+                if (is_active)
+                {
+                    CmdRequestReloadMissiles();
+                }
+                // Se o veículo estiver vazio (sem dono), o próprio servidor recarrega sozinho
+                else if (IsServerInitialized && !Owner.IsValid)
+                {
+                    ReloadMissilesServer<TvMissile>();
+                }
+
                 spawnInterval = original_spawn_interval;
             }
         }
+
 
         if (!is_active) return;
 
@@ -71,4 +85,11 @@ public class TvMissileController : MissileController
             MoveToNextMissile();
         }
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdRequestReloadMissiles()
+    {
+        ReloadMissilesServer<TvMissile>();
+    }
+
 }

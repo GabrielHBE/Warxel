@@ -1,4 +1,5 @@
 using System.Collections;
+using FishNet.Object;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -6,7 +7,7 @@ public class Flares : Countermeasures
 {
     [SerializeField] private GameObject flare_effect;
     private Coroutine flareCoroutine;
-    [SerializeField] private float force_multiplier = 10f;
+    private float force_multiplier = 15;
 
     protected override void Update()
     {
@@ -82,6 +83,7 @@ public class Flares : Countermeasures
         }
     }
 
+    [ServerRpc(RequireOwnership = false)]
     private void InstantiateFlare()
     {
         if (flare_effect == null)
@@ -96,6 +98,7 @@ public class Flares : Countermeasures
             transform.position,
             Quaternion.identity
         );
+        Spawn(flareInstance1);
 
         // Instanciar o segundo flare (esquerda)
         GameObject flareInstance2 = Instantiate(
@@ -103,7 +106,7 @@ public class Flares : Countermeasures
             transform.position,
             Quaternion.identity
         );
-
+        Spawn(flareInstance2);
         // Adicionar Rigidbody e aplicar força ao primeiro flare (direita)
         AddRigidbodyAndForce(flareInstance1, transform.right);
 
@@ -111,10 +114,11 @@ public class Flares : Countermeasures
         AddRigidbodyAndForce(flareInstance2, -transform.right);
 
         // Destruir os flares após um tempo
-        Destroy(flareInstance1, 5f);
-        Destroy(flareInstance2, 5f);
+        //Destroy(flareInstance1, 5f);
+        //Destroy(flareInstance2, 5f);
     }
 
+    [ObserversRpc]
     private void AddRigidbodyAndForce(GameObject flare, Vector3 direction)
     {
 
@@ -125,12 +129,12 @@ public class Flares : Countermeasures
         }
 
         rb.useGravity = true;
-        rb.linearDamping = 0.5f; 
+        rb.linearDamping = 0.5f;
         rb.angularDamping = 0.5f;
 
         rb.AddForce(direction * force_multiplier, ForceMode.Impulse);
 
-        rb.AddForce(Vector3.up * 2f, ForceMode.Impulse);
+        //rb.AddForce(Vector3.up * 2f, ForceMode.Impulse);
 
     }
 }

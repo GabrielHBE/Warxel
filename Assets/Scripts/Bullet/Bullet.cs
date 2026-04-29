@@ -128,6 +128,9 @@ public class Bullet : NetworkBehaviour
 
     #region Updates
 
+    // 1. Coloque o Array aqui em cima, nas variáveis globais da classe!
+    private RaycastHit[] hit_results = new RaycastHit[128];
+
     void FixedUpdate()
     {
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
@@ -144,35 +147,47 @@ public class Bullet : NetworkBehaviour
             {
                 int layerMask = ~(1 << LayerMask.NameToLayer("Projectile") | 1 << LayerMask.NameToLayer("Player"));
 
-                // Dispara um RaycastAll para pegar TUDO que a bala atravessou neste frame
-                RaycastHit[] hits = Physics.RaycastAll(lastPosition, direction.normalized, distance, layerMask);
+                // 2. Agora o Raycast preenche o Array global, não gerando MAIS NENHUM lixo na memória!
+                int hits = Physics.RaycastNonAlloc(lastPosition, direction.normalized, hit_results, distance, layerMask);
 
-                if (hits.Length > 0)
+                if (hits > 0)
                 {
+                    // 3. Vamos achar o hit mais próximo manualmente. É muito mais leve do que usar System.Array.Sort
+                    RaycastHit closestHit = default;
+                    float minDistance = float.MaxValue;
+                    bool foundValidHit = false;
 
-                    System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-
-                    foreach (RaycastHit hit in hits)
+                    // O loop vai APENAS até a quantidade de "hits", ignorando os espaços nulos do Array
+                    for (int i = 0; i < hits; i++)
                     {
+                        RaycastHit hit = hit_results[i];
 
+                        // Ignora o atirador e os filhos dele
                         if (ignoredTransform != null && hit.collider.transform.IsChildOf(ignoredTransform))
                         {
                             continue;
                         }
 
-                        HandleBulletHit(hit.collider.gameObject, hit.point, hit.normal, hit.collider);
+                        // Se a distância for menor que a gravada, salvamos como o hit mais próximo
+                        if (hit.distance < minDistance)
+                        {
+                            minDistance = hit.distance;
+                            closestHit = hit;
+                            foundValidHit = true;
+                        }
+                    }
 
-                        break;
+                    // Se achou um alvo válido, processa o tiro
+                    if (foundValidHit)
+                    {
+                        HandleBulletHit(closestHit.collider.gameObject, closestHit.point, closestHit.normal, closestHit.collider);
                     }
                 }
             }
             // Atualiza a posição antiga para o próximo frame
             lastPosition = currentPosition;
         }
-
-
     }
-
     float time_to_enable_view;
     void Update()
     {
@@ -426,7 +441,7 @@ public class Bullet : NetworkBehaviour
                 }
             }
 
-            KillFeedDisplay.Instance.AddKill(AccountManager.Instance.account_name, playerProperties.player_name, "Placeholder");
+            KillFeedDisplay.Instance.AddKill(AccountManager.Instance.account_name, playerProperties.player_name.Value, "Placeholder");
         }
 
         DamageMarker.Instance.UpdateDamage(dano_real_esperado);

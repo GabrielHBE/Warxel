@@ -10,9 +10,13 @@ public class AttackHelicopter : Helicopter
     #region Inspector Variables
 
     [Header("Attatck Helicopter variables")]
+    [SerializeField] private Transform gunner_gun_shoot_pos;
+    public AttackHelicopterGunnerProperties gunner_gun_properties;
     [SerializeField] private Transform gunner_position;
     [SerializeField] private HelicopterMissileManager missileManager;
     [SerializeField] private GameObject gunner_gun;
+
+    
     [HideInInspector] public float overheat;
     [SerializeField] private Camera gunner_gun_camera;
 
@@ -213,7 +217,7 @@ public class AttackHelicopter : Helicopter
         }
     }
 
-    private void SwitchWeapon()
+    protected override void SwitchWeapon()
     {
         if (Mouse.current.scroll.ReadValue().y != 0)
         {
@@ -310,7 +314,7 @@ public class AttackHelicopter : Helicopter
         bool isShooting = Input.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key);
         canShootGunnerGun = !overheated && isShooting;
 
-        current_spread = Mathf.Clamp(current_spread, 0, heliProperties.max_spread);
+        current_spread = Mathf.Clamp(current_spread, 0, gunner_gun_properties.max_spread);
 
         if (canShootGunnerGun)
         {
@@ -325,13 +329,13 @@ public class AttackHelicopter : Helicopter
 
 
 
-            heliProperties.shootPos.transform.localRotation = new Quaternion(Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, heliProperties.shootPos.transform.localRotation.w);
+            gunner_gun_shoot_pos.transform.localRotation = new Quaternion(Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, Random.Range(-current_spread, current_spread) / 1000, gunner_gun_shoot_pos.transform.localRotation.w);
         }
         else
         {
 
             current_spread = 0;
-            heliProperties.shootPos.transform.localRotation = original_shoot_pos_rotation;
+           gunner_gun_shoot_pos.transform.localRotation = original_shoot_pos_rotation;
         }
 
         next_time_to_fire -= dt;
@@ -343,14 +347,14 @@ public class AttackHelicopter : Helicopter
     {
         if (next_time_to_fire <= 0f)
         {
-            heliProperties.shoot_sound.PlayOneShot(heliProperties.shoot_sound.clip);
+            gunner_gun_properties.shoot_sound.PlayOneShot(gunner_gun_properties.shoot_sound.clip);
             FireGunnerGun();
-            next_time_to_fire = heliProperties.interval;
+            next_time_to_fire = gunner_gun_properties.interval;
         }
 
         overheat += dt;
 
-        if (overheat >= heliProperties.overheat_time)
+        if (overheat >= gunner_gun_properties.overheat_time)
             overheated = true;
     }
 
@@ -374,24 +378,24 @@ public class AttackHelicopter : Helicopter
 
         Bullet.BulletData data = new Bullet.BulletData
         {
-            position = heliProperties.shootPos.transform.position,
-            rotation = heliProperties.shootPos.transform.rotation,
-            direction = heliProperties.shootPos.transform.forward,
-            speed = heliProperties.muzzle_velocity,
-            dropMultiplier = heliProperties.bullet_drop,
-            infantaryDamage = heliProperties.infantary_damage,
-            damageDropoff = heliProperties.damage_dropoff,
-            damageDropoffTimer = heliProperties.damage_dropoff_timer,
-            destructionForce = heliProperties.destruction_force,
-            minimumDamage = heliProperties.minimum_damage,
+            position = gunner_gun_shoot_pos.position,
+            rotation = gunner_gun_shoot_pos.rotation,
+            direction = gunner_gun_shoot_pos.forward,
+            speed = gunner_gun_properties.muzzle_velocity,
+            dropMultiplier = gunner_gun_properties.bullet_drop,
+            infantaryDamage = gunner_gun_properties.infantary_damage,
+            damageDropoff = gunner_gun_properties.damage_dropoff,
+            damageDropoffTimer = gunner_gun_properties.damage_dropoff_timer,
+            destructionForce = gunner_gun_properties.destruction_force,
+            minimumDamage = gunner_gun_properties.minimum_damage,
             hsMultiplier = 2,
             size = 1,
             canDamageVehicles = true,
-            vehicleDamage = heliProperties.vehicle_damage
+            vehicleDamage = gunner_gun_properties.vehicle_damage
         };
 
         Transform bulletObj = Instantiate(
-            heliProperties.bullefPref,
+            gunner_gun_properties.bullefPref,
             data.position,
             data.rotation
         );
@@ -405,7 +409,7 @@ public class AttackHelicopter : Helicopter
             bullet.CreateBullet(data, transform);
         }
 
-        current_spread += heliProperties.spread;
+        current_spread += gunner_gun_properties.spread;
 
         Destroy(bulletObj.gameObject, 10f);
     }
@@ -413,7 +417,7 @@ public class AttackHelicopter : Helicopter
     [ObserversRpc(ExcludeOwner = true)]
     private void RpcShootMachineGunEffects()
     {
-        HandleSound(heliProperties.shoot_sound);
+        HandleSound(gunner_gun_properties.shoot_sound);
     }
 
     private void HandleCooldown(float dt)

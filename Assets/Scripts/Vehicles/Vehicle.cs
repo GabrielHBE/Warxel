@@ -10,9 +10,9 @@ using VoxelDestructionPro.VoxelObjects;
 public abstract class Vehicle : NetworkBehaviour, ISspottable
 {
     public Transform spot_position;
-    
-    public string vehicle_name;
+    public VehicleCategory vehicleCategory;
     public FactionManager.Faction vehicle_faction;
+    public VehicleCustomizableParts[] customizableParts;
 
     [Header("Progression")]
     public int vehicle_kills;
@@ -20,7 +20,7 @@ public abstract class Vehicle : NetworkBehaviour, ISspottable
     [Header("References & Components")]
     [SerializeField] protected VehicleHudManager vehicleHudManager;
     [SerializeField] protected Rigidbody rb;
-    [SerializeField] protected Countermeasures countermeasures;
+    public Countermeasures countermeasures;
     [SerializeField] protected GameObject fire_effects_parent;
     public Transform exit_vehicle_position;
     [SerializeField] protected AudioDistortionFilter distortion;
@@ -78,10 +78,6 @@ public abstract class Vehicle : NetworkBehaviour, ISspottable
             meshRenderer.enabled = true;
         }
 
-        if (countermeasures != null)
-        {
-            countermeasures.SetVehicle(this);
-        }
     }
 
     protected virtual void OnCollisionEnter(Collision collision)
@@ -102,15 +98,16 @@ public abstract class Vehicle : NetworkBehaviour, ISspottable
     }
     #endregion
 
-    #region Vehicle Control 
-    protected virtual void Start_Stop_Engine() { }
-    protected virtual void Move() { }
-    protected virtual void CameraController() { }
-    protected virtual void Switch_weapon() { }
+    #region Abstract Methods
+    protected abstract void Start_Stop_Engine();
+    protected abstract void Move();
+    protected abstract void CameraController();
+    protected abstract void SwitchWeapon();
+    protected abstract void GetVehicleCustomization();
     #endregion
 
     #region Player Interaction
-    
+
     public virtual void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
         player = _player;
@@ -122,8 +119,6 @@ public abstract class Vehicle : NetworkBehaviour, ISspottable
         vehicle_camera = player.GetComponent<PlayerController>().playerCamera;
 
         player_rb = playerController.rb;
-        player_rb.isKinematic = true;
-        player_rb.interpolation = RigidbodyInterpolation.None;
 
         playerProperties.is_in_vehicle = true;
         is_in_vehicle = true;
@@ -240,24 +235,44 @@ public abstract class Vehicle : NetworkBehaviour, ISspottable
 
     protected virtual void Explode(Vector3 contact_point, Vector3 contact_normal, LayerMask layer, float explosionForce)
     {
-        if (player != null)
-        {
-            if (playerController != null) playerController.RequestDamage(1000);
-            ExitVehicle();
-        }
+        // We only want the Server executing the destruction logic
+        if (!IsServerInitialized) return;
 
         if (did_explode) return;
-
         did_explode = true;
 
-        CmdRequestPlayExplosionSound();
-        HandleSound(crash_sound);
+        if (player != null)
+        {
+            if (playerController != null) playerController.RequestDamage(1000); // Server applies damage
 
+            // Send a TargetRpc to the client who owns the player to forcefully exit them
+            // BEFORE we despawn the vehicle they are sitting in.
+            TargetForceExitVehicle(player.GetComponent<NetworkObject>().Owner);
+        }
 
-        CmdRequestSpawnExplosionEffect(layer, contact_point);
+        PlayExplosionSound(); // Play locally on Server
+        CmdRequestPlayExplosionSound(); // Tell clients to play it
+
+        // Instantiate explosion effect directly on server and spawn it
+        GameObject explosion_effect;
+        if (layer == LayerMask.NameToLayer("Ground"))
+        {
+            explosion_effect = Instantiate(ground_explosion, contact_point, Quaternion.identity);
+        }
+        else
+        {
+            explosion_effect = Instantiate(crash_explosion, contact_point, Quaternion.identity);
+        }
+        Spawn(explosion_effect);
 
         RequestDespawn();
+    }
 
+    // New TargetRpc to force the client to exit gracefully
+    [TargetRpc]
+    private void TargetForceExitVehicle(NetworkConnection conn)
+    {
+        ExitVehicle();
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -397,5 +412,21 @@ public abstract class Vehicle : NetworkBehaviour, ISspottable
     {
         return spot_position;
     }
+    #endregion
+
+    #region Enums
+    public enum VehicleCategory
+    {
+        MBT,
+        IFV,
+        ScoutHelicopter,
+        AttackHelicopter,
+        TransportHelicopter,
+        AttackJet,
+        StealthJet,
+        Gunship
+
+    }
+
     #endregion
 }

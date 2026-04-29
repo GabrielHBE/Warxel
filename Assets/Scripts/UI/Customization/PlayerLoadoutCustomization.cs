@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
 using TMPro;
-using Unity.Transforms;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -177,7 +174,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     #region Unity Lifecycle
 
-    private void Awake()
+    private void Start()
     {
         Instance = this;
         InitializeComponents();
@@ -189,7 +186,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void Update()
     {
-        current_battle_coins_indicator.text = "Current Battle coins: " + AccountManager.Instance.battle_coins;
+        if (current_battle_coins_indicator != null) current_battle_coins_indicator.text = "Current Battle coins: " + AccountManager.Instance.battle_coins;
         UpdateWeaponStatusDisplay();
         UpdateCameraAndButtonVisibility();
         if (_currentStage == SelectionStage.ClassSelection)
@@ -224,7 +221,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             loadoutSaver.LoadLoadoutForClass(_selectedClass);
         }
 
-        switchLoadoutCamera.enabled = false;
+        if (switchLoadoutCamera != null) switchLoadoutCamera.enabled = false;
         _originalWeaponsGadgetsPosition = weaponsGadgetsParent.localPosition;
 
     }
@@ -301,12 +298,12 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     {
         if (_currentStage == SelectionStage.ClassSelection)
         {
-            switchLoadoutCamera.enabled = false;
+            if (switchLoadoutCamera != null) switchLoadoutCamera.enabled = false;
             updateLoadoutButton.SetActive(true);
         }
         else
         {
-            switchLoadoutCamera.enabled = true;
+            if (switchLoadoutCamera != null) switchLoadoutCamera.enabled = true;
             updateLoadoutButton.SetActive(false);
         }
     }
@@ -408,6 +405,10 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     public void SelectClass(ClassManager.Class @class)
     {
+        selected_primary = null;
+        selected_secondary = null;
+        selected_gadget1 = null;
+        selected_gadget2 = null;
         _selectedClass = @class;
         AccountManager.Instance.SetClass(@class);
         Gadget gadget2_class = classManager.GetClassGadget(@class);

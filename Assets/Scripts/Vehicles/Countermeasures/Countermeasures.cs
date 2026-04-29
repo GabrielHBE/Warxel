@@ -1,8 +1,9 @@
 
+using FishNet.Object;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class Countermeasures : MonoBehaviour
+public class Countermeasures : NetworkBehaviour, IsVehicleCustomizationPart
 {
     [HideInInspector] public bool is_active;
     [HideInInspector] public float reload_countermeasures_original_duration;
@@ -15,10 +16,11 @@ public class Countermeasures : MonoBehaviour
     protected Vehicle vehicle;
     protected KeyCode use_countermeasure_key;
     protected float countermeasures_original_duration;
-    
 
-    void Start()
+
+    void Awake()
     {
+        vehicle = GetComponentInParent<Vehicle>();
         reload_countermeasures_original_duration = reload_countermeasures_duration;
         countermeasures_original_duration = countermeasures_duration;
 
@@ -41,4 +43,24 @@ public class Countermeasures : MonoBehaviour
     }
     public virtual void UseCountermeasure() { }
     protected virtual void StopCountermeasure() { }
+
+    public void Activate()
+    {
+        GetComponentInParent<Vehicle>().countermeasures = this;
+    }
+
+    public void Deactivate()
+    {
+        Destroy(gameObject);
+    }
+
+    public VehicleCustomizableParts GetCustomizationPart()
+    {
+        return VehicleCustomizableParts.Countermeasure;
+    }
+
+    public string GetCustomizationPartName()
+    {
+        return gameObject.name;
+    }
 }

@@ -1,7 +1,8 @@
 
+using FishNet.Object;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
-public abstract class Missiles : MonoBehaviour
+public abstract class Missiles : NetworkBehaviour
 {
     [SerializeField] protected float infantary_damage;
     [SerializeField] protected float vehicle_damage;
@@ -21,9 +22,22 @@ public abstract class Missiles : MonoBehaviour
     protected bool didShoot;
 
     #region Unity Lifecycle
-    protected virtual void Start()
+    protected virtual void Awake()
     {
         SetParentVehicle();
+        if (!didShoot && rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
+    }
+
+    protected virtual void LateUpdate()
+    {
+        if (!didShoot && transform.parent != null)
+        {
+            transform.localPosition = Vector3.zero;
+        }
     }
 
     protected virtual void Update() { }
@@ -113,20 +127,32 @@ public abstract class Missiles : MonoBehaviour
 
     #region Collision / Explosion
 
+    [ServerRpc(RequireOwnership = false)]
     protected void Explode(Vector3 contact_point)
     {
-        CreateSound(explosion_sound);
-
+        //CreateSound(explosion_sound);
+        CmdPlayExplosionSound();
         if (explosion_effect != null)
         {
             GameObject explosion = Instantiate(explosion_effect, contact_point, Quaternion.identity);
+            Spawn(explosion);
             explosion.transform.localScale *= 2;
         }
 
-
-        Destroy(gameObject);
+        RequestDespawn();
 
     }
+
+    [ObserversRpc]
+    private void CmdPlayExplosionSound()
+    {
+        AudioDistanceController audioDistanceController = explosion_sound.GetComponent<AudioDistanceController>();
+
+        audioDistanceController.StartGrowth();
+
+    }
+
+
 
     protected virtual void CreateSound(AudioSource sound)
     {
@@ -170,6 +196,20 @@ public abstract class Missiles : MonoBehaviour
             voxCollider.parent_vehicle = vehicle;
         }
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestDespawn()
+    {
+        if (IsSpawned)
+        {
+            Despawn(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
 
 
     #endregion

@@ -216,7 +216,7 @@ public class Jet : Vehicle
         {
             Start_Stop_Engine();
             Shoot();
-            Switch_weapon();
+            SwitchWeapon();
 
         }
 
@@ -720,7 +720,7 @@ public class Jet : Vehicle
         _mainCannon.transform.Rotate(Vector3.left * _mainCannonRotationValue * deltaTime);
     }
 
-    protected override void Switch_weapon()
+    protected override void SwitchWeapon()
     {
         if (Mouse.current.scroll.ReadValue().y != 0)
         {
@@ -1083,6 +1083,11 @@ public class Jet : Vehicle
     private void RequestEnableFireEffects()
     {
         fire_effects_parent.SetActive(true);
+    }
+
+    protected override void GetVehicleCustomization()
+    {
+        throw new NotImplementedException();
     }
 
 
