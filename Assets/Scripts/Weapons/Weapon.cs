@@ -83,7 +83,7 @@ public class Weapon : MonoBehaviour
         if (weaponProperties != null)
             Reload();
 
-        if (!restarted || !is_active || SettingsHUD.Instance.is_menu_settings_active || playerProperties.is_in_vehicle)
+        if (!restarted || !is_active || SettingsHUD.Instance.is_menu_settings_active)
         {
             playerProperties.is_firing = false;
             DeleteMuzzle();
@@ -174,23 +174,23 @@ public class Weapon : MonoBehaviour
 
     void SwitchFireMode()
     {
-        string currentMode = weaponProperties.fire_modes[current_fire_mode];
+        WeaponProperties.FireMode currentMode = weaponProperties.fire_modes[current_fire_mode];
 
-        if (currentMode == "auto")
+        if (currentMode == WeaponProperties.FireMode.Auto)
         {
-            soldierHudManager.fire_mode_hud.SetFireMode("Auto");
+            soldierHudManager.fire_mode_hud.SetFireMode(WeaponProperties.FireMode.Auto);
             weaponProperties.can_hold_trigger = true;
             weaponProperties.CalculateRecoilSpeed(false);
         }
-        else if (currentMode == "burst")
+        else if (currentMode == WeaponProperties.FireMode.Burst)
         {
-            soldierHudManager.fire_mode_hud.SetFireMode("Burst");
+            soldierHudManager.fire_mode_hud.SetFireMode(WeaponProperties.FireMode.Burst);
             weaponProperties.can_hold_trigger = false;
             weaponProperties.CalculateRecoilSpeed(true);
         }
         else
         {
-            soldierHudManager.fire_mode_hud.SetFireMode("Single");
+            soldierHudManager.fire_mode_hud.SetFireMode(WeaponProperties.FireMode.Single);
             weaponProperties.can_hold_trigger = false;
             weaponProperties.CalculateRecoilSpeed(false);
         }
@@ -343,17 +343,17 @@ public class Weapon : MonoBehaviour
         }
 
         did_shoot = false;
-        string currentMode = weaponProperties.fire_modes[current_fire_mode];
+        WeaponProperties.FireMode currentMode = weaponProperties.fire_modes[current_fire_mode];
 
         switch (currentMode)
         {
-            case "auto":
+            case WeaponProperties.FireMode.Auto:
                 HandleAutoFire(hold_shoot);
                 break;
-            case "single":
+            case WeaponProperties.FireMode.Single:
                 HandleSingleFire(press_shoot);
                 break;
-            case "burst":
+            case WeaponProperties.FireMode.Burst:
                 HandleBurstFire(press_shoot);
                 break;
         }
@@ -571,7 +571,8 @@ public class Weapon : MonoBehaviour
             hsMultiplier = weaponProperties.headshot_multiplier,
             size = weaponProperties.bullet_size,
             canDamageVehicles = weaponProperties.can_damage_vehicles,
-            vehicleDamage = weaponProperties.vehicle_damage
+            vehicleDamage = weaponProperties.vehicle_damage,
+            delaytoEnableForNonOwner = 0.2f,
         };
 
         // 2. Send it to the Server
@@ -777,8 +778,8 @@ public class Weapon : MonoBehaviour
 
     bool CanAim()
     {
-        return !playerProperties.is_reloading &&
-               !switchWeapon._switch &&
+        return !switchWeapon._switch &&
+               //!playerProperties.is_reloading &&
                !playerProperties.isProneTransition &&
                !playerProperties.roll &&
                !playerProperties.is_dead.Value;
@@ -829,11 +830,23 @@ public class Weapon : MonoBehaviour
     void UpdateCameraFov(float targetFov)
     {
         float lerpSpeed = 10f * Time.deltaTime;
-        player_camera.fieldOfView = Mathf.Lerp(
-            player_camera.fieldOfView,
-            targetFov,
-            lerpSpeed
-        );
+        if (!playerProperties.is_reloading)
+        {
+            player_camera.fieldOfView = Mathf.Lerp(
+                player_camera.fieldOfView,
+                targetFov,
+                lerpSpeed
+            );
+        }
+        else
+        {
+            player_camera.fieldOfView = Mathf.Lerp(
+                player_camera.fieldOfView,
+                minFov,
+                lerpSpeed
+            );
+        }
+
     }
 
     void CheckAimPositionComplete()

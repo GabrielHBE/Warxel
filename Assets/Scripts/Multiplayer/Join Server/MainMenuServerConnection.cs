@@ -3,11 +3,14 @@ using TMPro;
 using FishNet;
 using FishNet.Managing.Scened;
 using FishNet.Transporting;
+using FishNet.Discovery;
 
 public class MainMenuConnection : MonoBehaviour
 {
-    [Header("UI References")]
-    [SerializeField] private TMP_InputField ipInputField;
+
+    [Header("References")]
+    [SerializeField] private NetworkDiscovery _networkDiscovery;
+    [SerializeField] private GameObject serverBrowserParent;
     
     [Header("Loading UI")]
     [SerializeField] private GameObject loadingPanel; // Arraste o painel da tela de loading aqui
@@ -15,8 +18,6 @@ public class MainMenuConnection : MonoBehaviour
 
     [Header("Scene Settings")]
     [SerializeField] private string gameSceneName = "SampleScene";
-
-    private const string DEFAULT_IP = "localhost";
 
     private void OnEnable()
     {
@@ -41,25 +42,33 @@ public class MainMenuConnection : MonoBehaviour
 
     public void ConnectAsClient()
     {
-        ShowLoading("Conectando ao servidor...");
+        StartMapImage("Conectando ao servidor...");
 
-        if (AccountManager.Instance != null) Destroy(AccountManager.Instance.gameObject);
-        if (Settings.Instance != null) Destroy(Settings.Instance.gameObject);
-        
-        string ipAddress = string.IsNullOrWhiteSpace(ipInputField.text) ? DEFAULT_IP : ipInputField.text;
-        InstanceFinder.ClientManager.StartConnection(ipAddress);
+        InstanceFinder.ClientManager.StartConnection();
+    }
+
+    public void ShowServerBrowser()
+    {
+        serverBrowserParent.SetActive(true);
     }
 
     public void StartAsHost()
     {
-        ShowLoading("Iniciando servidor...");
-
-        if (AccountManager.Instance != null) Destroy(AccountManager.Instance.gameObject);
-        if (Settings.Instance != null) Destroy(Settings.Instance.gameObject);
+        StartMapImage("Iniciando servidor...");
 
         // Apenas pede para iniciar. A cena será carregada pelo evento abaixo!
         InstanceFinder.ServerManager.StartConnection();
         InstanceFinder.ClientManager.StartConnection();
+
+    }
+
+    public void StartMapImage(string message)
+    {
+        ShowLoading(message);
+
+        if (AccountManager.Instance != null) Destroy(AccountManager.Instance.gameObject);
+        if (Settings.Instance != null) Destroy(Settings.Instance.gameObject);
+
     }
 
     // Este evento é disparado automaticamente quando o status do Servidor muda

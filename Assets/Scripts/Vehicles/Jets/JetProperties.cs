@@ -9,7 +9,6 @@ public class JetProperties : MonoBehaviour
 
     [Header("Movement")]
     public bool can_afterburner;
-    public float mass;
     public float aceleration;
     public float max_throttle;
     public float rotation_value;
@@ -20,37 +19,6 @@ public class JetProperties : MonoBehaviour
     public float max_lean_speed;
     public bool invertY;
     public float dive_speed_boost = 50f;
-    
-    [Header("Bullet")]
-    public float muzzle_velocity;
-    public float bullet_drop;
-    public float minimum_damage;
-    public GameObject bullet_hit_effect;
-
-    [Header("MainCannon")]
-    public float infantary_damage;
-    public float vehicle_damage;
-    public Sprite hud_icon;
-    public Transform bullefPref;
-    public float fire_rate;
-    public float interval;
-    public float zoom;
-    public float overheat_time;
-    public float damage_dropoff;
-    public float damage_dropoff_timer;
-    public float destruction_force;
-    public float spread;
-    public float max_spread;
-
     [Header("Audio")]
     public AudioSource interior_turbine;
-    public AudioSource shoot_sound;
-
-
-    void Start()
-    {
-        interval = 60f / fire_rate;
-    }
-
-
 }

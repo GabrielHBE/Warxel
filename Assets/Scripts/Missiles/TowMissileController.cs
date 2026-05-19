@@ -39,12 +39,12 @@ public class TowMissileController : MissileController
 
         if (!is_active) return;
 
-        UpdateRocketsHUD();
+        //UpdateRocketsHUD();
     }
 
-    public override void Shoot(KeyCode keyCode)
+    public override void ShootMissile()
     {
-        if (CanShoot() && Input.GetKeyDown(keyCode))
+        if (CanShoot())
         {
             if (only_show_missiles_when_shoot)
             {
@@ -55,7 +55,7 @@ public class TowMissileController : MissileController
             shoot_delay = original_shoot_delay;
 
             // Passamos 'this' (o TowMissileController inteiro) em vez do transform
-            current_missile.GetComponent<TowMissile>().Shoot(this);
+            current_missile.GetComponent<TowMissile>().Shoot(transform.forward);
 
             MoveToNextMissile();
         }

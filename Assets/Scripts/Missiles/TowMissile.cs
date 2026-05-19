@@ -5,7 +5,6 @@ public class TowMissile : Missiles
 {
     [SerializeField] private float turnSpeed = 5f;
 
-    private TowMissileController controller; // Referência segura de rede
 
     protected override void Update()
     {
@@ -16,36 +15,30 @@ public class TowMissile : Missiles
         // movimento continua na direção ATUAL do míssil
         transform.position += transform.forward * travel_speed * Time.deltaTime;
 
-        // Verifica se o controller e a câmera existem antes de seguir
-        if (controller != null && controller.camera_transform != null)
-        {
-            // direção desejada (câmera)
-            Vector3 foward = controller.camera_transform.forward;
 
-            // suavização (delay real)
-            transform.forward = Vector3.Slerp(
-                transform.forward,
-                foward,
-                turnSpeed * Time.deltaTime
-            );
-        }
+        // direção desejada (câmera)
+        Vector3 foward = Camera.main.transform.forward;
+
+        // suavização (delay real)
+        transform.forward = Vector3.Slerp(
+            transform.forward,
+            foward,
+            turnSpeed * Time.deltaTime
+        );
+
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void Shoot(TowMissileController shooterController)
+    public override void Shoot(Vector3 direction)
     {
-        CmndShoot(shooterController);
+        CmndShoot(direction);
 
     }
 
     [ObserversRpc]
-    private void CmndShoot(TowMissileController shooterController)
+    private void CmndShoot(Vector3 direction)
     {
-        controller = shooterController;
         didShoot = true;
-
-        if (controller != null && controller.camera_transform != null)
-            transform.forward = controller.camera_transform.forward;
 
         CreateSound(shoot_sound);
         missile_collider.enabled = true;

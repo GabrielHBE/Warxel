@@ -29,4 +29,14 @@ public class SoldierHudMagCounter : MonoBehaviour
         }
     }
 
+    public void UpdateMagCount(string text)
+    {
+
+        if (mag_ammo_hud != null)
+        {
+            mag_ammo_hud.text = text;
+
+        }
+    }
+
 }

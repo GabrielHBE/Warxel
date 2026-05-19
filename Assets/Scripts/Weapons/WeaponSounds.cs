@@ -21,7 +21,7 @@ public class WeaponSounds : MonoBehaviour
     {
         if (remove_mag_sound != null)
         {
-            cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+            cameraShake.RequestShake(0.5f, 0.5f);
             remove_mag_sound.PlayOneShot(remove_mag_sound.clip);
         }
     }
@@ -30,7 +30,7 @@ public class WeaponSounds : MonoBehaviour
     {
         if (put_mag_sound != null)
         {
-            cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+            cameraShake.RequestShake(0.5f, 0.5f);
             put_mag_sound.PlayOneShot(put_mag_sound.clip);
         }
     }
@@ -40,7 +40,7 @@ public class WeaponSounds : MonoBehaviour
 
         if (push_extractor_sound != null)
         {
-            cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+            cameraShake.RequestShake(0.5f, 0.5f);
             push_extractor_sound.PlayOneShot(push_extractor_sound.clip);
         }
     }
@@ -50,7 +50,7 @@ public class WeaponSounds : MonoBehaviour
 
         if (pull_extractor_sound != null)
         {
-            cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+            cameraShake.RequestShake(0.5f, 0.5f);
             pull_extractor_sound.PlayOneShot(pull_extractor_sound.clip);
         }
     }

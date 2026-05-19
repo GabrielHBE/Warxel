@@ -4,6 +4,7 @@ using UnityEngine;
 using VoxelDestructionPro.Tools;
 public abstract class Missiles : NetworkBehaviour
 {
+    public MeshRenderer mesh;
     [SerializeField] protected float infantary_damage;
     [SerializeField] protected float vehicle_damage;
     [SerializeField] protected float time_to_explode;
@@ -20,6 +21,7 @@ public abstract class Missiles : NetworkBehaviour
     public GameObject parent_gameobject;
 
     protected bool didShoot;
+    protected bool hasExploded; // Nova variável para evitar execuções duplicadas
 
     #region Unity Lifecycle
     protected virtual void Awake()
@@ -61,76 +63,80 @@ public abstract class Missiles : NetworkBehaviour
 
     protected virtual void OnCollisionEnter(Collision collision)
     {
+        if (!IsSpawned || hasExploded) return;
+
         trail.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         trail.transform.SetParent(null, true);
         trail.transform.localScale = Vector3.one;
         Destroy(trail.gameObject, trail.main.duration + trail.main.startLifetime.constantMax);
 
-        if (collision.gameObject != parent_gameobject)
+        if (collision.gameObject == parent_gameobject) return;
+
+        hasExploded = true;
+
+        if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
         {
-            if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
+            Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
+            if (vehicle != null)
             {
-                Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
-                if (vehicle != null)
+                if (!vehicle.vehicle_destroyed.Value)
                 {
-                    if (!vehicle.vehicle_destroyed.Value)
+                    float target_resistance = vehicle.GetResistance();
+                    float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
+
+                    vehicle.RequestDamage(vehicle_damage);
+
+                    if (vehicle.vehicle_destroyed.Value)
                     {
-                        float target_resistance = vehicle.GetResistance();
-                        float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
-
-                        vehicle.RequestDamage(vehicle_damage);
-
-                        if (vehicle.vehicle_destroyed.Value)
-                        {
-                            EliminationMarker.Instance.InstantiateVehicleImage();
-                        }
-                        else
-                        {
-                            DamageMarker.Instance.UpdateDamage(final_actual_damage);
-                        }
+                        EliminationMarker.Instance.InstantiateVehicleImage();
+                    }
+                    else
+                    {
+                        DamageMarker.Instance.UpdateDamage(final_actual_damage);
                     }
                 }
-
             }
-            else if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
+
+        }
+        else if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
+        {
+            PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
+            PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
+            player.RequestDamage(infantary_damage);
+            float target_resistance = player.GetResistance();
+            float final_actual_damage = infantary_damage * ((100f - target_resistance) / 100f);
+
+
+            if (player_properties.is_dead.Value)
             {
-                PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
-                PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
-                player.RequestDamage(infantary_damage);
-                float target_resistance = player.GetResistance();
-                float final_actual_damage = infantary_damage * ((100f - target_resistance) / 100f);
-
-
-                if (player_properties.is_dead.Value)
-                {
-                    AccountManager.Instance.status.AddKill();
-                    EliminationMarker.Instance.InstantiateVehicleImage();
-                }
-                else
-                {
-                    DamageMarker.Instance.UpdateDamage(final_actual_damage);
-                }
-
+                AccountManager.Instance.status.AddKill();
+                EliminationMarker.Instance.InstantiateVehicleImage();
             }
             else
             {
-                voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage);
-                missile_collider.enabled = false;
+                DamageMarker.Instance.UpdateDamage(final_actual_damage);
             }
 
-            Explode(collision.contacts[0].point);
+        }
+        else
+        {
+            voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage);
+            missile_collider.enabled = false;
         }
 
-    }
+        Explode(collision.contacts[0].point);
 
+
+    }
     #endregion
 
     #region Collision / Explosion
-
-    [ServerRpc(RequireOwnership = false)]
+    [ServerRpc]
     protected void Explode(Vector3 contact_point)
     {
-        //CreateSound(explosion_sound);
+        // No servidor, verificar novamente se já não foi processado
+        if (!IsSpawned) return;
+
         CmdPlayExplosionSound();
         if (explosion_effect != null)
         {
@@ -138,21 +144,15 @@ public abstract class Missiles : NetworkBehaviour
             Spawn(explosion);
             explosion.transform.localScale *= 2;
         }
-
         RequestDespawn();
-
     }
-
+    
     [ObserversRpc]
     private void CmdPlayExplosionSound()
     {
         AudioDistanceController audioDistanceController = explosion_sound.GetComponent<AudioDistanceController>();
-
         audioDistanceController.StartGrowth();
-
     }
-
-
 
     protected virtual void CreateSound(AudioSource sound)
     {
@@ -180,8 +180,7 @@ public abstract class Missiles : NetworkBehaviour
     #endregion
 
     #region Utility
-
-    public virtual void Shoot() { }
+    public virtual void Shoot(Vector3 direction) { }
 
     public GameObject GetGameObject()
     {
@@ -197,9 +196,9 @@ public abstract class Missiles : NetworkBehaviour
         }
     }
 
-    [ServerRpc(RequireOwnership = false)]
     private void RequestDespawn()
     {
+
         if (IsSpawned)
         {
             Despawn(gameObject);
@@ -208,10 +207,7 @@ public abstract class Missiles : NetworkBehaviour
         {
             Destroy(gameObject);
         }
+
     }
-
-
-
     #endregion
-
 }

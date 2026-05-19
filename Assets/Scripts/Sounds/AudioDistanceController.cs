@@ -5,7 +5,6 @@ using UnityEngine;
 public class AudioDistanceController : MonoBehaviour
 {
     [Header("Growth Settings")]
-
     private float finalGrowth;
     private float growthSpeed = 2000f;
 
@@ -19,6 +18,11 @@ public class AudioDistanceController : MonoBehaviour
     [Header("Detection Settings")]
     [SerializeField] private LayerMask cameraLayer;
     public bool useLayerMask = true;
+
+    [Header("Camera Shake")]
+    [SerializeField] private bool enableCameraShakeOnHit;
+    [SerializeField] private float cameraShakeIntensity = 2;
+    [SerializeField] private float cameraShakeDuration = 1;
 
     private SphereCollider sphereCollider;
     private bool isGrowing = false;
@@ -163,11 +167,19 @@ public class AudioDistanceController : MonoBehaviour
 
             if (selectedClip != null)
             {
+
                 audioSource.PlayOneShot(selectedClip);
             }
             else
             {
                 audioSource.PlayOneShot(audioSource.clip);
+            }
+
+            if (enableCameraShakeOnHit)
+            {
+                print(targetObject.name);
+                CameraShake cameraShake = targetObject.GetComponentInParent<CameraShake>();
+                if (cameraShake != null) cameraShake.RequestShake(cameraShakeIntensity, cameraShakeDuration);
             }
 
             // Armazenar qual som foi tocado para este objeto

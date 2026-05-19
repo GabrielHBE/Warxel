@@ -57,7 +57,6 @@ public class C4Explosive : MonoBehaviour
 
         }
 
-
     }
 
 }

@@ -1,15 +1,21 @@
+using FishNet;
+using FishNet.Object;
 using TMPro;
 using UnityEngine;
 
-public class factiontest : MonoBehaviour
+public class ServerState : NetworkBehaviour
 {
     [SerializeField] private TextMeshProUGUI a;
 
     void Update()
     {
-        if(AccountManager.Instance != null)
+        if(IsServerInitialized)
         {
-            a.text = AccountManager.Instance.faction.ToString();
+            a.text = "Server";
+        }
+        else
+        {
+            a.text = "Client";
         }
     }
     

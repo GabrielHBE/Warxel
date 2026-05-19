@@ -6,6 +6,8 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
     [HideInInspector] private GameObject playerNetworkObjectPrefab;
     [SerializeField] private WeaponProperties[] weapon_prefabs;
 
+    #region Sounds
+
     [ServerRpc(RequireOwnership = false)]
     public void CmdPlayWeaponSound(string weapon_name, Vector3 position)
     {
@@ -41,11 +43,13 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
         }
     }
 
-    [ServerRpc(RequireOwnership = false)]
+    #endregion
+
+    #region Bullet
+    [ServerRpc]
     public void ServerSpawnBullet(GameObject bulletPrefab, Bullet.BulletData data, NetworkObject shooter, string weaponshooted_name = null)
     {
         GameObject instantiaded_obj = Instantiate(bulletPrefab, data.position, data.rotation);
-
         Spawn(instantiaded_obj, shooter.Owner);
 
         Bullet bullet = instantiaded_obj.GetComponent<Bullet>();
@@ -71,6 +75,27 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
 
         return null;
     }
+
+    #endregion
+
+    #region  Gadget
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ServerSpawnAirStrike(GameObject airStrikePrefab, Vector3 goToPos)
+    {
+        Vector3 pos = new Vector3(Random.Range(-500, 500), MapSettings.Instance.max_altitude, Random.Range(-500, 500));
+        GameObject instantiatedAirStrike = Instantiate(airStrikePrefab, pos, Quaternion.identity);
+        Spawn(instantiatedAirStrike);
+
+        AirStrikeMissile airStrikeMissile = instantiatedAirStrike.GetComponent<AirStrikeMissile>();
+        if (airStrikeMissile != null)
+        {
+            airStrikeMissile.EnableMissile(goToPos);
+        }
+
+    }
+
+    #endregion
 
 
     public GameObject GetSpawnedPlayerNetworkObject()

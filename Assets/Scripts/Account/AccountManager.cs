@@ -23,7 +23,6 @@ public class AccountManager : MonoBehaviour
     {
         
         Instance = this;
-        print(Instance);
         LoadData();
 
     }

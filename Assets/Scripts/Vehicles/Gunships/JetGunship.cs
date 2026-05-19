@@ -13,10 +13,8 @@ public class JetGunship : Jet
             StitchSeats();
         }
 
-        if (is_pilot && !SettingsHUD.Instance.is_menu_settings_active && is_in_vehicle)
+        if (!SettingsHUD.Instance.is_menu_settings_active && is_in_vehicle)
         {
-            UpdateHUD();
-
             if (start_engine == true)
             {
             }
@@ -30,11 +28,6 @@ public class JetGunship : Jet
         {
             SlowDownEngine();
         }
-
-    }
-    protected override void UpdateHUD()
-    {
-        base.UpdateHUD();
 
     }
 

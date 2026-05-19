@@ -54,17 +54,17 @@ public class TvMissileController : MissileController
         }
 
 
-        if (!is_active) return;
+        //if (!is_active) return;
 
-        UpdateRocketsHUD();
+        //UpdateRocketsHUD();
 
     }
 
     TvMissile tvMissile;
 
-    public override void Shoot(KeyCode keyCode)
+    public override void ShootMissile()
     {
-        if (CanShoot() && Input.GetKeyDown(keyCode) && tvMissile == null)
+        if (CanShoot() && tvMissile == null)
         {
             if (only_show_missiles_when_shoot)
                 current_missile.GetComponent<MeshRenderer>().enabled = true;

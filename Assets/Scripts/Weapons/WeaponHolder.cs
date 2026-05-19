@@ -284,7 +284,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 1;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
 
     }
 
@@ -294,7 +294,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 2;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
     }
 
     public void LeftHand_WeaponToExtractor(float moveTime)
@@ -302,7 +302,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 5;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
 
     }
 
@@ -311,7 +311,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 6;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
 
     }
 
@@ -320,7 +320,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 7;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
     }
 
     public void LeftHand_ExtractorToMag(float moveTime)
@@ -328,7 +328,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 8;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
     }
 
     public void RightHand_WeaponToExtractor(float moveTime)
@@ -336,7 +336,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 3;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
     }
 
     public void RightHand_ExtractorToWeapon(float moveTime)
@@ -344,7 +344,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 4;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
 
     }
 
@@ -353,7 +353,7 @@ public class WeaponHolder : MonoBehaviour
         this.moveTime = moveTime;
         func = 8;
         MoveTimer = 0;
-        cameraShake.RequestShake(CameraShake.ShakeType.Reload, 0.5f, 0.5f);
+        cameraShake.RequestShake(0.5f, 0.5f);
 
     }
 

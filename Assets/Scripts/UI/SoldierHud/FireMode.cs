@@ -15,23 +15,23 @@ public class FireMode : MonoBehaviour
         key.text = SettingsHUD.Instance.WEAPON_switchFireModeButton.text;
     }
 
-    public void SetFireMode(string fire_mode)
+    public void SetFireMode(WeaponProperties.FireMode fire_mode)
     {
         switch (fire_mode)
         {
-            case "Auto":
+            case WeaponProperties.FireMode.Auto:
                 auto.SetActive(true);
                 burst.SetActive(false);
                 single.SetActive(false);
                 break;
 
-            case "Burst":
+            case WeaponProperties.FireMode.Burst:
                 auto.SetActive(false);
                 burst.SetActive(true);
                 single.SetActive(false);
                 break;
 
-            case "Single":
+            case WeaponProperties.FireMode.Single:
                 auto.SetActive(false);
                 burst.SetActive(false);
                 single.SetActive(true);

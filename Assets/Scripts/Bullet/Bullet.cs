@@ -30,6 +30,7 @@ public class Bullet : NetworkBehaviour
     private Vector3 original_position;
     private bool did_ricochet;
     private float timer;
+    private float delaytoEnableForNonOwner;
 
     // Variável de controle para o despawn
     private bool isDespawning;
@@ -55,18 +56,21 @@ public class Bullet : NetworkBehaviour
         public float size;
         public bool canDamageVehicles;
         public float vehicleDamage;
+        public float delaytoEnableForNonOwner;
     }
 
     #region Bullet Creation
     [ObserversRpc]
     public void CreateBullet(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
+        meshRenderer.enabled = false;
+        trail.enabled = false;
+
         ignoredTransform = ignoredObject;
 
         shoot_root = root;
 
         isDespawning = false;
-        GetComponent<BoxCollider>().enabled = true;
         voxCollider.destructionRadius = data.destructionForce;
         did_ricochet = false;
         infantary_damage = data.infantaryDamage;
@@ -76,7 +80,7 @@ public class Bullet : NetworkBehaviour
         hs_multiplier = data.hsMultiplier;
         can_damage_vehicles = data.canDamageVehicles;
         vehicle_damage = data.vehicleDamage;
-
+        delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
         SetDirection(data.direction, data.speed, data.dropMultiplier);
 
         if (data.size != 0) transform.localScale *= data.size;
@@ -104,7 +108,6 @@ public class Bullet : NetworkBehaviour
     private IEnumerator DelayForEnableBulletForOwner()
     {
         yield return null;
-
         meshRenderer.enabled = true;
         trail.enabled = true;
     }
@@ -194,7 +197,7 @@ public class Bullet : NetworkBehaviour
         if (!IsOwner && !meshRenderer.enabled)
         {
             time_to_enable_view += Time.deltaTime;
-            if (time_to_enable_view > 0.2f)
+            if (time_to_enable_view > delaytoEnableForNonOwner)
             {
                 EnableBulletView();
             }

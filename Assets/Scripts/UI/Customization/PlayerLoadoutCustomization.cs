@@ -459,6 +459,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     public void ShowLoadoutOptions()
     {
+        if(PlayerSpawnController.Instance !=null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
         _currentStage = SelectionStage.LoadoutOptionSelection;
         backButton.SetActive(true);
 
@@ -1095,9 +1096,12 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (weaponsGadgetsSlider != null)
             weaponsGadgetsSlider.gameObject.SetActive(false);
 
+        print(_currentStage);
         switch (_currentStage)
-        {
+        {   
+
             case SelectionStage.LoadoutOptionSelection:
+                if(PlayerSpawnController.Instance !=null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(true);
                 _maxSliderY = minScrollY;
                 _currentStage = SelectionStage.ClassSelection;
                 loadoutOptionsParent.gameObject.SetActive(false);
@@ -1107,6 +1111,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
                 break;
 
             case SelectionStage.ItemSelection:
+                if(PlayerSpawnController.Instance !=null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
                 _currentStage = SelectionStage.LoadoutOptionSelection;
                 weaponsGadgetsParent.gameObject.SetActive(false);
                 ClearItemButtons();
@@ -1199,7 +1204,20 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         damageDropoffTimerText.text = wp.damage_dropoff_timer.ToString("F2") + "s";
         spreadIncreaserText.text = wp.spread_increaser.ToString("F2");
         maxSpreadText.text = wp.max_spread.ToString("F2");
-        horizontalRecoilText.text = wp.horizontal_recoil_media.ToString("F2");
+        if (wp.horizontal_recoil_media < 0)
+        {
+            horizontalRecoilText.text = Math.Abs(wp.horizontal_recoil_media).ToString("F2") + "  <-";
+        }
+        else if (wp.horizontal_recoil_media > 0)
+        {
+            horizontalRecoilText.text = wp.horizontal_recoil_media.ToString("F2") + "  ->";
+        }
+        else
+        {
+            horizontalRecoilText.text = "0.00";
+        }
+
+
         verticalRecoilText.text = wp.vertical_recoil_media.ToString("F2");
         firstShotRecoilIncreaserText.text = "x" + wp.first_shoot_increaser.ToString("F1");
         magCountText.text = wp.mag_count.ToString();

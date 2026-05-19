@@ -1,6 +1,5 @@
 using System;
 using FishNet.Object;
-using FishNet.Object.Synchronizing;
 using UnityEngine;
 
 public class Helicopter : Vehicle
@@ -8,29 +7,18 @@ public class Helicopter : Vehicle
     #region Inspector Variables
 
     [Header("Helicopter variables")]
-    [SerializeField] protected Transform pilot_position;
-
     [SerializeField] protected HeliProperties heliProperties;
     [SerializeField] protected GameObject main_propeller;
     [SerializeField] protected GameObject back_propeller;
-
     [SerializeField] protected AudioSource inside_propeller_sound;
     [SerializeField] protected AudioSource outside_propeller_sound;
     [SerializeField] protected AudioSource fall_alarm;
 
-    public readonly SyncVar<bool> is_pilot_seat_occupied = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-
-
-    protected Transform player_camera;
-
     #endregion
 
     #region Private Variables
-    [SerializeField] protected HelicopterHudManager helicopterHudManager;
-
     protected float mouseY;
     protected float mouseX;
-    protected bool is_pilot;
 
     // Movement
     private float gravity_force;
@@ -41,9 +29,11 @@ public class Helicopter : Vehicle
     private float rotate_value;
     private float destroyTimer = 0f;
     protected Vector3 liftDirection;
-
+    private float currentPropellerSpeed = 0f;
+    private float propellerAccelerationTime = 10f;
+    private float propellerDecelerationTime = 1f;
+    protected float exit_cooldown;
     #endregion
-
 
     #region Movement 
 
@@ -65,19 +55,19 @@ public class Helicopter : Vehicle
         }
     }
 
-
     protected override void Move()
     {
         float deltaTime = Time.fixedDeltaTime;
 
-        if (is_pilot_seat_occupied.Value == false)
+        if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
         {
-            throttle = 0;
-            gravity_force = 5;
+            
+            HandleThrottleInput(deltaTime);
         }
         else
         {
-            HandleThrottleInput(deltaTime);
+            throttle = 0;
+            gravity_force = 5;
         }
 
         rb.AddForce(Vector3.down * gravity_force, ForceMode.Acceleration);
@@ -86,6 +76,8 @@ public class Helicopter : Vehicle
 
     protected void HandleThrottleInput(float deltaTime)
     {
+        print("to no HandleThrottleInput");
+        
         float pitchAngle = transform.eulerAngles.x;
         float rollAngle = transform.eulerAngles.z;
 
@@ -143,12 +135,9 @@ public class Helicopter : Vehicle
 
     protected void Rotate()
     {
-        if (!is_pilot) return;
-
         float deltaTime = Time.fixedDeltaTime;
         CalculateRotationInput(deltaTime);
         ApplyRotationTorque();
-
 
     }
 
@@ -184,47 +173,37 @@ public class Helicopter : Vehicle
         }
         else
         {
-            lean_value = Mathf.Lerp(lean_value, 0, 2 * deltaTime);
+            lean_value = 0;
         }
     }
 
     protected void ApplyRotationTorque()
     {
-        rb.AddTorque(transform.forward * -mouseX * heliProperties.rotation_value * 200, ForceMode.Force);
-        rb.AddTorque(transform.right * -mouseY * heliProperties.pitch_value * 2000, ForceMode.Force);
-        rb.AddTorque(transform.up * lean_value * rb.mass * 1.5f);
+        rb.AddTorque(transform.forward * -mouseX * heliProperties.rotation_value * (rb.mass / 10), ForceMode.Force);
+        rb.AddTorque(transform.right * -mouseY * heliProperties.pitch_value * rb.mass, ForceMode.Force);
+        if (lean_value != 0) rb.AddTorque(transform.up * lean_value * rb.mass);
     }
 
     #endregion
 
     #region Utility 
-    protected override void UpdateHUD()
+    protected void PropellerRotation()
     {
-        helicopterHudManager.helicopterPilotHUD.UpdateDamage();
-        helicopterHudManager.helicopterPilotHUD.UpdateRotationX(transform.eulerAngles.x);
-        helicopterHudManager.helicopterPilotHUD.UpdateRotationY(transform.eulerAngles.y);
-        helicopterHudManager.helicopterPilotHUD.UpdateAltitude(transform.position.y / 3);
-        helicopterHudManager.helicopterPilotHUD.UpdateSpeed(rb.linearVelocity.magnitude);
-        helicopterHudManager.helicopterPilotHUD.UpdateThrottle(throttle);
+        float deltaTime = Time.deltaTime;
+        float targetSpeed = start_engine == true ? heliProperties.max_lift_force : 0f;
 
-        if (countermeasures != null)
-        {
-            if (countermeasures.is_active)
-            {
-                helicopterHudManager.UpdateCountermeasuresStatus("Active");
-            }
-            else if (!countermeasures.is_active && countermeasures.is_reloading)
-            {
-                helicopterHudManager.UpdateCountermeasuresStatus("Reloading... [" + countermeasures.reload_countermeasures_duration.ToString("F0") + "]");
-            }
-            else if (!countermeasures.is_active && !countermeasures.is_reloading)
-            {
-                helicopterHudManager.UpdateCountermeasuresStatus("Ready");
-            }
-        }
+        float smoothTime = start_engine == true ? propellerAccelerationTime : propellerDecelerationTime;
+        float t = Mathf.Clamp01(deltaTime / smoothTime);
 
+        currentPropellerSpeed = Mathf.Lerp(currentPropellerSpeed, targetSpeed, t);
+
+        float rotationAmount = currentPropellerSpeed * deltaTime * 20;
+
+        if (main_propeller != null)
+            main_propeller.transform.Rotate(0, rotationAmount * 4, 0, Space.Self);
+        if (back_propeller != null)
+            back_propeller.transform.Rotate(0, 0, rotationAmount * 4, Space.Self);
     }
-
     #endregion
 
     #region Collision & Destruction 
@@ -247,7 +226,7 @@ public class Helicopter : Vehicle
             Vector3 contactPoint = contact.point; // Ponto da colisão
             Vector3 contactNormal = contact.normal; // Normal da colisão
 
-            if (playerController != null) playerController.RequestDamage(100);
+            if (currentSeat.playerController != null) currentSeat.playerController.RequestDamage(100);
 
             // Usando os valores obtidos da colisão
             HandleCollision(collision, 50);
@@ -267,12 +246,12 @@ public class Helicopter : Vehicle
         }
 
         // 2. CRITICAL CHANGE: Only the server handles the timer, physics torque, and the final explosion
-        if (!IsServerInitialized) return;
+        //if (!IsServerInitialized) return;
 
         destroyTimer += Time.fixedDeltaTime;
         rotate_value = Math.Clamp(Mathf.Pow(destroyTimer * 15, 2f), 0, 900);
 
-        if (playerController != null) playerController.RequestDamage(destroyTimer);
+        if (currentSeat.playerController != null) currentSeat.playerController.RequestDamage(destroyTimer);
 
         Ray ray = new Ray(transform.position, Vector3.down);
         RaycastHit hit;
@@ -311,27 +290,50 @@ public class Helicopter : Vehicle
         fire_effects_parent.SetActive(true);
     }
 
-    protected override void Start_Stop_Engine()
+    [ServerRpc(RequireOwnership = false)]
+    protected void CmdRequestPlayEngineSound()
     {
-        throw new NotImplementedException();
+        RpcPlayEngineSound();
     }
 
-    protected override void CameraController()
+    [ObserversRpc]
+    private void RpcPlayEngineSound()
     {
-        throw new NotImplementedException();
+        inside_propeller_sound.Play();
     }
 
-    protected override void SwitchWeapon()
+    [ServerRpc(RequireOwnership = false)]
+    protected void CmdRequestStopEngineSound()
     {
-        throw new NotImplementedException();
+        RpcStopEngineSound();
     }
 
-    protected override void GetVehicleCustomization()
+    [ObserversRpc]
+    private void RpcStopEngineSound()
     {
-        throw new NotImplementedException();
+        inside_propeller_sound.Stop();
     }
 
 
+    protected override void StartStopEngine()
+    {
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
+        {
+            start_engine = !start_engine;
+            if (start_engine == true)
+            {
+                CmdRequestPlayEngineSound();
+            }
+            else
+            {
+                CmdRequestStopEngineSound();
+            }
+        }
+    }
+
+    protected override void CameraController() { }
+
+    public override float GetMaxThrottle() => heliProperties.max_lift_force;
     #endregion
 
 }

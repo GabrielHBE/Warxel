@@ -9,7 +9,7 @@ public class CursorManager : MonoBehaviour
     {
         Instance = this;
 
-        if (PlayerSpawnManager.Instance.GetPlayerSpawnController() == null)
+        if (PlayerSpawnController.Instance == null)
         {
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
@@ -20,9 +20,9 @@ public class CursorManager : MonoBehaviour
 
     void Update()
     {
-        if (PlayerSpawnManager.Instance.GetPlayerSpawnController()== null) return;
+        if (PlayerSpawnController.Instance == null) return;
 
-        if (SettingsHUD.Instance.is_menu_settings_active || PlayerSpawnManager.Instance.GetPlayerSpawnController().player_instantiated == null)
+        if (SettingsHUD.Instance.is_menu_settings_active || PlayerSpawnController.Instance.player_instantiated == null)
         {
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;

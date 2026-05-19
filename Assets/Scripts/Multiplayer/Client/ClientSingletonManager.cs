@@ -17,6 +17,7 @@ public class ClientSingletonManager : NetworkBehaviour
     [SerializeField] private GameObject vehicleLoadoutCustomization;
 
 
+
     private GameObject instantiated_player_spawner;
     private GameObject instantiated_account_manager;
     private GameObject instantiated_gerenal_hud;
@@ -68,7 +69,7 @@ public class ClientSingletonManager : NetworkBehaviour
             instantiated_vehicle_loadout_customization = Instantiate(vehicleLoadoutCustomization);
             StartCoroutine(DisableVehicleCustomization());
         }
-            
+
     }
 
     private IEnumerator DisableVehicleCustomization()
@@ -80,11 +81,11 @@ public class ClientSingletonManager : NetworkBehaviour
     public override void OnStopClient()
     {
         base.OnStopClient();
-        Destroy(instantiated_account_manager);
-        Destroy(instantiated_gerenal_hud);
-        Destroy(instantiated_settings);
-        Destroy(instantiated_infantary_loadout_customization);
-        Destroy(instantiated_vehicle_loadout_customization);
+        if (instantiated_account_manager != null) Destroy(instantiated_account_manager);
+        if (instantiated_gerenal_hud != null) Destroy(instantiated_gerenal_hud);
+        if (instantiated_settings != null) Destroy(instantiated_settings);
+        if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
+        if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
 
     }
 

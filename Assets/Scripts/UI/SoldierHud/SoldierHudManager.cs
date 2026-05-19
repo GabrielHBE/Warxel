@@ -41,10 +41,12 @@ public class SoldierHudManager : NetworkBehaviour
         }
     }
 
+    
     void Update()
     {
         if (!IsOwner) return;
-
+        
+        /*
         // Verifica se o estado do veículo mudou
         if (isInitialized && playerProperties.is_in_vehicle != lastVehicleState)
         {
@@ -54,6 +56,7 @@ public class SoldierHudManager : NetworkBehaviour
             // Atualiza o estado anterior
             lastVehicleState = playerProperties.is_in_vehicle;
         }
+        */
 
         if (playerProperties.sprinting && !playerProperties.is_in_vehicle)
         {
@@ -64,12 +67,13 @@ public class SoldierHudManager : NetworkBehaviour
             center_screen_dot.enabled = false;
         }
     }
+    
 
     /// <summary>
     /// Atualiza a visibilidade dos itens que devem ser escondidos no veículo
     /// </summary>
     /// <param name="isInVehicle">Indica se o jogador está dentro de um veículo</param>
-    private void UpdateItemsVisibility(bool isInVehicle)
+    public void UpdateItemsVisibility(bool isInVehicle)
     {
         foreach (GameObject item in itens_to_hide_when_in_vehicle)
         {
@@ -78,5 +82,12 @@ public class SoldierHudManager : NetworkBehaviour
                 item.SetActive(isInVehicle);
             }
         }
+    }
+
+    public void UpdateDeadPlayerHud(bool isDead)
+    {
+
+        if (deadPlayerHud.gameObject.activeSelf) deadPlayerHud.gameObject.SetActive(isDead);
+
     }
 }

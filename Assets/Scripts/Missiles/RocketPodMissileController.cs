@@ -1,17 +1,25 @@
+using System.Collections;
+using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
 
 public class RocketPodController : MissileController
 {
-    // Roda apenas quando o objeto é iniciado no Servidor
-    public override void OnStartServer()
+
+    public override void OnOwnershipClient(NetworkConnection prevOwner)
     {
-        base.OnStartServer();
-        InitializeMissilesServer<RocketPodsMissile>();
+        base.OnOwnershipClient(prevOwner);
+        //CmdRequestReloadMissiles();
+        //StartCoroutine(StartMissileForOwnerDelay());
+        if(IsOwner) CmdReuestInitializeMissiles();
     }
 
     protected override void Update()
     {
+        if (!IsSpawned) return;
+        
+        if(!IsOwner) return;
+        
         base.Update();
 
         if (missiles.Count == 0 && can_reload_missiles)
@@ -21,48 +29,44 @@ public class RocketPodController : MissileController
 
             if (spawnInterval <= 0)
             {
-                // Se eu sou o piloto controlando a arma, eu peço ao servidor para recarregar
-                if (is_active)
-                {
-                    CmdRequestReloadMissiles();
-                }
-                // Se o veículo estiver vazio (sem dono), o próprio servidor recarrega sozinho
-                else if (IsServerInitialized && !Owner.IsValid)
-                {
-                    ReloadMissilesServer<RocketPodsMissile>();
-                }
-                
+
+                CmdRequestReloadMissiles();
+
                 spawnInterval = original_spawn_interval;
             }
         }
 
-        if (!is_active) return;
-        UpdateRocketsHUD();
     }
 
-    public override void Shoot(KeyCode keyCode)
+    public override void ShootMissile()
     {
-        if (CanShoot() && Input.GetKeyDown(keyCode))
+        if (CanShoot())
         {
             if (only_show_missiles_when_shoot)
             {
                 CmdEnableMesh(current_missile.gameObject);
-                current_missile.GetComponent<MeshRenderer>().enabled = true;
-            } 
-            
+                current_missile.mesh.enabled = true;
+            }
+
             shoot_delay = original_shoot_delay;
-            
+
             // Aqui o cliente chama o [ServerRpc] no míssil. 
-            current_missile.Shoot(); 
+            current_missile.Shoot(transform.forward);
             MoveToNextMissile();
         }
     }
 
     // Novo RPC para o Cliente pedir a recarga
-    [ServerRpc(RequireOwnership = false)]
+    [ServerRpc(RequireOwnership = true)]
     private void CmdRequestReloadMissiles()
     {
         ReloadMissilesServer<RocketPodsMissile>();
     }
-    
+
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdReuestInitializeMissiles()
+    {
+        InitializeMissilesServer<RocketPodsMissile>();
+    }
+
 }

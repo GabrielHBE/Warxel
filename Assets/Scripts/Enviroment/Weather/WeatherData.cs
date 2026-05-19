@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.UI;
 
 public class WeatherData : MonoBehaviour {
 	private float timer;

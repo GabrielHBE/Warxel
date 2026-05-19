@@ -164,9 +164,8 @@ public class SwayNBobScript : MonoBehaviour
 
         CachePlayerProperties();
 
-
         // Verificar se o jogador está morto
-        if (playerProperties.is_dead.Value || playerProperties.isProneTransition || playerProperties.is_composing_bullets || playerProperties.is_in_vehicle)
+        if (playerProperties.is_dead.Value || playerProperties.isProneTransition || playerProperties.is_composing_bullets)
         {
             // Apenas aplicar rotação de morte
             Quaternion deadRotation = Quaternion.Euler(40f, 0f, 0f);
@@ -179,8 +178,6 @@ public class SwayNBobScript : MonoBehaviour
             // Retornar para evitar outros cálculos
             return;
         }
-
-
 
         if (playerProperties.sprinting && !switchWeapon._switch && !playerProperties.is_aiming && !playerProperties.is_proned && !playerProperties.roll && !playerProperties.isProneTransition)
         {
@@ -245,7 +242,6 @@ public class SwayNBobScript : MonoBehaviour
         new Vector3(transform.localPosition.x + current_position_sprinting, transform.localPosition.y, transform.localPosition.z),
         Time.deltaTime
         );
-
 
     }
 

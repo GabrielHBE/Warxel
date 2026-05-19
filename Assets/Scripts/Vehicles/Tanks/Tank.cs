@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using FishNet.Connection;
 using FishNet.Object;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -10,7 +9,6 @@ public class Tank : Vehicle
 {
     [Header("Properties")]
     [SerializeField] private TankProperties tankProperties;
-    [SerializeField] private TankHudManager tankHudManager;
     public TankPilotGun tankPilotGun;
 
     [Header("Instances")]
@@ -70,25 +68,14 @@ public class Tank : Vehicle
 
     #region Unity Lifecycle
 
-    public override void Initialize()
-    {
-        base.Initialize();
-        if (countermeasures != null && Settings.Instance != null) countermeasures.SetUseCountermeasureKey(Settings.Instance._keybinds.VEHICLE_countermeasureKey);
-
-        SetHpProperties(tankProperties.hp, tankProperties.resistance);
-    }
-
     public override void OnStartClient()
     {
         base.OnStartClient();
+        
+        if (countermeasures != null && Settings.Instance != null) countermeasures.SetUseCountermeasureKey(Settings.Instance._keybinds.VEHICLE_countermeasureKey);
 
         InitiaizeClientItens();
-
-        // Configuramos a HUD aqui para que todos os clientes vejam os ícones corretamente!
-        if (tankMainShell.image_hud != null && tankPilotGun.pilot_gun_hud_image != null && countermeasures.image_icon_hud != null)
-        {
-            tankHudManager.SetImages(tankMainShell.image_hud, tankPilotGun.pilot_gun_hud_image, countermeasures.image_icon_hud);
-        }
+        SetHpProperties(tankProperties.hp, tankProperties.resistance);
     }
 
     private void InitiaizeClientItens()
@@ -127,11 +114,10 @@ public class Tank : Vehicle
                 SwitchWeapon();
                 HandleShooting();
                 Zoom();
-                UpdateHUD();
 
                 if (!vehicle_destroyed.Value)
                 {
-                    Start_Stop_Engine();
+                    StartStopEngine();
                     if (start_engine == true)
                     {
                         Boost();
@@ -477,7 +463,7 @@ public class Tank : Vehicle
 
     private void RotateInput()
     {
-    
+
         moveSideways = 0;
 
         if (Input.GetKey(Settings.Instance._keybinds.TANK_turn_left_key) && Input.GetKey(Settings.Instance._keybinds.TANK_turn_right_key))
@@ -597,19 +583,19 @@ public class Tank : Vehicle
 
     private void Zoom()
     {
-        if (!vehicle_camera.enabled) return;
+        if (!currentSeat.playerCamera.enabled) return;
 
         if (Input.GetKey(Settings.Instance._keybinds.TANK_zoom_key))
         {
 
             float targetFov = minFov / tankProperties.zoom;
-            vehicle_camera.fieldOfView = Mathf.Lerp(vehicle_camera.fieldOfView, targetFov, 4 * Time.deltaTime);
+            currentSeat.playerCamera.fieldOfView = Mathf.Lerp(currentSeat.playerCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
 
         }
         else
         {
-            vehicle_camera.fieldOfView = Mathf.Lerp(
-                vehicle_camera.fieldOfView,
+            currentSeat.playerCamera.fieldOfView = Mathf.Lerp(
+                currentSeat.playerCamera.fieldOfView,
                 minFov,
                 4 * Time.deltaTime);
 
@@ -634,7 +620,7 @@ public class Tank : Vehicle
         }
     }
 
-    protected override void Start_Stop_Engine()
+    protected override void StartStopEngine()
     {
         if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
@@ -665,7 +651,6 @@ public class Tank : Vehicle
     }
 
     #endregion
-
 
     #region Shoot
     private void HandleShooting()
@@ -804,7 +789,8 @@ public class Tank : Vehicle
             hsMultiplier = 2,
             size = 1,
             canDamageVehicles = false,
-            vehicleDamage = tankPilotGun.vehicle_damage
+            vehicleDamage = tankPilotGun.vehicle_damage,
+            delaytoEnableForNonOwner = 0,
         };
 
         Spawn(bulletObj.gameObject, Owner);
@@ -955,26 +941,16 @@ public class Tank : Vehicle
     [TargetRpc]
     public override void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
-        if (vehicleHudManager != null) vehicleHudManager.gameObject.SetActive(true);
-        player = _player;
-
-        playerProperties = _player.GetComponent<PlayerProperties>();
-        playerController = _player.GetComponent<PlayerController>();
-        player_rb = playerController.rb;
-
-        playerProperties.is_in_vehicle = true;
+        CallBaseEnterVehicle(conn, _player);
         is_in_vehicle = true;
         _exitCooldown = 0;
-
-        vehicle_camera.enabled = true;
-        vehicle_camera.GetComponent<AudioListener>().enabled = true;
-        player.transform.SetParent(turret.transform);
-
-        player.transform.localPosition = Vector3.zero;
-        player.transform.localRotation = Quaternion.identity;
-
         // Ao invés de chamar o ObserversRpc direto, o Cliente pede ao Servidor
         CmdDisablePlayer(_player);
+    }
+
+    private void CallBaseEnterVehicle(NetworkConnection conn, GameObject _player)
+    {
+        base.EnterVehicle(conn, _player);
     }
 
     // O Cliente pede para o Servidor...
@@ -994,11 +970,11 @@ public class Tank : Vehicle
     protected override void ExitVehicle()
     {
         // O mesmo vale para a saída: pede ao Servidor primeiro
+        GameObject player = currentSeat.playerGameObject;
+
         CmdEnablePlayer(player);
 
         base.ExitVehicle();
-        vehicle_camera.enabled = false;
-        vehicle_camera.GetComponent<AudioListener>().enabled = false;
     }
 
     // O Cliente pede para o Servidor...
@@ -1014,38 +990,28 @@ public class Tank : Vehicle
     {
         if (_player != null) _player.SetActive(true);
     }
-
-    #endregion
-    #region HUD
-
-    protected override void UpdateHUD()
-    {
-        tankHudManager.UpdateSpeed(speed);
-        tankHudManager.ChangeHeatIndicatorActive(!usingMainCannon);
-        tankHudManager.UpdateHeat(pilot_gun_overheat_amount);
-        tankHudManager.UpdateCannonRotation(cannon_rotation_amount);
-        if (cannon_shoot_delay != tankMainShell.reload_time)
-        {
-            tankHudManager.UpdateMainCannonStatus("Reloading... [" + cannon_shoot_delay.ToString("F1") + "]");
-        }
-        else
-        {
-            tankHudManager.UpdateMainCannonStatus("Ready!");
-        }
-    }
-
     #endregion
 
     #region Destruction
-
     protected override void DestroyAnimation()
     {
-        base.DestroyAnimation();
-        fire_effects_parent.SetActive(true);
-        StartCoroutine(DelayToExplode(5));
+        CmdEnableFire();
     }
 
-    IEnumerator DelayToExplode(float delay)
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdEnableFire()
+    {
+        EnableFire();
+    }
+
+    [ObserversRpc]
+    private void EnableFire()
+    {
+        StartCoroutine(DelayToExplode(5));
+        fire_effects_parent.SetActive(true);
+    }
+
+    private IEnumerator DelayToExplode(float delay)
     {
         yield return new WaitForSeconds(delay);
         Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Ground"), 20);
@@ -1055,12 +1021,6 @@ public class Tank : Vehicle
     {
         throw new NotImplementedException();
     }
-
-    protected override void GetVehicleCustomization()
-    {
-        throw new NotImplementedException();
-    }
-
 
     #endregion
 

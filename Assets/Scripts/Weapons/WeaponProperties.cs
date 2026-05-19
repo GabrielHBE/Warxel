@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine.UI;
 using Unity.VisualScripting;
 using UnityEngine;
+using System;
 
 public class WeaponProperties : MonoBehaviour
 {
@@ -17,6 +18,7 @@ public class WeaponProperties : MonoBehaviour
     [Header("Weapon properties")]
     public bool can_damage_vehicles;
     public bool manual_calculate_recoil;
+    public List<FireMode> fire_modes = new List<FireMode>();
     public bool is_shotgun;
     public bool single_reload;
     public bool can_hold_trigger;
@@ -27,7 +29,7 @@ public class WeaponProperties : MonoBehaviour
     public float zoom;
     public float time_to_transfer_bullets;
     public Vector3 ads_position;
-    public List<string> fire_modes = new List<string>();
+    
 
     [Header("HUD")]
     public Sprite icon_hud;
@@ -76,7 +78,7 @@ public class WeaponProperties : MonoBehaviour
     public float screen_reset_recoil_speed;
     public float weapon_reset_recoil_speed;
     public float weapon_apply_recoil_speed;
-    [HideInInspector] public float interval;
+    [HideInInspector] public float interval => 60f / rate_of_fire;
     public Vector3 visual_recoil;
     public float horizontal_recoil_media;
     public float vertical_recoil_media;
@@ -114,12 +116,21 @@ public class WeaponProperties : MonoBehaviour
     public enum WeaponCategory
     {
         AssaultRifle,
+        Dmr,
         SniperRifle,
         SubmachineGun,
         LightMachineGun,
         Shotgun,
         Pistol,
         Launcher
+    }
+
+    [Serializable]
+    public enum FireMode
+    {
+        Auto,
+        Burst,
+        Single
     }
 
     public void Initialize()
@@ -154,8 +165,7 @@ public class WeaponProperties : MonoBehaviour
     {
 
         CalculateMedia();
-        interval = 60f / rate_of_fire;
-
+        
         if (!manual_calculate_recoil)
         {
             //weapon_reset_recoil_speed = interval * 0.75f;  // 75% do interval

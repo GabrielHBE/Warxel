@@ -222,8 +222,6 @@ public class SettingsHUD : MonoBehaviour
         // Agora podemos inicializar com segurança
         InitializeUIValues();
         LoadAllKeybindsToUI();
-
-        Debug.Log("SettingsHUD initialized successfully");
     }
 
     private void ShowErrorMessage()

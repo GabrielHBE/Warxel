@@ -36,6 +36,7 @@ public class KeyBinds : MonoBehaviour
     public KeyCode PLAYER_rollKey = KeyCode.Z;
     public KeyCode PLAYER_activateNightNision = KeyCode.N;
     public KeyCode PLAYER_spotKey = KeyCode.Q;
+    public KeyCode PLAYER_holdBreathKey = KeyCode.LeftShift;
 
 
     [Header("Weapons")]
@@ -65,6 +66,13 @@ public class KeyBinds : MonoBehaviour
     public KeyCode VEHICLE_switchSeatKey = KeyCode.LeftControl;
     public KeyCode VEHICLE_weapon1 = KeyCode.Alpha1;
     public KeyCode VEHICLE_weapon2 = KeyCode.Alpha2;
+    public KeyCode VEHICLE_weapon3 = KeyCode.Alpha3;
+    public KeyCode VEHICLE_weapon4 = KeyCode.Alpha4;
+    public KeyCode VEHICLE_weapon5 = KeyCode.Alpha5;
+    public KeyCode VEHICLE_weapon6 = KeyCode.Alpha6;
+    public KeyCode VEHICLE_weapon7 = KeyCode.Alpha7;
+    public KeyCode VEHICLE_weapon8 = KeyCode.Alpha8;
+    public KeyCode VEHICLE_weapon9 = KeyCode.Alpha9;
 
 
     [Header("Jet")]

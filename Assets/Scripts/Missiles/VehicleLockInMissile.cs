@@ -41,9 +41,9 @@ public class VehicleLockInMissile : Missiles
         transform.position = Vector3.Lerp(transform.position, target_transform.position, maneuverability);
 
     }
-    public override void Shoot()
+    public override void Shoot(Vector3 direction)
     {
-        base.Shoot();
+        base.Shoot(direction);
         can_follow_target = true;
     }
     public void SetVehicle(Vehicle vehicle)

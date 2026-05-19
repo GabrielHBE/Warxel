@@ -4,10 +4,8 @@ using FishNet.Object;
 using TMPro;
 using UnityEngine;
 
-public abstract class MissileController : NetworkBehaviour
-{
-    [SerializeField] protected TextMeshProUGUI rockets_left_hud;
-    public Sprite image_hud;
+public abstract class MissileController : NetworkBehaviour, IsVehicleCustomizationPart, IVehicleArmory
+{    public Sprite image_hud;
     public GameObject parent_gameobject;
     [SerializeField] protected bool can_reload_missiles;
     [SerializeField] protected bool only_show_missiles_when_shoot;
@@ -22,6 +20,8 @@ public abstract class MissileController : NetworkBehaviour
     protected Missiles current_missile;
     protected float original_shoot_delay;
     protected float original_spawn_interval;
+
+    public Transform shootDirection;
 
     public override void OnStartNetwork()
     {
@@ -59,7 +59,7 @@ public abstract class MissileController : NetworkBehaviour
             rocket.parent_gameobject = parent_gameobject;
 
             // Spawna na rede
-            ServerManager.Spawn(currentItem, Owner);
+            Spawn(currentItem, Owner);
 
             // Adiciona na lista do servidor e na array temporária
             missiles.Add(rocket);
@@ -93,11 +93,11 @@ public abstract class MissileController : NetworkBehaviour
 
             // 2. Parenteia e reseta posições
             rocket.transform.SetParent(spawnPoints[i]);
-            //rocket.transform.localPosition = Vector3.zero;
-            //rocket.transform.localRotation = Quaternion.identity;
+            rocket.transform.localPosition = Vector3.zero;
+            rocket.transform.localRotation = Quaternion.identity;
             rocket.parent_gameobject = parent_gameobject;
 
-            if (only_show_missiles_when_shoot) rocket.GetComponent<MeshRenderer>().enabled = false;
+            if (only_show_missiles_when_shoot) rocket.mesh.enabled = false;
 
             // 3. Adiciona na lista local para que o cliente saiba que tem munição
             if (!IsServerInitialized)
@@ -188,22 +188,7 @@ public abstract class MissileController : NetworkBehaviour
         return true;
     }
 
-    public virtual void Shoot(KeyCode keyCode) { }
-
-    public void SetActive(bool active) => is_active = active;
-
-    protected virtual void UpdateRocketsHUD()
-    {
-        if (rockets_left_hud == null) return;
-        if (missiles.Count != 0)
-        {
-            rockets_left_hud.text = (spawnPoints.Count - current_missile_index).ToString("F0");
-        }
-        else
-        {
-            rockets_left_hud.text = "Reloading... " + spawnInterval.ToString("F1");
-        }
-    }
+    public virtual void ShootMissile() { }
 
     // Update ServerRpc to receive the GameObject
     [ServerRpc(RequireOwnership = false)]
@@ -226,4 +211,64 @@ public abstract class MissileController : NetworkBehaviour
         }
     }
 
+    #region Interface implementations
+    //IsVehicleCustomizationPart
+    public void Activate()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void Deactivate()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public VehicleCustomizableParts GetCustomizationPart()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public string GetCustomizationPartName()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    //IVehicleArmory
+    public void Shoot()
+    {
+        if (Input.GetKeyDown(Settings.Instance._keybinds.JET_shootVehicleKey))
+        {
+            ShootMissile();
+        }
+    }
+
+    public Sprite GetArmoryIcon()
+    {
+        return image_hud;
+    }
+
+    public void ActivateArmory() => is_active = true;
+
+    public void DeactivateArmory() => is_active = false;
+
+    public string GetCurrentAmmo()
+    {
+
+        string text = "";
+
+        if (missiles.Count != 0)
+        {
+            text = (spawnPoints.Count - current_missile_index).ToString("F0");
+        }
+        else
+        {
+            text = "Reloading... " + spawnInterval.ToString("F1");
+        }
+
+        return text;
+    }
+
+    public float GetHeatingLevel() => 0;
+    public float GetMaxOverheat() => 0;
+    #endregion
 }

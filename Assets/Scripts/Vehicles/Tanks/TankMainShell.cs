@@ -2,7 +2,7 @@ using FishNet.Object;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
 
-public class TankMainShell : NetworkBehaviour
+public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart, IVehicleArmory
 {
     [SerializeField] private Collider shell_collider;
     [SerializeField] private Rigidbody rb;
@@ -120,4 +120,63 @@ public class TankMainShell : NetworkBehaviour
             Despawn(gameObject);
         }
     }
+
+    #region Interface implementations
+    //IsVehicleCustomizationPart
+    public void Activate()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void Deactivate()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public VehicleCustomizableParts GetCustomizationPart()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public string GetCustomizationPartName()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    //IVehicleArmory
+    public void Shoot()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public Sprite GetArmoryIcon()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void ActivateArmory()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public string GetCurrentAmmo()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public float GetHeatingLevel()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void DeactivateArmory()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public float GetMaxOverheat()
+    {
+        throw new System.NotImplementedException();
+    }
+    #endregion
 }

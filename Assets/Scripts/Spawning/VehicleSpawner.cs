@@ -5,62 +5,64 @@ public class VehicleSpawner : MonoBehaviour
     public Vehicle.VehicleCategory vehicleCategory;
 
     [SerializeField] private Transform[] spawn_points;
+    
+    [Header("Click Settings")]
+    private float doubleClickThreshold = 0.2f; // Tempo máximo entre os cliques para ser considerado duplo
+    private float lastClickTime = 0f;
 
     private void OnMouseDown()
     {
-        if (AccountManager.Instance.selected_class != ClassManager.Class.Pilot)
+        // Calcula o tempo desde o último clique
+        float timeSinceLastClick = Time.time - lastClickTime;
+        
+        // Atualiza o tempo do último clique para o tempo atual
+        lastClickTime = Time.time;
+
+        // Se o tempo entre os cliques for menor que o limite, é um clique duplo!
+        if (timeSinceLastClick <= doubleClickThreshold)
         {
-
-            GeneralHudAlertMessages.Instance.CreateMessage("Only the pilot Class can drive vehicles", 2);
-            return;
-
+            ExecuteSpawn();
         }
+    }
 
-        PlayerSpawnController localController = PlayerSpawnManager.Instance?.GetPlayerSpawnController();
-        if (localController == null)
-        {
-            Debug.LogWarning("No local spawn controller found!");
-            return;
-        }
+    private void ExecuteSpawn()
+    {
 
         Transform selected_spawn_point = spawn_points[Random.Range(0, spawn_points.Length)];
 
         switch (vehicleCategory)
         {
             case Vehicle.VehicleCategory.AttackHelicopter:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedAttackHeli, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedAttackHeli, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.AttackJet:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedAttackJet, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedAttackJet, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.Gunship:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedGunship, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedGunship, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.IFV:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedIfv, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedIfv, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.MBT:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedMbt, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedMbt, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.ScoutHelicopter:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedScountHeli, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedScountHeli, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.StealthJet:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedStealthJet, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedStealthJet, selected_spawn_point);
                 break;
 
             case Vehicle.VehicleCategory.TransportHelicopter:
-                localController.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedTransportHeli, selected_spawn_point);
+                PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedTransportHeli, selected_spawn_point);
                 break;
         }
-
-
     }
-
 }

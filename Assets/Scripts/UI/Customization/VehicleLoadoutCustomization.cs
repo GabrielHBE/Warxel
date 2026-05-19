@@ -54,6 +54,10 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     [SerializeField] private TextMeshProUGUI currentSelectionText;
     [SerializeField] private Slider itemsSlider;
 
+    // NOVO: Botão para entrar na customização do veículo selecionado
+    [Header("Vehicle Customization Button")]
+    [SerializeField] private GameObject customizeVehicleButton;
+
     [Header("Selection Outline")]
     [SerializeField] private Color selectedOutlineColor = Color.white;
     [SerializeField] private float outlineWidth = 5f;
@@ -138,6 +142,13 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     {
         InitializeSlider();
 
+        // Inicializa o botão de customização
+        if (customizeVehicleButton != null)
+        {
+            customizeVehicleButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(OnCustomizeVehicleButtonClicked);
+            customizeVehicleButton.SetActive(false);
+        }
+
         backButton.SetActive(false);
         categoriesParent.gameObject.SetActive(false);
         vehiclesParent.gameObject.SetActive(false);
@@ -159,7 +170,8 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     {
         if (switchLoadoutCamera != null)
         {
-            switchLoadoutCamera.enabled = _currentStage != SelectionStage.CategorySelection && _currentStage != SelectionStage.VehicleSelection;
+            //switchLoadoutCamera.enabled = _currentStage != SelectionStage.CategorySelection && _currentStage != SelectionStage.VehicleSelection;
+            switchLoadoutCamera.enabled = _currentStage != SelectionStage.CategorySelection;
         }
     }
 
@@ -174,7 +186,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         float scrollY = Mathf.Lerp(minScrollY, _maxSliderY, value);
         Vector3 newPosition = _originalPartsPosition;
         newPosition.y = scrollY;
-        
+
         // Aplica o scroll no parent que estiver ativo (vehicles ou parts)
         if (vehiclesParent.gameObject.activeSelf) vehiclesParent.localPosition = newPosition;
         if (partsParent.gameObject.activeSelf) partsParent.localPosition = newPosition;
@@ -227,7 +239,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         ResetSlider(vehiclesParent);
 
         GameObject[] vehicles = GetVehiclesArrayForCategory(category);
-        
+
         if (vehicles != null)
         {
             for (int i = 0; i < vehicles.Length; i++)
@@ -235,14 +247,66 @@ public class VehicleLoadoutCustomization : MonoBehaviour
                 CreateVehicleButton(vehicles[i], i);
             }
         }
-        
+
         ShowSliderIfNeeded(vehicles?.Length ?? 0, vehiclesParent);
+    }
+
+    // NOVO: Chamado ao clicar no botão de um veículo
+    public void OnVehicleSelected(GameObject vehiclePrefab, VehicleCategory category)
+    {
+        if (audio_source != null && select_item_sfx != null)
+        {
+            audio_source.clip = select_item_sfx;
+            audio_source.Play();
+        }
+
+        _selectedVehiclePrefab = vehiclePrefab;
+
+        // Instancia e prepara o veículo na tela (igual ao PlayerLoadout)
+        if (_currentVehicleInstance != null) Destroy(_currentVehicleInstance);
+        _currentVehicleInstance = Instantiate(vehiclePrefab, currentItemParent);
+        SetupInstanceForCustomization(_currentVehicleInstance);
+
+        // Carrega loadout salvo para visualizar as peças
+        loadoutSaver.LoadLoadoutForVehicle(_currentVehicleInstance, vehiclePrefab.name);
+
+        // Atribui o script Vehicle à variável da categoria correspondente
+        Vehicle vehicleComponent = vehiclePrefab.GetComponent<Vehicle>();
+        if (vehicleComponent != null)
+        {
+            switch (category)
+            {
+                case VehicleCategory.MBT: selectedMbt = vehicleComponent; break;
+                case VehicleCategory.IFV: selectedIfv = vehicleComponent; break;
+                case VehicleCategory.ScoutHelicopter: selectedScountHeli = vehicleComponent; break;
+                case VehicleCategory.AttackHelicopter: selectedAttackHeli = vehicleComponent; break;
+                case VehicleCategory.TransportHelicopter: selectedTransportHeli = vehicleComponent; break;
+                case VehicleCategory.AttackJet: selectedAttackJet = vehicleComponent; break;
+                case VehicleCategory.StealthJet: selectedStealthJet = vehicleComponent; break;
+                case VehicleCategory.Gunship: selectedGunship = vehicleComponent; break;
+            }
+        }
+
+        // Ativa o botão de "Customizar"
+        if (customizeVehicleButton != null)
+        {
+            customizeVehicleButton.SetActive(true);
+        }
+    }
+
+    // NOVO: O botão secundário dispara a customização
+    public void OnCustomizeVehicleButtonClicked()
+    {
+        if (_selectedVehiclePrefab != null)
+        {
+            if (customizeVehicleButton != null) customizeVehicleButton.SetActive(false);
+            ShowOptions(_selectedVehiclePrefab);
+        }
     }
 
     public void ShowOptions(GameObject vehiclePrefab)
     {
         _currentStage = SelectionStage.OptionSelection;
-        _selectedVehiclePrefab = vehiclePrefab;
 
         ClearAllButtons();
         DisableAllParents();
@@ -251,16 +315,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
 
         if (currentSelectionText != null) currentSelectionText.text = $"Customizando: {vehiclePrefab.name}";
 
-        // Instancia o veículo se não existir
-        if (_currentVehicleInstance == null || _currentVehicleInstance.name != vehiclePrefab.name + "(Clone)")
-        {
-            if (_currentVehicleInstance != null) Destroy(_currentVehicleInstance);
-            _currentVehicleInstance = Instantiate(vehiclePrefab, currentItemParent);
-            SetupInstanceForCustomization(_currentVehicleInstance);
-            
-            // Carrega loadout salvo
-            loadoutSaver.LoadLoadoutForVehicle(_currentVehicleInstance, vehiclePrefab.name);
-        }
+        // O veículo já foi instanciado no OnVehicleSelected, não precisamos criar novamente.
 
         // Procura todos os slots disponíveis neste veículo baseando-se nas partes presentes
         IsVehicleCustomizationPart[] parts = _currentVehicleInstance.GetComponentsInChildren<IsVehicleCustomizationPart>(true);
@@ -320,7 +375,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         }
 
         // Ativa o selecionado
-        //selectedPart.Activate();
+        //selectedPart.Activate(); // Você tem ele comentado no original também
 
         // Salva as alterações
         loadoutSaver.SaveCurrentLoadout(_selectedVehiclePrefab.name, _currentVehicleInstance);
@@ -338,10 +393,14 @@ public class VehicleLoadoutCustomization : MonoBehaviour
                 ShowOptions(_selectedVehiclePrefab);
                 break;
             case SelectionStage.OptionSelection:
-                if (_currentVehicleInstance != null) Destroy(_currentVehicleInstance);
+                // Retorna o botão de customização ao voltar pros veículos, se houver um selecionado
+                if (customizeVehicleButton != null && _selectedVehiclePrefab != null) customizeVehicleButton.SetActive(true);
                 ShowVehicles(_selectedCategory);
                 break;
             case SelectionStage.VehicleSelection:
+                if (customizeVehicleButton != null) customizeVehicleButton.SetActive(false);
+                if (_currentVehicleInstance != null) Destroy(_currentVehicleInstance);
+                _selectedVehiclePrefab = null;
                 ShowCategories();
                 break;
         }
@@ -369,7 +428,10 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         ApplyVerticalSpacing(btnObj, index);
 
         btnObj.GetComponentInChildren<TextMeshProUGUI>().text = vehiclePrefab.name;
-        btnObj.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(() => ShowOptions(vehiclePrefab));
+
+        // MODIFICADO: Agora chama OnVehicleSelected em vez de abrir direto ShowOptions
+        btnObj.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(() => OnVehicleSelected(vehiclePrefab, _selectedCategory));
+
         _buttonsList.Add(btnObj);
     }
 
@@ -505,7 +567,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         public void UpdateOutlineState()
         {
             if (_outline == null || _part == null) return;
-            
+
             // Assume-se que a parte ativa estará com seu respectivo GameObject ativado ou gerenciado na lógica interna
             // Como fallback simples, validamos se o GameObject que carrega este componente está ativo na hierarquia
             MonoBehaviour mbPart = _part as MonoBehaviour;
@@ -560,10 +622,10 @@ public class VehicleLoadoutCustomization : MonoBehaviour
                 MonoBehaviour mbPart = part as MonoBehaviour;
                 if (mbPart != null && mbPart.gameObject.activeSelf)
                 {
-                    data.slots.Add(new SlotData 
-                    { 
-                        slotType = part.GetCustomizationPart(), 
-                        activePartName = part.GetCustomizationPartName() 
+                    data.slots.Add(new SlotData
+                    {
+                        slotType = part.GetCustomizationPart(),
+                        activePartName = part.GetCustomizationPartName()
                     });
                 }
             }
@@ -577,7 +639,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
             if (data == null) return;
 
             IsVehicleCustomizationPart[] allParts = vehicleInstance.GetComponentsInChildren<IsVehicleCustomizationPart>(true);
-            
+
             // Primeiro desativa tudo
             foreach (var part in allParts) part.Deactivate();
 
@@ -586,7 +648,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
             {
                 foreach (var savedSlot in data.slots)
                 {
-                    if (part.GetCustomizationPart() == savedSlot.slotType && 
+                    if (part.GetCustomizationPart() == savedSlot.slotType &&
                         part.GetCustomizationPartName() == savedSlot.activePartName)
                     {
                         part.Activate();

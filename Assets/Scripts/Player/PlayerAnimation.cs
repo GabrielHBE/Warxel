@@ -3,6 +3,7 @@ using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 
 public class PlayerAnimation : NetworkBehaviour
 {
@@ -42,6 +43,10 @@ public class PlayerAnimation : NetworkBehaviour
     [SerializeField] private Transform leftHand;
     [SerializeField] private TwoBoneIKConstraint leftHand_twoBoneIKConstraint;
     private Transform leftHand_target;
+
+
+    [SerializeField] private Transform vehicleLeftHandTarget;
+    [SerializeField] private Transform vehicleRightHandTarget;
 
     private float left_twoBoneIKConstraint_weight;
     private float right_twoBoneIKConstraint_weight;
@@ -317,7 +322,7 @@ public class PlayerAnimation : NetworkBehaviour
         }
     }
 
-    void Update()
+    void LateUpdate()
     {
         if (IsOwner)
         {
@@ -326,24 +331,28 @@ public class PlayerAnimation : NetworkBehaviour
         UpdateLeftHandTarget();
         UpdateAnimatorParameters();
         UpdateDeathAnimation();
-        UpdateRightHandTransform();
-        UpdateLeftHandIK();
-        UpdateRightHandIK();
 
+        // MUDE A ORDEM: primeiro executa o IK
+        UpdateLeftHandIK();
+        UpdateRightHandIK();      // ← Agora executa antes
+
+        // Depois executa a transformação da mão direita
+        UpdateRightHandTransform(); // ← Agora executa depois
+
+        // O código comentado sobre a arma...
+        // Lógica do veículo
+        
         if (StateInVehicle)
         {
-            if (current_weapon != null)
-            {
-                if (current_weapon.activeSelf) current_weapon.SetActive(false);
-            }
+            if (current_weapon != null && current_weapon.activeSelf)
+                current_weapon.SetActive(false);
         }
         else
         {
-            if (current_weapon != null)
-            {
-                if (!current_weapon.activeSelf) current_weapon.SetActive(true);
-            }
+            if (current_weapon != null && !current_weapon.activeSelf)
+                current_weapon.SetActive(true);
         }
+        
     }
 
     #region Sincronizacao de Rede
@@ -466,6 +475,13 @@ public class PlayerAnimation : NetworkBehaviour
     {
         if (weapon_hand_holder == null) return;
 
+        // LOG 2: Verificar se está ignorando quando no veículo
+        if (StateInVehicle)
+        {
+            return;
+        }
+
+        // Resto do código permanece igual...
         if (StateAiming || StateFiring || leftHand_target == null)
         {
             weapon_hand_holder.transform.localRotation = Quaternion.Slerp(
@@ -517,41 +533,75 @@ public class PlayerAnimation : NetworkBehaviour
 
     private void UpdateLeftHandIK()
     {
-        // 1. Se temos um alvo válido, a "âncora" invisível do IK segue a arma
+        // Lógica para Veículo
+        if (StateInVehicle)
+        {
+            if (vehicleLeftHandTarget != null && leftHand != null)
+            {
+                left_twoBoneIKConstraint_weight = 1f;
+                leftHand.position = vehicleLeftHandTarget.position;
+                leftHand.rotation = vehicleLeftHandTarget.rotation;
+            }
+            else
+            {
+                // Se estiver no veículo mas sem alvo definido, desativa o IK
+                left_twoBoneIKConstraint_weight = 0f;
+            }
+
+            if (leftHand_twoBoneIKConstraint != null)
+                leftHand_twoBoneIKConstraint.weight = left_twoBoneIKConstraint_weight;
+
+            return; // Sai do método para não executar a lógica de arma
+        }
+
+        // Lógica normal de Arma (fora do veículo)
         if (leftHand_target != null && leftHand != null)
         {
             leftHand.position = leftHand_target.position;
             leftHand.rotation = leftHand_target.rotation;
         }
 
-        // 2. A mão deve estar grudada agora?
-        bool should_hold_weapon = (leftHand_target != null) && !StateProneTrans && !StateDead && !StateInVehicle;
+        bool should_hold_weapon = (leftHand_target != null) && !StateProneTrans && !StateDead;
 
-        // 3. Suaviza a transição (Sobe para 1 se segurando, Desce para 0 se soltou)
         if (should_hold_weapon)
-        {
             left_twoBoneIKConstraint_weight += Time.deltaTime * 7f;
-        }
         else
-        {
             left_twoBoneIKConstraint_weight -= Time.deltaTime * 7f;
-        }
 
-        // 4. Trava o valor entre 0 e 1 e aplica no Rigging
         left_twoBoneIKConstraint_weight = Mathf.Clamp01(left_twoBoneIKConstraint_weight);
 
         if (leftHand_twoBoneIKConstraint != null)
-        {
             leftHand_twoBoneIKConstraint.weight = left_twoBoneIKConstraint_weight;
-        }
     }
-    
+
     #endregion
 
     #region Right Hand IK
 
     private void UpdateRightHandIK()
     {
+        // Lógica para Veículo
+        if (StateInVehicle)
+        {
+            if (vehicleRightHandTarget != null && rightHand != null)
+            {
+                right_twoBoneIKConstraint_weight = 1f;
+                rightHand.position = vehicleRightHandTarget.position;
+                rightHand.rotation = vehicleRightHandTarget.rotation;
+            }
+            else
+            {
+                // Se estiver no veículo mas sem alvo definido, desativa o IK
+                right_twoBoneIKConstraint_weight = 0f;
+            }
+
+            if (rightHand_twoBoneIKConstraint != null)
+                rightHand_twoBoneIKConstraint.weight = right_twoBoneIKConstraint_weight;
+
+            return; // Sai do método para não executar a lógica de arma/switch
+        }
+
+        // Lógica normal de Arma/Switch (fora do veículo)
         if (StateSwitch)
         {
             SwitchWeapon(StateWeapon);
@@ -562,7 +612,7 @@ public class PlayerAnimation : NetworkBehaviour
             right_hand_transition_speed = 7f;
         }
 
-        if ((StateAiming || StateFiring || StateSwitch) && leftHand_target != null && !StateInVehicle)
+        if ((StateAiming || StateFiring || StateSwitch) && leftHand_target != null)
         {
             right_twoBoneIKConstraint_weight += Time.deltaTime * right_hand_transition_speed;
         }
@@ -572,10 +622,10 @@ public class PlayerAnimation : NetworkBehaviour
         }
 
         right_twoBoneIKConstraint_weight = Mathf.Clamp01(right_twoBoneIKConstraint_weight);
+
         if (rightHand_twoBoneIKConstraint != null)
             rightHand_twoBoneIKConstraint.weight = right_twoBoneIKConstraint_weight;
     }
-
 
     private void UpdateLeftHandTarget()
     {
@@ -627,14 +677,14 @@ public class PlayerAnimation : NetworkBehaviour
             {
                 instantiatedWeapons[currently_instantiated_weapon_index] = current_weapon;
             }
-            current_weapon.SetActive(false);
+            //current_weapon.SetActive(false);
         }
 
         // Tenta recuperar do cache
         if (instantiatedWeapons.TryGetValue(index, out GameObject cachedWeapon) && cachedWeapon != null)
         {
             current_weapon = cachedWeapon;
-            current_weapon.SetActive(true);
+            //current_weapon.SetActive(true);
             currently_instantiated_weapon_index = index;
         }
         else
@@ -654,6 +704,9 @@ public class PlayerAnimation : NetworkBehaviour
         }
 
         if (current_weapon == null) return;
+
+        current_weapon.SetActive(true);
+
 
         // Busca o LeftHandPosition
         ThirdPersonWeapon thirdPersonWeapon = current_weapon.GetComponent<ThirdPersonWeapon>();
@@ -696,6 +749,41 @@ public class PlayerAnimation : NetworkBehaviour
         thirdPersonWeaponController.Reestart(IsOwner);
 
 
+    }
+
+    #endregion
+
+    #region Public Methods
+    [ServerRpc]
+    public void DeactivateCurrentWeapon()
+    {
+        if (current_weapon != null)
+        {
+            CmdUpdateWeaponActive(false);
+            current_weapon.SetActive(false);
+        }
+    }
+
+    [ServerRpc]
+    public void ActivateCurrentWeapon()
+    {
+        if (current_weapon != null)
+        {
+            CmdUpdateWeaponActive(true);
+            current_weapon.SetActive(true);
+        }
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void CmdUpdateWeaponActive(bool status)
+    {
+        current_weapon.SetActive(status);
+    }
+
+    public void SetVehicleIKTargets(Transform vehicleLeftHandTarget, Transform vehicleRightHandTarget)
+    {
+        this.vehicleLeftHandTarget = vehicleLeftHandTarget;
+        this.vehicleRightHandTarget = vehicleRightHandTarget;
     }
 
     #endregion

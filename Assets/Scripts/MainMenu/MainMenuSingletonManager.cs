@@ -16,7 +16,6 @@ public class MainMenuSingletonManager : MonoBehaviour
         if (settings != null)
         {
             Instantiate(settings); 
-            print("Settings Initialized");
         }
         if (accountManager != null)
         {

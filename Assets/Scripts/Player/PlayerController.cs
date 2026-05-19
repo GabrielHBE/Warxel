@@ -9,15 +9,14 @@ using UnityEngine.Rendering.Universal;
 
 public class PlayerController : NetworkBehaviour, ISspottable
 {
+    public static PlayerController Instance { get; private set; }
+
     #region Serialized Fields
-
     public Transform spot_position;
-
     [Header("Multiplayer / Player")]
     [SerializeField] private BoxCollider[] player_hit_colliders;
-    public static PlayerController Instance { get; private set; }
     [SerializeField] private AudioListener camera_audio;
-    [SerializeField] private GameObject first_person_player_components;
+    public GameObject first_person_player_components;
     [SerializeField] private MeshRenderer[] hideToOwnerItems;
     public GameObject[] body_parts;
     [SerializeField] private GameObject fist_person;
@@ -70,11 +69,11 @@ public class PlayerController : NetworkBehaviour, ISspottable
     [SerializeField] private CameraShake cameraShake;
     [SerializeField] private FootstepSound footstepSound;
     [SerializeField] private Weapon weapon;
-    [SerializeField] private SoldierHudManager soldierHudManager;
+    public SoldierHudManager soldierHudManager;
     [SerializeField] private SwayNBobScript SwayNBob;
     [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     public PlayerProperties playerProperties;
-    [SerializeField] private PlayerAnimation playerAnimation;
+    public PlayerAnimation playerAnimation;
 
     [Header("Volumes")]
     [SerializeField] private Volume nightVision_volume;
@@ -145,11 +144,16 @@ public class PlayerController : NetworkBehaviour, ISspottable
     private Coroutine current_DealDamageOverTime;
 
     // Syncvars
+    /*
     private readonly SyncVar<bool> is_dead = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     private readonly SyncVar<bool> is_in_vehicle = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     private readonly SyncVar<bool> is_proned = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     private readonly SyncVar<bool> crouched = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     private readonly SyncVar<bool> roll = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    */
+
+    private enum PlayerStance { Stand, Crouch, Prone, Disabled }
+    private PlayerStance currentStance = PlayerStance.Stand;
 
     #endregion
 
@@ -172,24 +176,16 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     void Update()
     {
+
         if (!IsOwner) return;
 
-        UpdateSyncVars();
         UpdateColliderStateLocal();
-
-        UpdateColliderStateServer(
-            playerProperties.is_dead.Value,
-            playerProperties.is_in_vehicle,
-            playerProperties.is_proned,
-            playerProperties.crouched,
-            playerProperties.roll
-        );
 
         // Se estiver em um veículo, roda a lógica do veículo e aborta o resto
         if (playerProperties.is_in_vehicle)
         {
-            DisableColliders();
-            if (first_person_player_components.activeSelf) first_person_player_components.SetActive(false);
+            playerProperties.isGrounded = true;
+            //if (first_person_player_components.activeSelf) first_person_player_components.SetActive(false);
             UpdateHeadRotation();
             return;
         }
@@ -197,7 +193,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
         HandleDebugInput();
         UpdateDamageVignette();
 
-        if (!first_person_player_components.activeSelf) first_person_player_components.SetActive(true);
+        //if (!first_person_player_components.activeSelf) first_person_player_components.SetActive(true);
 
         FootstepSound();
         UpdateGroundCheck();
@@ -253,7 +249,6 @@ public class PlayerController : NetworkBehaviour, ISspottable
         playerCamera.GetComponent<AudioListener>().enabled = true;
         soldierHudManager.hud.gameObject.SetActive(true);
         fist_person.SetActive(true);
-        enabled = true;
 
         playerProperties.faction.Value = AccountManager.Instance.faction;
         playerProperties.selected_class = AccountManager.Instance.selected_class;
@@ -271,13 +266,13 @@ public class PlayerController : NetworkBehaviour, ISspottable
         original_sprint_speed = sprintSpeed;
         original_walk_speed = walkSpeed;
         original_crouch_speed = crouchSpeed;
+        currentMoveSpeed = walkSpeed;
 
         // Caching das layers para performance
         interactivesLayer = LayerMask.GetMask("Interactives");
         vehicleLayer = LayerMask.GetMask("Vehicle");
         playerLayer = LayerMask.GetMask("Player");
 
-        SetupPhysics();
         playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
         InitializeVolume();
 
@@ -286,10 +281,6 @@ public class PlayerController : NetworkBehaviour, ISspottable
         StartCoroutine(weaponIcon.Initialize());
     }
 
-    private void SetupPhysics()
-    {
-        currentMoveSpeed = walkSpeed;
-    }
 
     private void InitializeVolume()
     {
@@ -513,7 +504,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
     private void ToggleCrouch()
     {
         if (playerProperties.is_aiming) StartCoroutine(SwayNBob.CrouchWeaponShake());
-        cameraShake.RequestShake(CameraShake.ShakeType.Crouch, 1);
+        cameraShake.RequestShake(0.8f, 0.2f);
         playerProperties.crouched = !playerProperties.crouched;
 
         if (playerProperties.crouched)
@@ -667,7 +658,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     private void Jump()
     {
-        cameraShake.RequestShake(CameraShake.ShakeType.Jump, 2);
+        cameraShake.RequestShake(3, 0.15f);
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(transform.up * jumpForce * rb.mass, ForceMode.Impulse);
         grounded = false;
@@ -712,7 +703,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
             }
 
             if (fall_damage != 0) RequestDamage(fall_damage);
-            cameraShake.RequestShake(CameraShake.ShakeType.Jump, 2);
+            cameraShake.RequestShake(3, 0.15f);
         }
 
         wasGroundedLastFrame = grounded;
@@ -914,6 +905,8 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     public void InteractWithVehicle(Vehicle vehicle)
     {
+        if (gameObject == null || !gameObject.activeSelf) return;
+
         if (is_night_vision_active)
         {
             is_night_vision_active = false;
@@ -922,10 +915,6 @@ public class PlayerController : NetworkBehaviour, ISspottable
             if (nightVision_vignette != null) nightVision_vignette.active = false;
         }
 
-        playerProperties.is_reloading = false;
-
-        rb.isKinematic = true;
-        rb.interpolation = RigidbodyInterpolation.None;
         if (weapon.weaponProperties != null)
         {
             weapon.can_shoot = true;
@@ -935,11 +924,6 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
         }
 
-        HideOwnerItems(false);
-
-        if (gameObject == null || !gameObject.activeSelf) return;
-
-        playerProperties.is_in_vehicle = true;
         RequestEnterVehicle(vehicle, gameObject);
     }
 
@@ -948,7 +932,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
     {
         if (vehicle == null || player == null || !vehicle.IsSpawned || !player.activeInHierarchy) return;
 
-        vehicle.NetworkObject.GiveOwnership(Owner);
+        //vehicle.NetworkObject.GiveOwnership(Owner);
         vehicle.EnterVehicle(Owner, player);
     }
 
@@ -956,31 +940,66 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     #region State Management
 
-    private void UpdateSyncVars()
-    {
-        // Otimização: Só atualiza a SyncVar se o valor realmente mudou para reduzir o uso da rede
-        if (is_dead.Value != playerProperties.is_dead.Value) is_dead.Value = playerProperties.is_dead.Value;
-        if (is_in_vehicle.Value != playerProperties.is_in_vehicle) is_in_vehicle.Value = playerProperties.is_in_vehicle;
-        if (is_proned.Value != playerProperties.is_proned) is_proned.Value = playerProperties.is_proned;
-        if (crouched.Value != playerProperties.crouched) crouched.Value = playerProperties.crouched;
-        if (roll.Value != playerProperties.roll) roll.Value = playerProperties.roll;
-    }
-
-    [ServerRpc]
-    private void UpdateColliderStateServer(bool isDead, bool isInVehicle, bool isProned, bool isCrouched, bool isRolling)
-    {
-        if (isDead || isInVehicle) DisableColliders();
-        else if (isProned) EnableProneCollider();
-        else if (isCrouched || isRolling) EnableCrouchCollider();
-        else EnableStandCollider();
-    }
-
     private void UpdateColliderStateLocal()
     {
-        if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle) DisableColliders();
-        else if (playerProperties.is_proned) EnableProneCollider();
-        else if (playerProperties.crouched || playerProperties.roll) EnableCrouchCollider();
-        else EnableStandCollider();
+        // 1. Define qual deve ser a postura (estado) alvo neste frame
+        PlayerStance targetStance;
+
+        if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle)
+            targetStance = PlayerStance.Disabled;
+        else if (playerProperties.is_proned)
+            targetStance = PlayerStance.Prone;
+        else if (playerProperties.crouched || playerProperties.roll)
+            targetStance = PlayerStance.Crouch;
+        else
+            targetStance = PlayerStance.Stand;
+
+        // 2. Só executa a troca e o RPC se o estado alvo for diferente do atual
+        if (targetStance != currentStance)
+        {
+            // Aplica as mudanças locais baseadas no novo estado
+            if (targetStance == PlayerStance.Disabled)
+                DisableColliders();
+            else if (targetStance == PlayerStance.Prone)
+                EnableProneCollider();
+            else if (targetStance == PlayerStance.Crouch)
+                EnableCrouchCollider();
+            else
+                EnableStandCollider();
+
+            // Salva o novo estado para o próximo frame
+            currentStance = targetStance;
+
+            // Envia para a rede APENAS no frame em que ocorreu a transição!
+            CmdUpdateColliderStateRemote(targetStance);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdUpdateColliderStateRemote(PlayerStance playerStance)
+    {
+        RpcUpdateColliderStateRemote(playerStance);
+    }
+
+    [ObserversRpc(ExcludeOwner = true)]
+    private void RpcUpdateColliderStateRemote(PlayerStance playerStance)
+    {
+        switch (playerStance)
+        {
+            case PlayerStance.Disabled:
+                DisableColliders();
+                break;
+            case PlayerStance.Prone:
+                EnableProneCollider();
+                break;
+            case PlayerStance.Crouch:
+                EnableCrouchCollider();
+                break;
+            case PlayerStance.Stand:
+                EnableStandCollider();
+                break;
+        }
+
     }
 
     private void EnableStandCollider()
@@ -1048,7 +1067,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
         {
             AccountManager.Instance.status.AddDeath();
             AccountManager.Instance.RemoveBattleCoin(10);
-            PlayerSpawnManager.Instance.GetPlayerSpawnController().Reestart();
+            PlayerSpawnController.Instance.Reestart();
 
             if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
 
@@ -1169,7 +1188,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
         CmdUpdateServerHP(playerProperties.hp.Value);
 
-        cameraShake.RequestShake(CameraShake.ShakeType.Damage, damage_dealt, 0.3f);
+        cameraShake.RequestShake(damage_dealt / 2, 0.1f);
         if (damage_dealt > 40) soldierHudManager.screenBlood.TriggerBlood();
         soldierHudManager.soldierHudHpManager.UpdateHp();
 
@@ -1261,7 +1280,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     public float GetHp() => playerProperties.hp.Value;
     public float GetResistance() => playerProperties.resistance.Value;
-    public bool IsPlayerDead() => is_dead.Value;
+    public bool IsPlayerDead() => playerProperties.is_dead.Value;
 
     public FactionManager.Faction GetFaction()
     {
