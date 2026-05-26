@@ -15,15 +15,11 @@ public class Audio : MonoBehaviour
     [Range(0f, 100f)]
     public float world_volume;
     [Range(0f, 100f)]
+    public float enviroment_volume;
+    [Range(0f, 100f)]
     public float hit_volume;
     [Range(0f, 100f)]
     public float kill_volume;
-    [Range(0f, 100f)]
-    public float vehicle_volume;
-    [Range(0f, 100f)]
-    public float infantary_volume;
-    [Range(0f, 100f)]
-    public float microphone_volume;
 
     [Header("Voip")]
     public bool enable_deth_voip;
@@ -31,6 +27,5 @@ public class Audio : MonoBehaviour
     public List<string> radio_world_voip_modes = new List<string> { "Off", "Push", "Enabled" };
     public KeyCode in_world_voip_key = KeyCode.V;
     public KeyCode radio_voip_key;
-
 
 }

@@ -59,17 +59,46 @@ public class Bullet : NetworkBehaviour
         public float delaytoEnableForNonOwner;
     }
 
+    #region Unity Lifecycle (Initialization)
+
+    void Awake()
+    {
+        HideVisuals();
+    }
+
+    void OnEnable()
+    {
+        HideVisuals();
+    }
+
+    // Força o objeto a ficar invisível localmente no exato milissegundo em que nasce/renasce
+    private void HideVisuals()
+    {
+        if (meshRenderer != null)
+        {
+            meshRenderer.enabled = false;
+        }
+
+        if (trail != null)
+        {
+            trail.enabled = false;
+            trail.Clear(); // Essencial: Limpa os rastros antigos caso o FishNet use Object Pooling
+        }
+    }
+
+    #endregion
+
     #region Bullet Creation
     [ObserversRpc]
     public void CreateBullet(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
         meshRenderer.enabled = false;
-        trail.enabled = false;
+        if (trail != null) trail.enabled = false;
+
+        SetDirection(data.direction, data.speed, data.dropMultiplier);
 
         ignoredTransform = ignoredObject;
-
         shoot_root = root;
-
         isDespawning = false;
         voxCollider.destructionRadius = data.destructionForce;
         did_ricochet = false;
@@ -81,7 +110,7 @@ public class Bullet : NetworkBehaviour
         can_damage_vehicles = data.canDamageVehicles;
         vehicle_damage = data.vehicleDamage;
         delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
-        SetDirection(data.direction, data.speed, data.dropMultiplier);
+
 
         if (data.size != 0) transform.localScale *= data.size;
 
@@ -91,35 +120,25 @@ public class Bullet : NetworkBehaviour
             Invoke(nameof(DespawnLocalSafe), 10f);
         }
 
-        if (IsOwner)
+        if (!IsOwner)
         {
-            StartCoroutine(DelayForEnableBulletForOwner());
-        }
-        else
-        {
-            // Outros clients começam com a bala invisível
             meshRenderer.enabled = false;
-            trail.enabled = false;
+            if (trail != null) trail.enabled = false;
         }
 
         lastPosition = transform.position;
     }
 
-    private IEnumerator DelayForEnableBulletForOwner()
-    {
-        yield return null;
-        meshRenderer.enabled = true;
-        trail.enabled = true;
-    }
-
     public void SetDirection(Vector3 direction, float speed, float dropMultiplier)
     {
         original_position = transform.localPosition;
+        /*
         rb.useGravity = false;
         if (TryGetComponent<FishNet.Component.Transforming.NetworkTransform>(out var nt))
         {
             nt.enabled = false;
         }
+        */
 
         rb.isKinematic = false;
         rb.linearVelocity = direction * speed;
@@ -359,6 +378,8 @@ public class Bullet : NetworkBehaviour
 
         if (hit_vehicle != null)
         {
+            string[] occupantNames = hit_vehicle.GetOccupantNames();
+
             if (!hit_vehicle.vehicle_destroyed.Value)
             {
                 hit_vehicle.RequestDamage(vehicle_damage);
@@ -370,17 +391,8 @@ public class Bullet : NetworkBehaviour
             }
             else
             {
-                if (shoot_root != null)
-                {
-                    Vehicle v = shoot_root.GetComponent<Vehicle>();
-                    if (v != null)
-                    {
-                        v.AddKill();
-                    }
-                }
-
+                ProcessKill.ProcessVehicleKill(shoot_root, occupantNames);
             }
-
         }
     }
 
@@ -429,22 +441,7 @@ public class Bullet : NetworkBehaviour
 
         if (is_lethal_shot)
         {
-            EliminationMarker.Instance.InstantiateVehicleImage();
-
-            AccountManager.Instance.status.AddKill();
-            if (hs_hit) AccountManager.Instance.status.AddHeadShotKill();
-            AccountManager.Instance.AddPointsToLevelUp(10);
-
-            if (shoot_root != null)
-            {
-                WeaponProperties wp = shoot_root.GetComponent<WeaponProperties>();
-                if (wp != null)
-                {
-                    wp.AddKill();
-                }
-            }
-
-            KillFeedDisplay.Instance.AddKill(AccountManager.Instance.account_name, playerProperties.player_name.Value, "Placeholder");
+            ProcessKill.ProcessInfantryKill(shoot_root, hs_hit, playerProperties.player_name.Value);
         }
 
         DamageMarker.Instance.UpdateDamage(dano_real_esperado);
@@ -455,7 +452,7 @@ public class Bullet : NetworkBehaviour
     private void EnableBulletView()
     {
         meshRenderer.enabled = true;
-        trail.enabled = true;
+        if (trail != null) trail.enabled = true;
     }
 
     void Ricochet(Vector3 position)

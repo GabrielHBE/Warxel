@@ -2,12 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
-using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class PlayerController : NetworkBehaviour, ISspottable
+public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 {
     public static PlayerController Instance { get; private set; }
 
@@ -24,7 +23,6 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     [Header("Body")]
     public GameObject playerHead;
-
     [Header("Colliders")]
     public CapsuleCollider stand_collider;
     public CapsuleCollider crouch_collider;
@@ -33,10 +31,8 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     [Header("Camera Settings")]
     public Camera playerCamera;
-
     [Header("Movement Settings - Tutorial Style")]
     public Transform orientation;
-
     [SerializeField] private float walkSpeed = 14f;
     [SerializeField] private float sprintSpeed = 14f;
     [SerializeField] private float crouchSpeed = 2f;
@@ -78,11 +74,9 @@ public class PlayerController : NetworkBehaviour, ISspottable
     [Header("Volumes")]
     [SerializeField] private Volume nightVision_volume;
     [SerializeField] private Volume damageTaken_volume;
-
     #endregion
 
     #region Private Variables
-
     // Components
     public Rigidbody rb;
 
@@ -143,22 +137,11 @@ public class PlayerController : NetworkBehaviour, ISspottable
     private Collider[] medicCollidersCache = new Collider[6];
     private Coroutine current_DealDamageOverTime;
 
-    // Syncvars
-    /*
-    private readonly SyncVar<bool> is_dead = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<bool> is_in_vehicle = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<bool> is_proned = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<bool> crouched = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<bool> roll = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    */
-
     private enum PlayerStance { Stand, Crouch, Prone, Disabled }
     private PlayerStance currentStance = PlayerStance.Stand;
-
     #endregion
 
     #region Unity Lifecycle
-
     public override void OnStartClient()
     {
         base.OnStartClient();
@@ -1150,8 +1133,7 @@ public class PlayerController : NetworkBehaviour, ISspottable
 
     #endregion
 
-    #region Public Methods
-
+    #region Damage / Kill and Revive
     public float GetDamageDealt()
     {
         return damage_dealt;
@@ -1256,7 +1238,9 @@ public class PlayerController : NetworkBehaviour, ISspottable
         }
         soldierHudManager.soldierHudHpManager.UpdateHp();
     }
+    #endregion
 
+    #region Utility
     [Client]
     public void HideOwnerItems(bool hide)
     {
@@ -1277,20 +1261,12 @@ public class PlayerController : NetworkBehaviour, ISspottable
         if (!hide) thirdPersonWeapon.ShowWeapon();
         else thirdPersonWeapon.HideWeapon();
     }
-
+    public ClassManager.Class GetClass() => playerProperties.selected_class;
     public float GetHp() => playerProperties.hp.Value;
     public float GetResistance() => playerProperties.resistance.Value;
     public bool IsPlayerDead() => playerProperties.is_dead.Value;
-
-    public FactionManager.Faction GetFaction()
-    {
-        return playerProperties.faction.Value;
-    }
-
-    public Transform GetSpotPosition()
-    {
-        return spot_position;
-    }
-
+    public FactionManager.Faction GetFaction() => playerProperties.faction.Value;
+    public Transform GetSpotPosition() => spot_position;
     #endregion
+
 }

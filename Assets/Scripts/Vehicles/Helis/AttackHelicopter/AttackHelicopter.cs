@@ -29,13 +29,6 @@ public class AttackHelicopter : Helicopter
 
     protected override void FixedUpdate()
     {
-        print("start_engine: " + start_engine);
-        print("is_in_vehicle: " + is_in_vehicle);
-        print("!SettingsHUD.Instance.is_menu_settings_active:" + !SettingsHUD.Instance.is_menu_settings_active);
-        print("!vehicle_destroyed.Value:" + !vehicle_destroyed.Value);
-        print("currentSeat != null: " + currentSeat != null);
-        print("currentSeat.seatType == VehicleSeats.SeatType.Pilot: " + (currentSeat.seatType == VehicleSeats.SeatType.Pilot));
-        print("IsOwner: " + IsOwner);
         if (start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && !vehicle_destroyed.Value && currentSeat != null && currentSeat.seatType == VehicleSeats.SeatType.Pilot && IsOwner)
         {
             Move();
@@ -81,11 +74,8 @@ public class AttackHelicopter : Helicopter
 
         if (is_in_vehicle)
         {
-            // Usando playerSeatIndex diretamente como int
-            VehicleSeats seat = vehicleSeats[playerSeatIndex];
 
-            seat.playerGameObject.transform.position = currentSeat.playerSeat.position;
-            seat.playerGameObject.transform.rotation = currentSeat.playerSeat.rotation;
+            SyncPlayerPosition();
 
             SwitchWeapon();
             if (Input.GetKeyDown(KeyCode.P))
@@ -110,11 +100,8 @@ public class AttackHelicopter : Helicopter
         FreeLook();
         if (!vehicle_destroyed.Value) Shoot();
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey))
-        {
-            SwitchSeats();
-        }
-
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
+        
         if (start_engine == true)
         {
 
@@ -131,9 +118,6 @@ public class AttackHelicopter : Helicopter
         if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
         {
             currentSeat.playerController.playerCamera.enabled = true;
-            //helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(false);
-            //helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(false);
-
 
             ExitVehicle();
         }
@@ -240,79 +224,6 @@ public class AttackHelicopter : Helicopter
     private void InitializeVehicleEntry()
     {
         exit_cooldown = 0f;
-    }
-
-    protected override void ExitVehicle()
-    {
-        base.ExitVehicle();
-
-        //if (helicopterHudManager.helicopterGunnerHUD.gameObject != null) helicopterHudManager.helicopterGunnerHUD.gameObject.SetActive(false);
-        //if (helicopterHudManager.helicopterPilotHUD.gameObject != null) helicopterHudManager.helicopterPilotHUD.gameObject.SetActive(false);
-    }
-
-    private void SwitchSeats()
-    {
-        for (int i = 0; i < vehicleSeats.Length; i++)
-        {
-            VehicleSeats seat = vehicleSeats[i];
-            if (seat.seatType != VehicleSeats.SeatType.Gunner || seat.isOccupied) continue;
-
-            int oldIndex = playerSeatIndex;
-            int newIndex = i;
-
-            // Cache das referências locais
-            PlayerProperties props = currentSeat.playerProperties;
-            PlayerController controller = currentSeat.playerController;
-            Rigidbody rb = currentSeat.playerRigidbody;
-            GameObject pGo = currentSeat.playerGameObject;
-            NetworkConnection conn = pGo.GetComponent<NetworkObject>().Owner;
-
-            // Limpeza local
-            currentSeat.ClearReferences();
-
-            // Setup local do novo assento
-            currentSeat = seat;
-            playerSeatIndex = newIndex;
-            currentSeat.EnterSeat(props, controller, seat.playerSeat, rb, pGo);
-
-            // SOLICITA AO SERVIDOR A TROCA
-            UpdateServerSwitchSeatsStatus(oldIndex, newIndex, pGo, conn);
-
-            break;
-        }
-    }
-
-
-
-    [ServerRpc(RequireOwnership = false)]
-    private void UpdateServerSwitchSeatsStatus(int oldSeatIndex, int newSeatIndex, GameObject playerGameObject, NetworkConnection conn)
-    {
-        if (playerGameObject == null) return;
-
-        NetworkObject playerNetObj = playerGameObject.GetComponent<NetworkObject>();
-        if (playerNetObj == null) return;
-
-        // Remove autoridade das armas do assento antigo
-        if (vehicleSeats[oldSeatIndex].vehicleArmory != null)
-        {
-            vehicleSeats[oldSeatIndex].SetAuthority(null);
-        }
-
-        // Dá autoridade das armas do novo assento
-        if (vehicleSeats[newSeatIndex].vehicleArmory != null)
-        {
-            vehicleSeats[newSeatIndex].SetAuthority(conn);
-        }
-
-        // Esvazia a cadeira antiga e preenche a nova na rede
-        RpcUpdateSeatStatus(oldSeatIndex, false, null, null);
-        RpcUpdateSeatStatus(newSeatIndex, true, playerNetObj, conn);
-
-        // Se mudou para piloto, dá o Ownership do helicóptero
-        if (vehicleSeats[newSeatIndex].seatType == VehicleSeats.SeatType.Pilot)
-        {
-            this.NetworkObject.GiveOwnership(playerNetObj.Owner);
-        }
     }
     #endregion
 

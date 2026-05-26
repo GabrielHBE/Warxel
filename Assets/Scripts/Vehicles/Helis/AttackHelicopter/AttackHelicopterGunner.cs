@@ -238,6 +238,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         current_camera = 2;
         gunnerGunCamera.enabled = false;
         isActive = false;
+        helicopter.currentSeat.playerController.playerCamera.enabled = true;
     }
     public string GetCurrentAmmo() => "";
 }

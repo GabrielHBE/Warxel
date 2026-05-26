@@ -463,9 +463,6 @@ public class SettingsHUD : MonoBehaviour
         if (worldVolumeSlider != null) worldVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.WORLD_VOLUME, Settings.Instance._audio.world_volume);
         if (hitVolumeSlider != null) hitVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.HIT_VOLUME, Settings.Instance._audio.hit_volume);
         if (killVolumeSlider != null) killVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.KILL_VOLUME, Settings.Instance._audio.kill_volume);
-        if (vehicleVolumeSlider != null) vehicleVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.VEHICLE_VOLUME, Settings.Instance._audio.vehicle_volume);
-        if (infantryVolumeSlider != null) infantryVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.INFANTRY_VOLUME, Settings.Instance._audio.infantary_volume);
-        if (microphoneVolumeSlider != null) microphoneVolumeSlider.value = PlayerPrefs.GetFloat(SettingsKeys.MICROPHONE_VOLUME, Settings.Instance._audio.microphone_volume);
         if (enableDeathVoipToggle != null) enableDeathVoipToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.ENABLE_DEATH_VOIP, Settings.Instance._audio.enable_deth_voip ? 1 : 0) == 1;
 
         // Configurar dropdowns
@@ -528,12 +525,6 @@ public class SettingsHUD : MonoBehaviour
         if (enemyIndicatorAimOpacitySlider != null) enemyIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_INDICATOR_AIM_OPACITY, Settings.Instance._gameplay.enemy_indicator_aim_opacity);
         if (allyIndicatorAimOpacitySlider != null) allyIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_INDICATOR_AIM_OPACITY, Settings.Instance._gameplay.ally_indicator_aim_opacity);
         if (squadIndicatorAimOpacitySlider != null) squadIndicatorAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.SQUAD_INDICATOR_AIM_OPACITY, Settings.Instance._gameplay.squad_indicator_aim_opacity);
-
-        // Flags
-        if (enemyFlagOpacitySlider != null) enemyFlagOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_FLAG_OPACITY, Settings.Instance._gameplay.enemy_flag_opacity);
-        if (allyFlagOpacitySlider != null) allyFlagOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_FLAG_OPACITY, Settings.Instance._gameplay.ally_flag_opacity);
-        if (enemyFlagAimOpacitySlider != null) enemyFlagAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ENEMY_FLAG_AIM_OPACITY, Settings.Instance._gameplay.enemy_flag_aim_opacity);
-        if (allyFlagAimOpacitySlider != null) allyFlagAimOpacitySlider.value = PlayerPrefs.GetFloat(SettingsKeys.ALLY_FLAG_AIM_OPACITY, Settings.Instance._gameplay.ally_flag_aim_opacity);
 
         // Chat
         if (showChatToggle != null) showChatToggle.isOn = PlayerPrefs.GetInt(SettingsKeys.SHOW_CHAT, Settings.Instance._gameplay.show_chat ? 1 : 0) == 1;
@@ -758,25 +749,7 @@ public class SettingsHUD : MonoBehaviour
         Settings.Instance._audio.kill_volume = value;
         PlayerPrefs.SetFloat(SettingsKeys.KILL_VOLUME, value);
     }
-
-    public void OnVehicleVolumeChanged(float value)
-    {
-        Settings.Instance._audio.vehicle_volume = value;
-        PlayerPrefs.SetFloat(SettingsKeys.VEHICLE_VOLUME, value);
-    }
-
-    public void OnInfantryVolumeChanged(float value)
-    {
-        Settings.Instance._audio.infantary_volume = value;
-        PlayerPrefs.SetFloat(SettingsKeys.INFANTRY_VOLUME, value);
-    }
-
-    public void OnMicrophoneVolumeChanged(float value)
-    {
-        Settings.Instance._audio.microphone_volume = value;
-        PlayerPrefs.SetFloat(SettingsKeys.MICROPHONE_VOLUME, value);
-    }
-
+    
     public void OnEnableDeathVoipChanged()
     {
         Settings.Instance._audio.enable_deth_voip = enableDeathVoipToggle.isOn;
@@ -897,31 +870,6 @@ public class SettingsHUD : MonoBehaviour
         PlayerPrefs.SetFloat(SettingsKeys.SQUAD_INDICATOR_AIM_OPACITY, value);
     }
 
-    // Flags
-    public void OnEnemyFlagOpacityChanged(float value)
-    {
-        Settings.Instance._gameplay.enemy_flag_opacity = value;
-        PlayerPrefs.SetFloat(SettingsKeys.ENEMY_FLAG_OPACITY, value);
-    }
-
-    public void OnAllyFlagOpacityChanged(float value)
-    {
-        Settings.Instance._gameplay.ally_flag_opacity = value;
-        PlayerPrefs.SetFloat(SettingsKeys.ALLY_FLAG_OPACITY, value);
-    }
-
-    public void OnEnemyFlagAimOpacityChanged(float value)
-    {
-        Settings.Instance._gameplay.enemy_flag_aim_opacity = value;
-        PlayerPrefs.SetFloat(SettingsKeys.ENEMY_FLAG_AIM_OPACITY, value);
-    }
-
-    public void OnAllyFlagAimOpacityChanged(float value)
-    {
-        Settings.Instance._gameplay.ally_flag_aim_opacity = value;
-        PlayerPrefs.SetFloat(SettingsKeys.ALLY_FLAG_AIM_OPACITY, value);
-    }
-
     // Chat
     public void OnShowChatChanged()
     {
@@ -982,24 +930,6 @@ public class SettingsHUD : MonoBehaviour
     {
         Settings.Instance._gameplay.squad_color = color;
         PlayerPrefs.SetString("SquadColor", ColorUtility.ToHtmlStringRGBA(color));
-    }
-
-    public void OnEnemyFlagColorSelected(Color color)
-    {
-        Settings.Instance._gameplay.enemy_color_flag = color;
-        PlayerPrefs.SetString("EnemyFlagColor", ColorUtility.ToHtmlStringRGBA(color));
-    }
-
-    public void OnAllyFlagColorSelected(Color color)
-    {
-        Settings.Instance._gameplay.ally_color_flag = color;
-        PlayerPrefs.SetString("AllyFlagColor", ColorUtility.ToHtmlStringRGBA(color));
-    }
-
-    public void OnSquadFlagColorSelected(Color color)
-    {
-        Settings.Instance._gameplay.squad_color_flag = color;
-        PlayerPrefs.SetString("SquadFlagColor", ColorUtility.ToHtmlStringRGBA(color));
     }
     #endregion
 
@@ -1339,33 +1269,6 @@ public class SettingsHUD : MonoBehaviour
             if (ColorUtility.TryParseHtmlString("#" + squadColor, out Color color))
             {
                 Settings.Instance._gameplay.squad_color = color;
-            }
-        }
-
-        string enemyFlagColor = PlayerPrefs.GetString("EnemyFlagColor", "");
-        if (!string.IsNullOrEmpty(enemyFlagColor))
-        {
-            if (ColorUtility.TryParseHtmlString("#" + enemyFlagColor, out Color color))
-            {
-                Settings.Instance._gameplay.enemy_color_flag = color;
-            }
-        }
-
-        string allyFlagColor = PlayerPrefs.GetString("AllyFlagColor", "");
-        if (!string.IsNullOrEmpty(allyFlagColor))
-        {
-            if (ColorUtility.TryParseHtmlString("#" + allyFlagColor, out Color color))
-            {
-                Settings.Instance._gameplay.ally_color_flag = color;
-            }
-        }
-
-        string squadFlagColor = PlayerPrefs.GetString("SquadFlagColor", "");
-        if (!string.IsNullOrEmpty(squadFlagColor))
-        {
-            if (ColorUtility.TryParseHtmlString("#" + squadFlagColor, out Color color))
-            {
-                Settings.Instance._gameplay.squad_color_flag = color;
             }
         }
 

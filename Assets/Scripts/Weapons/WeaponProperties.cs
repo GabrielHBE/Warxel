@@ -1,10 +1,8 @@
 using System.Collections.Generic;
-using UnityEngine.UI;
-using Unity.VisualScripting;
 using UnityEngine;
 using System;
 
-public class WeaponProperties : MonoBehaviour
+public class WeaponProperties : MonoBehaviour, UpgradeLevel
 {
     [Header("Progression / Category / Settings")]
     public GameObject third_person_prefab;
@@ -19,7 +17,6 @@ public class WeaponProperties : MonoBehaviour
     public bool can_damage_vehicles;
     public bool manual_calculate_recoil;
     public List<FireMode> fire_modes = new List<FireMode>();
-    public bool is_shotgun;
     public bool single_reload;
     public bool can_hold_trigger;
     public string weapon_name;
@@ -50,7 +47,7 @@ public class WeaponProperties : MonoBehaviour
     public int shells;
 
     [Header("Damage")]
-    public float infantary_damage;
+    public float infantry_damage;
     public float vehicle_damage;
     public float minimum_damage;
     public float headshot_multiplier;

@@ -46,8 +46,6 @@ public class SwitchWeapon : MonoBehaviour
     private WeaponProperties weaponProperties;
     
     private WeaponHolder weaponHolder;
-    private Shell shell;
-
     private Vector3 originalPosition;
     private Quaternion originalQuaternionRotation;
 
@@ -312,19 +310,12 @@ public class SwitchWeapon : MonoBehaviour
     private void InitializeWeaponComponents()
     {
         weaponProperties = GetComponentInChildren<WeaponProperties>();
-        shell = GetComponentInChildren<Shell>();
-
 
         if (weaponProperties != null)
         {
             weaponProperties.Restart();
         }
 
-
-        if (shell != null && weaponProperties != null)
-        {
-            shell.Restart(weaponProperties);
-        }
     }
 
     private void ConfigureSwayForWeapon()
@@ -391,7 +382,7 @@ public class SwitchWeapon : MonoBehaviour
 
         weaponHolder = GetComponentInChildren<WeaponHolder>();
         weaponHolder?.SetHandsToWeapon(0);
-        if (weapon != null) weapon.ads_position.transform.localPosition = Vector3.zero;
+        //if (weapon != null) weapon.ads_position.transform.localPosition = Vector3.zero;
     }
 
     private void ResetSwitchState()

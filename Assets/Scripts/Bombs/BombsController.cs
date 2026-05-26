@@ -8,7 +8,7 @@ public abstract class BombsController : NetworkBehaviour, IsVehicleCustomization
 
     public Sprite image_hud;
     public GameObject parent_gameobject;
-    
+
     [Header("Config")]
     [SerializeField] protected bool can_reload_bomb;
     [SerializeField] protected bool only_show_bombs_when_shoot;
@@ -19,11 +19,11 @@ public abstract class BombsController : NetworkBehaviour, IsVehicleCustomization
 
     protected List<Bombs> bombs = new List<Bombs>();
     protected int current_bomb_index = 0;
-    protected bool is_active;
+    protected bool isActive;
     protected Bombs current_bomb;
     protected float original_shoot_delay;
     protected float original_spawn_interval;
-    
+
     public Transform shootDirection; // Adicionado para consistência
 
     public override void OnStartNetwork()
@@ -37,12 +37,12 @@ public abstract class BombsController : NetworkBehaviour, IsVehicleCustomization
     protected virtual void Update()
     {
         if (!IsSpawned) return;
-        
-        if (Input.GetKeyDown(KeyCode.R) && is_active && IsOwner)
+
+        if (Input.GetKeyDown(KeyCode.R) && isActive && IsOwner)
         {
             RequestDestroyBombs();
         }
-        
+
         shoot_delay -= Time.deltaTime;
     }
 
@@ -81,7 +81,7 @@ public abstract class BombsController : NetworkBehaviour, IsVehicleCustomization
             Bombs bomb = spawnedBombs[i];
             bomb.GetComponent<Rigidbody>().isKinematic = true;
             bomb.GetComponent<Rigidbody>().useGravity = false;
-            
+
             bomb.transform.SetParent(spawnPoints[i]);
             bomb.transform.localPosition = Vector3.zero;
             bomb.transform.localRotation = Quaternion.identity;
@@ -194,8 +194,8 @@ public abstract class BombsController : NetworkBehaviour, IsVehicleCustomization
         return "Reloading... " + spawnInterval.ToString("F1");
     }
 
-    public void ActivateArmory() => is_active = true;
-    public void DeactivateArmory() => is_active = false;
+    public virtual void ActivateArmory() => isActive = true;
+    public virtual void DeactivateArmory() => isActive = false;
     public Sprite GetArmoryIcon() => image_hud;
     public float GetHeatingLevel() => 0;
     public float GetMaxOverheat() => 0;

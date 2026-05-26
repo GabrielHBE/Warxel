@@ -32,6 +32,8 @@ public class DamageMarker : MonoBehaviour
 
     public void UpdateDamage(float damage)
     {
+        if(damage==0) return;
+        
         // Atualizar tempo da última chamada
         lastUpdateTime = Time.time;
         

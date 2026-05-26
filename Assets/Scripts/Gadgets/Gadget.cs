@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public class Gadget : MonoBehaviour
+public class Gadget : MonoBehaviour, UpgradeLevel
 {   
     [Header("Progression / Category / Settings")]
     public GameObject third_person_prefab;
@@ -55,6 +55,10 @@ public class Gadget : MonoBehaviour
             gadget_level_progression = 0;
         }
 
+    }
+    public void AddKill()
+    {
+        
     }
 
 }

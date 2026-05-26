@@ -177,6 +177,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     private void Start()
     {
         Instance = this;
+        SortWeaponsByCategory();
         InitializeComponents();
         InitializeUI();
         SetupButtonListeners();
@@ -202,6 +203,19 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     #endregion
 
     #region Initialization
+
+    private void SortWeaponsByCategory()
+    {
+        // Ordena o array primaryWeapons acessando o componente WeaponProperties de cada GameObject
+        primaryWeapons = primaryWeapons
+            .OrderBy(weapon => weapon.GetComponent<WeaponProperties>().category)
+            .ToArray();
+
+        // Faz o mesmo para o array secondaryWeapons
+        secondaryWeapons = secondaryWeapons
+            .OrderBy(weapon => weapon.GetComponent<WeaponProperties>().category)
+            .ToArray();
+    }
 
     private void InitializeComponents()
     {
@@ -459,7 +473,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     public void ShowLoadoutOptions()
     {
-        if(PlayerSpawnController.Instance !=null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
+        if (PlayerSpawnController.Instance != null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
         _currentStage = SelectionStage.LoadoutOptionSelection;
         backButton.SetActive(true);
 
@@ -1098,10 +1112,10 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
         print(_currentStage);
         switch (_currentStage)
-        {   
+        {
 
             case SelectionStage.LoadoutOptionSelection:
-                if(PlayerSpawnController.Instance !=null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(true);
+                if (PlayerSpawnController.Instance != null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(true);
                 _maxSliderY = minScrollY;
                 _currentStage = SelectionStage.ClassSelection;
                 loadoutOptionsParent.gameObject.SetActive(false);
@@ -1111,7 +1125,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
                 break;
 
             case SelectionStage.ItemSelection:
-                if(PlayerSpawnController.Instance !=null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
+                if (PlayerSpawnController.Instance != null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
                 _currentStage = SelectionStage.LoadoutOptionSelection;
                 weaponsGadgetsParent.gameObject.SetActive(false);
                 ClearItemButtons();
@@ -1196,7 +1210,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         fireModesText.text = string.Join(" / ", wp.fire_modes);
 
         destructionForceText.text = wp.destruction_force.ToString("F0");
-        damageText.text = wp.infantary_damage.ToString("F1");
+        damageText.text = wp.infantry_damage.ToString("F1");
         minimumDamageText.text = wp.minimum_damage.ToString("F1");
         vehicleBaseDamageText.text = wp.vehicle_damage.ToString("F1");
         headshotMultiplierText.text = wp.headshot_multiplier.ToString("F1");

@@ -47,7 +47,7 @@ public class ScoutHelicopter : Helicopter
                 currentSeat.currentArmory.Shoot();
             }
 
-            UpdatePlayerSeatTransform();
+            SyncPlayerPosition();
             HandleDebugInput();
 
             if (!SettingsHUD.Instance.is_menu_settings_active)
@@ -226,54 +226,9 @@ public class ScoutHelicopter : Helicopter
 
         return true;
     }
-
-
-
-    private void SwitchSeats()
-    {
-        int searchIndex;
-
-        if (playerSeatIndex == vehicleSeats.Length - 1)
-            searchIndex = 0;
-        else
-            searchIndex = playerSeatIndex + 1;
-
-        for (int i = searchIndex; i < vehicleSeats.Length; i++)
-        {
-            VehicleSeats seat = vehicleSeats[i];
-
-            if (!seat.isOccupied)
-            {
-                int oldIndex = playerSeatIndex;
-                int newIndex = i;
-
-                PlayerProperties props = currentSeat.playerProperties;
-                PlayerController controller = currentSeat.playerController;
-                Rigidbody rb = currentSeat.playerRigidbody;
-                GameObject pGo = currentSeat.playerGameObject;
-
-                currentSeat.ClearReferences();
-                currentSeat = seat;
-                playerSeatIndex = newIndex;
-                currentSeat.EnterSeat(props, controller, seat.playerSeat, rb, pGo);
-
-                UpdateServerSwitchSeatsStatus(oldIndex, newIndex, pGo);
-
-                break;
-            }
-        }
-    }
-
     #endregion
 
     #region HELPER METHODS
-
-    private void UpdatePlayerSeatTransform()
-    {
-        currentSeat.playerGameObject.transform.position = currentSeat.playerSeat.position;
-        currentSeat.playerGameObject.transform.rotation = currentSeat.playerSeat.rotation;
-    }
-
     private void HandleDebugInput()
     {
         if (Input.GetKeyDown(KeyCode.P))
@@ -320,27 +275,4 @@ public class ScoutHelicopter : Helicopter
 
     #endregion
 
-    #region NETWORKED ACTIONS
-
-    [ServerRpc(RequireOwnership = false)]
-    private void UpdateServerSwitchSeatsStatus(int oldSeatIndex, int newSeatIndex, GameObject playerGameObject)
-    {
-        NetworkConnection conn = playerGameObject.GetComponent<NetworkObject>().Owner;
-
-        // Remove autoridade do antigo
-        if (vehicleSeats[oldSeatIndex].vehicleArmory != null)
-            vehicleSeats[oldSeatIndex].SetAuthority(null);
-
-        // Dá autoridade ao novo
-        if (vehicleSeats[newSeatIndex].vehicleArmory != null)
-            vehicleSeats[newSeatIndex].SetAuthority(conn);
-
-        RpcUpdateSeatStatus(oldSeatIndex, false, null);
-        NetworkObject netObj = playerGameObject.GetComponent<NetworkObject>();
-        RpcUpdateSeatStatus(newSeatIndex, true, netObj);
-
-        if (vehicleSeats[newSeatIndex].seatType == VehicleSeats.SeatType.Pilot)
-            this.NetworkObject.GiveOwnership(conn);
-    }
-    #endregion
 }

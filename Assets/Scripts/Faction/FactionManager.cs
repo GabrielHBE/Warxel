@@ -18,8 +18,9 @@ public class FactionManager : MonoBehaviour
 
     public enum Faction
     {
-        factionA,
-        factionB,
+        Neutral,
+        FactionA,
+        FactionB,
     }
 
 }

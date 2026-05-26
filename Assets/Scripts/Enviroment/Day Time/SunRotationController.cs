@@ -4,9 +4,9 @@ public class SunRotationController : MonoBehaviour
 {
     [Header("Sun Light Reference")]
     [SerializeField] private Light sunLight;
+    [SerializeField] private Light moonLight;
     
     [Header("Rotation Settings")]
-    [SerializeField] private float rotationSpeed = 0.5f;
     [SerializeField] private float fixedAzimuth = 180f; // Sul (180 graus)
     
     private DayNightCycleManager dayNightCycle;
@@ -33,8 +33,20 @@ public class SunRotationController : MonoBehaviour
         sunLight.transform.rotation = Quaternion.Slerp(
             sunLight.transform.rotation,
             targetRotation,
-            Time.deltaTime * rotationSpeed
+            Time.deltaTime
         );
+
+        if (moonLight != null)
+        {
+            float moonAngle = sunAngle + 180f;
+            Quaternion targetMoonRotation = Quaternion.Euler(moonAngle, fixedAzimuth, 0f);
+            
+            moonLight.transform.rotation = Quaternion.Slerp(
+                moonLight.transform.rotation,
+                targetMoonRotation,
+                Time.deltaTime
+            );
+        }
     }
     
     private float CalculateSunAngle(float hour)

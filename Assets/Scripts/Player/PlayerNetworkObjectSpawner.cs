@@ -7,7 +7,6 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
     [SerializeField] private WeaponProperties[] weapon_prefabs;
 
     #region Sounds
-
     [ServerRpc(RequireOwnership = false)]
     public void CmdPlayWeaponSound(string weapon_name, Vector3 position)
     {
@@ -42,11 +41,10 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
             }
         }
     }
-
     #endregion
 
     #region Bullet
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = true)]
     public void ServerSpawnBullet(GameObject bulletPrefab, Bullet.BulletData data, NetworkObject shooter, string weaponshooted_name = null)
     {
         GameObject instantiaded_obj = Instantiate(bulletPrefab, data.position, data.rotation);
@@ -75,7 +73,6 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
 
         return null;
     }
-
     #endregion
 
     #region  Gadget
@@ -94,7 +91,6 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
         }
 
     }
-
     #endregion
 
 

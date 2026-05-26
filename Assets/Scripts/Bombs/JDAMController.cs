@@ -5,6 +5,7 @@ using UnityEngine;
 public class JDAMController : BombsController
 {
     [SerializeField] private Camera jdam_camera;
+    [SerializeField] private Canvas jdamCameraHud;
     [SerializeField] private Vehicle vehicle;
     [SerializeField] private LayerMask groundLayerMask; // Configure no Inspector com o layer do chão
 
@@ -44,10 +45,12 @@ public class JDAMController : BombsController
             currentJdam = null;
         }
 
-        if (is_active)
+        if (isActive)
         {
             if (Input.GetKey(KeyCode.Mouse1))
             {
+                if (vehicle.currentSeat.seatHUD.activeSelf) vehicle.currentSeat.seatHUD.SetActive(false);
+                if (!jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(true);
                 UpdateJDAMCamera();
                 jdam_camera.enabled = true;
                 if (vehicle.currentSeat.playerCamera != null)
@@ -55,6 +58,8 @@ public class JDAMController : BombsController
             }
             else
             {
+                if (!vehicle.currentSeat.seatHUD.activeSelf) vehicle.currentSeat.seatHUD.SetActive(true);
+                if (jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(false);
                 jdam_camera.enabled = false;
                 if (vehicle.currentSeat.playerCamera != null)
                     vehicle.currentSeat.playerCamera.enabled = true;
@@ -68,10 +73,10 @@ public class JDAMController : BombsController
         {
             // Calcula o ponto de impacto previsto
             predictedImpactPoint = CalculateImpactPoint(currentJdam);
-            
+
             // Faz a câmera olhar para o ponto de impacto
             jdam_camera.transform.LookAt(predictedImpactPoint);
-            
+
             // Opcional: desenha um gizmo para debug
             Debug.DrawLine(currentJdam.transform.position, predictedImpactPoint, Color.red);
         }
@@ -90,45 +95,45 @@ public class JDAMController : BombsController
         Vector3 position = bomb.transform.position;
         Vector3 velocity = bomb.GetRigidbody().linearVelocity;
         float gravityMagnitude = Physics.gravity.magnitude;
-        
+
         // Como a bomba usa AddForce(Vector3.down * travel_speed * mass, ForceMode.Acceleration)
         // a aceleração efetiva é travel_speed para baixo
         float effectiveGravity = bomb.GetTravelSpeed(); // travel_speed é usado como aceleração
-        
+
         // Método 1: Para terreno plano (mais rápido)
         // Equação: y = y0 + vy*t + 0.5 * a * t²
         // Resolvendo para y = groundLevel quando a = -effectiveGravity
-        
+
         float groundLevel = GetGroundLevel(position);
         float deltaY = position.y - groundLevel;
         float vy = velocity.y;
-        
+
         // Resolve a equação quadrática: 0.5 * a * t² + vy * t - deltaY = 0
         // Onde a = -effectiveGravity (negativo porque puxa para baixo)
         float a = -0.5f * effectiveGravity;
         float b = vy;
         float c = -deltaY;
-        
+
         float discriminant = b * b - 4 * a * c;
-        
+
         if (discriminant >= 0)
         {
             float t1 = (-b + Mathf.Sqrt(discriminant)) / (2 * a);
             float t2 = (-b - Mathf.Sqrt(discriminant)) / (2 * a);
-            
+
             // Pega o menor tempo positivo
             float timeToImpact = (t1 > 0 && t2 > 0) ? Mathf.Min(t1, t2) : Mathf.Max(t1, t2);
-            
+
             if (timeToImpact > 0 && timeToImpact < 30f) // Limite de 30 segundos
             {
                 // Calcula a posição futura
                 Vector3 impactPoint = position + velocity * timeToImpact;
                 impactPoint.y = groundLevel; // Ajusta para o nível do chão
-                
+
                 return impactPoint;
             }
         }
-        
+
         // Fallback: método iterativo (mais preciso, especialmente em terrenos irregulares)
         return CalculateImpactPointIterative(bomb, position, velocity, effectiveGravity);
     }
@@ -137,16 +142,16 @@ public class JDAMController : BombsController
     {
         Vector3 pos = startPos;
         Vector3 vel = startVel;
-        
+
         // Simula a trajetória em passos pequenos
         for (float t = 0; t < 10f; t += 0.05f) // Máximo 10 segundos de simulação
         {
             // Atualiza velocidade (aceleração constante para baixo)
             vel.y -= gravity * 0.05f;
-            
+
             // Atualiza posição
             pos += vel * 0.05f;
-            
+
             // Verifica se atingiu o chão
             float groundLevel = GetGroundLevel(pos);
             if (pos.y <= groundLevel)
@@ -155,7 +160,7 @@ public class JDAMController : BombsController
                 return pos;
             }
         }
-        
+
         return pos;
     }
 
@@ -166,7 +171,7 @@ public class JDAMController : BombsController
         {
             return hit.point.y;
         }
-        
+
         // Se não encontrar chão, assume y = 0
         return 0f;
     }
@@ -201,5 +206,14 @@ public class JDAMController : BombsController
     private void CmdRequestInitializeBombs()
     {
         InitializeBombsServer<Jdam>();
+    }
+
+    public override void DeactivateArmory()
+    {
+        base.DeactivateArmory();
+        if (!vehicle.currentSeat.seatHUD.activeSelf) vehicle.currentSeat.seatHUD.SetActive(true);
+        if (jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(false);
+        jdam_camera.enabled = false;
+        vehicle.currentSeat.playerController.playerCamera.enabled = true;
     }
 }

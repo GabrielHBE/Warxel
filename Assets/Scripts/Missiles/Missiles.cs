@@ -65,6 +65,8 @@ public abstract class Missiles : NetworkBehaviour
     {
         if (!IsSpawned || hasExploded) return;
 
+        GameObject ignoreGoInExplosion = null;
+
         trail.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         trail.transform.SetParent(null, true);
         trail.transform.localScale = Vector3.one;
@@ -77,24 +79,21 @@ public abstract class Missiles : NetworkBehaviour
         if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
         {
             Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
-            if (vehicle != null)
+
+            if (vehicle != null && !vehicle.vehicle_destroyed.Value)
             {
-                if (!vehicle.vehicle_destroyed.Value)
-                {
-                    float target_resistance = vehicle.GetResistance();
-                    float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
+                ignoreGoInExplosion = vehicle.gameObject;
 
-                    vehicle.RequestDamage(vehicle_damage);
+                string[] occupantNames = vehicle.GetOccupantNames();
 
-                    if (vehicle.vehicle_destroyed.Value)
-                    {
-                        EliminationMarker.Instance.InstantiateVehicleImage();
-                    }
-                    else
-                    {
-                        DamageMarker.Instance.UpdateDamage(final_actual_damage);
-                    }
-                }
+                float target_resistance = vehicle.GetResistance();
+                float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
+                vehicle.RequestDamage(vehicle_damage);
+
+                if (vehicle.vehicle_destroyed.Value)
+                    ProcessKill.ProcessVehicleKill(gameObject, occupantNames);
+                else
+                    DamageMarker.Instance?.UpdateDamage(final_actual_damage);
             }
 
         }
@@ -106,11 +105,11 @@ public abstract class Missiles : NetworkBehaviour
             float target_resistance = player.GetResistance();
             float final_actual_damage = infantary_damage * ((100f - target_resistance) / 100f);
 
+            ignoreGoInExplosion = player.gameObject;
 
             if (player_properties.is_dead.Value)
             {
-                AccountManager.Instance.status.AddKill();
-                EliminationMarker.Instance.InstantiateVehicleImage();
+                ProcessKill.ProcessInfantryKill(gameObject, false, player_properties.player_name.Value);
             }
             else
             {
@@ -118,14 +117,11 @@ public abstract class Missiles : NetworkBehaviour
             }
 
         }
-        else
-        {
-            voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage);
-            missile_collider.enabled = false;
-        }
 
+        missile_collider.enabled = false;
+
+        voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage, ignoreGoInExplosion);
         Explode(collision.contacts[0].point);
-
 
     }
     #endregion
@@ -146,7 +142,7 @@ public abstract class Missiles : NetworkBehaviour
         }
         RequestDespawn();
     }
-    
+
     [ObserversRpc]
     private void CmdPlayExplosionSound()
     {

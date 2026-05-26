@@ -3,7 +3,7 @@ using UnityEngine;
 public class Reticle : MonoBehaviour
 {
     [Header("Instances")]
-    public Weapon weapon;
+    public AdsBehaviour adsBehaviour;
     [SerializeField] private Transform parent;
     public SwayNBobScript swayNBob;
     private Sight active_sight;
@@ -76,7 +76,7 @@ public class Reticle : MonoBehaviour
 
 
 
-        if (weapon.dot_position && !playerProperties.is_reloading && !switchWeapon._switch)
+        if (adsBehaviour.dot_position && !playerProperties.is_reloading && !switchWeapon._switch)
         {
             if (active_sight != null)
             {

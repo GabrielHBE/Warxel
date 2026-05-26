@@ -37,13 +37,13 @@ public class AccountMainMenu : MainMenuTabs
     private void SwitchFaction()
     {
         FactionManager.Faction current_faction = AccountManager.Instance.faction;
-        if (current_faction == FactionManager.Faction.factionA)
+        if (current_faction == FactionManager.Faction.FactionA)
         {
-            AccountManager.Instance.SwitchFaction(FactionManager.Faction.factionB);
+            AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionB);
         }
         else
         {
-            AccountManager.Instance.SwitchFaction(FactionManager.Faction.factionA);
+            AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionA);
         }
     }
 

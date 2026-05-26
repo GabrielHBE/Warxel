@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using FishNet.Object;
 using UnityEngine;
 
@@ -81,7 +80,7 @@ public class Jet : Vehicle
 
         if (is_in_vehicle)
         {
-            SyncPlayerPosition();
+            //SyncPlayerPosition();
             HandleInVehicleLogic();
         }
         else
@@ -91,6 +90,11 @@ public class Jet : Vehicle
 
         UpdateWeaponSpread();
         UpdateEngineSound();
+    }
+
+    void LateUpdate()
+    {
+        if(is_in_vehicle) SyncPlayerPosition();
     }
 
     protected void OnCollisionStay(Collision collision)
@@ -159,20 +163,13 @@ public class Jet : Vehicle
     {
         speed = rb.linearVelocity.magnitude;
     }
-
-    private void SyncPlayerPosition()
-    {
-        if(currentSeat == null) return;
-        
-        currentSeat.playerGameObject.transform.position = currentSeat.playerSeat.position;
-        currentSeat.playerGameObject.transform.rotation = currentSeat.playerSeat.rotation;
-    }
-
     private void HandleInVehicleLogic()
     {
         if (SettingsHUD.Instance.is_menu_settings_active) return;
 
         minFov = Settings.Instance._video.jet_fov;
+
+        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
 
         HandleDebugInput();
         PilotBehaviour();

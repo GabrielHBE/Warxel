@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using FishNet.Object;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,23 +16,15 @@ public class SoldierHudManager : NetworkBehaviour
     public SoldierHudHpManager soldierHudHpManager;
     public DeadPlayerHud deadPlayerHud;
 
-    private bool lastVehicleState;
-    private bool isInitialized = false;
 
     public override void OnStartClient()
     {
         base.OnStartClient();
         if (IsOwner)
         {
-            //settings = GameObject.FindGameObjectWithTag("GeneralHUD").GetComponent<Settings>();
 
-            // Inicializa o estado anterior
-            lastVehicleState = playerProperties.is_in_vehicle;
-
-            // Aplica o estado inicial
             UpdateItemsVisibility(!playerProperties.is_in_vehicle);
 
-            isInitialized = true;
         }
         else
         {
@@ -46,17 +37,6 @@ public class SoldierHudManager : NetworkBehaviour
     {
         if (!IsOwner) return;
         
-        /*
-        // Verifica se o estado do veículo mudou
-        if (isInitialized && playerProperties.is_in_vehicle != lastVehicleState)
-        {
-            // Atualiza a visibilidade dos itens
-            UpdateItemsVisibility(!playerProperties.is_in_vehicle);
-
-            // Atualiza o estado anterior
-            lastVehicleState = playerProperties.is_in_vehicle;
-        }
-        */
 
         if (playerProperties.sprinting && !playerProperties.is_in_vehicle)
         {

@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class InfantarySpawnFlags : MonoBehaviour
 {
+    [SerializeField] private FlagCapture flagCapture;
 
     [SerializeField] private Transform[] spawn_points;
 

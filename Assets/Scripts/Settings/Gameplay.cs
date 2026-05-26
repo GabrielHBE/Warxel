@@ -13,49 +13,42 @@ public class Gameplay : MonoBehaviour
     public float hit_marker_size = 1;
 
     [Header("User Interface")]
-    public bool show_fps;
-    public bool show_network_status;
-    public bool show_level_progression;
-    public bool show_kill_feed;
+    public bool show_fps = true;
+    public bool show_network_status = true;
+    public bool show_level_progression = true;
+    public bool show_kill_feed = true;
     [Range(0.1f, 2f)]
     public float sight_reticle_size;
-    public Color sight_reticle_collor;
+    public Color sight_reticle_collor = Color.red;
 
     //Indicators
-    public Color enemy_color;
-    public Color ally_color;
-    public Color squad_color;
+    public Color neutral_color = Color.gray;
+    public Color enemy_color = Color.red;
+    public Color ally_color = Color.softBlue;
+    public Color squad_color = Color.lightGreen;
     [Range(0f, 1f)]
-    public float enemy_indicator_opacity;
+    public float enemy_indicator_opacity = 1;
     [Range(0f, 1f)]
-    public float ally_indicator_opacity;
+    public float ally_indicator_opacity = 1;
     [Range(0f, 1f)]
-    public float squad_indicator_opacity;
+    public float squad_indicator_opacity = 1;
     [Range(0f, 1f)]
-    public float enemy_indicator_aim_opacity;
+    public float neutral_indicator_opacity = 1;
     [Range(0f, 1f)]
-    public float ally_indicator_aim_opacity;
+    public float enemy_indicator_aim_opacity = 1;
     [Range(0f, 1f)]
-    public float squad_indicator_aim_opacity;
-
-    //Flags
-    public Color enemy_color_flag;
-    public Color ally_color_flag;
-    public Color squad_color_flag;
+    public float ally_indicator_aim_opacity = 1;
     [Range(0f, 1f)]
-    public float enemy_flag_opacity;
+    public float squad_indicator_aim_opacity = 1;
     [Range(0f, 1f)]
-    public float ally_flag_opacity;
-    [Range(0f, 1f)]
-    public float enemy_flag_aim_opacity;
-    [Range(0f, 1f)]
-    public float ally_flag_aim_opacity;
+    public float neutral_indicator_aim_opacity = 1;
+    
 
     [Header("Chat")]
-    public bool show_chat;
+    public bool show_chat = true;
     [Range(0f, 1f)]
-    public float chat_opacity;
+    public float chat_opacity = 1;
     [Range(0.1f, 2f)]
-    public float chat_size;
+    public float chat_size = 1;
 
 }

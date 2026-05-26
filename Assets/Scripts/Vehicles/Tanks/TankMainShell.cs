@@ -24,7 +24,7 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart, IVehi
 
         if(ignoreCollision == collision.gameObject) return;
 
-        print(collision.gameObject.name);
+        GameObject ignoreGoInExplosion = null;
 
         Vector3 contact_point = collision.contacts[0].point;
 
@@ -34,6 +34,9 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart, IVehi
 
             if (vehicle != null)
             {
+                ignoreGoInExplosion = vehicle.gameObject;
+                
+                string[] occupantNames = vehicle.GetOccupantNames();
 
                 float target_resistance = vehicle.GetResistance();
                 float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
@@ -44,10 +47,9 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart, IVehi
 
                 if (vehicle.vehicle_destroyed.Value)
                 {
-                    EliminationMarker.Instance.InstantiateVehicleImage();
+                    ProcessKill.ProcessVehicleKill(gameObject, occupantNames);
                 }
             }
-
 
         }
         else if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
@@ -55,6 +57,7 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart, IVehi
             PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
             if (player != null)
             {
+                ignoreGoInExplosion = player.gameObject;
                 PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
                 player.RequestDamage(infantary_damage);
 
@@ -65,16 +68,13 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart, IVehi
 
                 if (player_properties.is_dead.Value)
                 {
-                    EliminationMarker.Instance.InstantiateVehicleImage();
+                    ProcessKill.ProcessInfantryKill(gameObject, false, player_properties.player_name.Value);
                 }
             }
 
+        }
 
-        }
-        else
-        {
-            voxCollider.SphereExplosion(contact_point, infantary_damage, vehicle_damage);
-        }
+        voxCollider.SphereExplosion(contact_point, infantary_damage, vehicle_damage, ignoreGoInExplosion);
 
         shell_collider.enabled = false;
 

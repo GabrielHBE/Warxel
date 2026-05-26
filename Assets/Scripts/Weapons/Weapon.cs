@@ -1,4 +1,3 @@
-
 using System.Collections;
 using System.Collections.Generic;
 using FishNet;
@@ -8,7 +7,7 @@ using UnityEngine;
 public class Weapon : MonoBehaviour
 {
     [Header("State")]
-    [HideInInspector] public bool is_active;
+    public bool is_active;
     [HideInInspector] public bool is_side_grip_activated;
 
     [Header("HUD")]
@@ -23,8 +22,10 @@ public class Weapon : MonoBehaviour
     [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private Camera player_camera;
-    public GameObject ads_position;
     [SerializeField] private SwitchWeapon switchWeapon;
+
+    // Nova referência necessária
+    private AdsBehaviour adsBehaviour;
 
     [Header("Sounds")]
     public AudioSource switch_fire_mode_sound;
@@ -38,8 +39,6 @@ public class Weapon : MonoBehaviour
     private float next_time_to_fire = 0f;
     [HideInInspector] public bool did_shoot = false;
 
-    private Vector3 attatchment_change_ads_position;
-    private float minFov;
     private int current_fire_mode = 0;
 
     private float burst_timer = 0f;
@@ -49,32 +48,30 @@ public class Weapon : MonoBehaviour
     private bool is_first_shot;
     private int recoil_position_in_array = 0;
 
-    private Vector3 original_ads_position;
     private WeaponSounds weaponSounds;
     [HideInInspector] public WeaponProperties weaponProperties;
     private PlayerController playerController;
-
+    private Shell shell;
     [HideInInspector] public WeaponAnimation weaponAnimation;
     private Sight sight_attatchment;
-    private Shell Shell;
+
 
     private float current_spread;
-    [HideInInspector] public bool dot_position;
+
     private bool restarted;
     private int reserve_ammo;
     private float crouch_recoil_multiplier = 0.8f;
 
     private float time_to_contatenate = 0;
     private GameObject current_muzzle_flash;
-    private bool is_aiming;
 
 
     #region Unity Lifecycle Methods
 
     void Awake()
     {
-        minFov = Settings.Instance._video.infantary_fov;
         restarted = false;
+        adsBehaviour = GetComponent<AdsBehaviour>();
     }
 
     void Update()
@@ -90,6 +87,8 @@ public class Weapon : MonoBehaviour
             return;
         }
 
+        if (adsBehaviour == null) adsBehaviour = GetComponent<AdsBehaviour>();
+
         ConcatenateBullets();
 
         if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_reloadKey))
@@ -98,8 +97,6 @@ public class Weapon : MonoBehaviour
         }
 
         if (soldierHudManager.mag_counter_hud != null && weaponProperties != null) soldierHudManager.mag_counter_hud.UpdateMagCount(0, weaponProperties.mags);
-
-        aim();
 
         if (can_shoot && !playerProperties.is_reloading)
         {
@@ -119,23 +116,15 @@ public class Weapon : MonoBehaviour
 
     public void Restart()
     {
+
         weaponProperties = GetComponentInChildren<WeaponProperties>();
         weaponAnimation = GetComponent<WeaponAnimation>();
         playerController = GetComponentInParent<PlayerController>();
         sight_attatchment = GetComponentInChildren<Sight>();
-        Shell = GetComponentInChildren<Shell>();
         weaponSounds = GetComponentInChildren<WeaponSounds>();
 
+        shell = weaponProperties.GetComponentInChildren<Shell>();
         time_to_contatenate = weaponProperties.time_to_transfer_bullets;
-
-        if (sight_attatchment == null)
-        {
-            attatchment_change_ads_position = Vector3.zero;
-        }
-        else
-        {
-            attatchment_change_ads_position = sight_attatchment.change_ads_position;
-        }
 
         current_fire_mode = 0;
         next_time_to_fire = 0f;
@@ -146,6 +135,16 @@ public class Weapon : MonoBehaviour
 
         weaponProperties.weapon.transform.localPosition = weaponProperties.initial_potiion;
         weaponProperties.weapon.transform.localRotation = weaponProperties.inicial_rotation;
+
+        if (sight_attatchment != null)
+        {
+            AdsBehaviour.Instance.Setup(sight_attatchment.adsPosition, weaponProperties.ads_speed, weaponProperties.zoom);
+        }
+        else
+        {
+            AdsBehaviour.Instance.Setup(null, weaponProperties.ads_speed, weaponProperties.zoom);
+        }
+
 
         SwitchFireMode();
     }
@@ -295,7 +294,7 @@ public class Weapon : MonoBehaviour
         is_last_bullet = weaponProperties.mags[^1] == 0;
 
         int temp = weaponProperties.mags[^1];
-        weaponProperties.mags[^1] = max;
+        ApplyMagAmmo(max);
 
         if (!is_last_bullet)
         {
@@ -303,6 +302,15 @@ public class Weapon : MonoBehaviour
         }
 
         weaponProperties.mags[index] = temp;
+    }
+
+    public void ApplyMagAmmo(int amount)
+    {
+        weaponProperties.mags[^1] = amount;
+    }
+    public void RemoveMagAmmo(int amount, int index)
+    {
+        weaponProperties.mags[index] -= amount;
     }
 
     private void HandleSingleReload()
@@ -313,11 +321,11 @@ public class Weapon : MonoBehaviour
             !playerProperties.is_firing &&
             weaponProperties.shells > 0)
         {
-            Shell.Reload(weaponProperties);
+            shell.Reload();
         }
         else
         {
-            Shell.ReturnHand();
+
             playerProperties.is_reloading = false;
         }
     }
@@ -555,7 +563,6 @@ public class Weapon : MonoBehaviour
 
     private void SpawnBullet()
     {
-        // 1. Pack the data
         Bullet.BulletData data = new Bullet.BulletData
         {
             position = weaponProperties.barrel.transform.position,
@@ -563,7 +570,7 @@ public class Weapon : MonoBehaviour
             direction = weaponProperties.barrel.transform.forward,
             speed = weaponProperties.muzzle_velocity,
             dropMultiplier = weaponProperties.bullet_drop,
-            infantaryDamage = weaponProperties.infantary_damage,
+            infantaryDamage = weaponProperties.infantry_damage,
             damageDropoff = weaponProperties.damage_dropoff,
             damageDropoffTimer = weaponProperties.damage_dropoff_timer,
             destructionForce = weaponProperties.destruction_force,
@@ -575,7 +582,6 @@ public class Weapon : MonoBehaviour
             delaytoEnableForNonOwner = 0.2f,
         };
 
-        // 2. Send it to the Server
         NetworkObject shooterNetObj = playerController.GetComponent<NetworkObject>();
         playerNetworkObjectSpawner.ServerSpawnBullet(weaponProperties.bulletPref.gameObject, data, shooterNetObj, weaponProperties.gameObject.name);
     }
@@ -726,141 +732,6 @@ public class Weapon : MonoBehaviour
 
     #endregion
 
-    #region Aiming
-
-    void aim()
-    {
-        if (Settings.Instance._controls.is_aim_on_hold)
-        {
-            AimWithHoldLogic();
-        }
-        else
-        {
-            AimWithToggleLogic();
-        }
-    }
-
-    void AimWithHoldLogic()
-    {
-        bool canAim = CanAim();
-
-        if (canAim && Input.GetKey(Settings.Instance._keybinds.WEAPON_aimKey))
-        {
-            StartAiming();
-        }
-        else
-        {
-            StopAiming();
-        }
-    }
-
-    void AimWithToggleLogic()
-    {
-        bool canAim = CanAim();
-
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
-        {
-            is_aiming = !is_aiming;
-        }
-
-        if (!canAim)
-            is_aiming = false;
-
-        if (is_aiming)
-        {
-            StartAiming();
-        }
-        else
-        {
-            StopAiming();
-        }
-    }
-
-    bool CanAim()
-    {
-        return !switchWeapon._switch &&
-               //!playerProperties.is_reloading &&
-               !playerProperties.isProneTransition &&
-               !playerProperties.roll &&
-               !playerProperties.is_dead.Value;
-    }
-
-    void StartAiming()
-    {
-        playerProperties.sprinting = false;
-        playerProperties.is_aiming = true;
-
-        float targetFov = minFov / weaponProperties.zoom;
-
-        UpdateAimPosition();
-        UpdateCameraFov(targetFov);
-        CheckAimPositionComplete();
-    }
-
-    void StopAiming()
-    {
-        playerProperties.is_aiming = false;
-        dot_position = false;
-        RestoreAimPosition();
-    }
-
-    void UpdateAimPosition()
-    {
-        Vector3 targetPosition = weaponProperties.ads_position + attatchment_change_ads_position;
-        float moveSpeed = weaponProperties.ads_speed * Time.deltaTime;
-
-        ads_position.transform.localPosition = Vector3.MoveTowards(
-            ads_position.transform.localPosition,
-            targetPosition,
-            moveSpeed
-        );
-    }
-
-    void RestoreAimPosition()
-    {
-        float lerpSpeed = 5f * Time.deltaTime;
-
-        ads_position.transform.localPosition = Vector3.Lerp(
-            ads_position.transform.localPosition,
-            original_ads_position,
-            lerpSpeed
-        );
-    }
-
-    void UpdateCameraFov(float targetFov)
-    {
-        float lerpSpeed = 10f * Time.deltaTime;
-        if (!playerProperties.is_reloading)
-        {
-            player_camera.fieldOfView = Mathf.Lerp(
-                player_camera.fieldOfView,
-                targetFov,
-                lerpSpeed
-            );
-        }
-        else
-        {
-            player_camera.fieldOfView = Mathf.Lerp(
-                player_camera.fieldOfView,
-                minFov,
-                lerpSpeed
-            );
-        }
-
-    }
-
-    void CheckAimPositionComplete()
-    {
-        Vector3 targetPosition = weaponProperties.ads_position + attatchment_change_ads_position;
-
-        if (ads_position.transform.localPosition == targetPosition)
-        {
-            dot_position = true;
-        }
-    }
-
-    #endregion
-
     #region Muzzle Effects
 
     private void CreateMuzzle()
@@ -869,7 +740,6 @@ public class Weapon : MonoBehaviour
         {
             int randomIndex = UnityEngine.Random.Range(0, muzzle_flashes.Count);
             current_muzzle_flash = Instantiate(muzzle_flashes[randomIndex], weaponProperties.barrel.transform);
-            //thirdPersonWeapon.CreateMuzzle(current_muzzle_flash);
         }
     }
 
@@ -878,7 +748,6 @@ public class Weapon : MonoBehaviour
         if (current_muzzle_flash != null)
         {
             Destroy(current_muzzle_flash);
-            //thirdPersonWeapon.DeleteMuzzle();
         }
     }
 
