@@ -10,6 +10,11 @@ public class AdsBehaviour : MonoBehaviour
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private SwitchWeapon switchWeapon;
 
+    [Header("Smooth Settings")]
+    [Tooltip("Curva para customizar a aceleração/desaceleração da mira diretamente pelo Inspector.")]
+    [SerializeField] private AnimationCurve aimCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [SerializeField] private float fovLerpSpeed = 12f; // Velocidade do amortecimento do FOV
+
     public bool dot_position { get; private set; }
 
     private float adsTimer;
@@ -20,31 +25,31 @@ public class AdsBehaviour : MonoBehaviour
     private Vector3 original_ads_position;
     private float zoom;
     
-    // Nova variável para guardar o offset do eixo Z desejado
     [SerializeField] private float zOffset;
 
     private Coroutine aimCoroutine;
     private bool isAimTransitionActive;
+    
+    private float targetCameraFov;
 
-    // Adicionado o parâmetro zOffset no método Setup
     public void Setup(Transform adsReference, float adsTimer, float zoom)
     {
         this.adsReference = adsReference;
         this.adsTimer = adsTimer;
         this.zoom = zoom;
-
     }
 
     void Awake()
     {
         Instance = this;
         minFov = Settings.Instance._video.infantary_fov;
+        targetCameraFov = minFov; 
         original_ads_position = transform.localPosition;
     }
 
     void Update()
     {
-        if(adsReference==null) return;
+        if (adsReference == null) return;
         
         if (SettingsHUD.Instance.is_menu_settings_active)
         {
@@ -53,6 +58,7 @@ public class AdsBehaviour : MonoBehaviour
         }
 
         HandleAimInput();
+        ApplyCameraFovLerp();
     }
 
     private void HandleAimInput()
@@ -110,7 +116,8 @@ public class AdsBehaviour : MonoBehaviour
         return !switchWeapon._switch &&
                !playerProperties.isProneTransition &&
                !playerProperties.roll &&
-               !playerProperties.is_dead.Value;
+               !playerProperties.is_dead.Value &&
+               !playerProperties.is_reloading;
     }
 
     private void StartAiming()
@@ -119,9 +126,6 @@ public class AdsBehaviour : MonoBehaviour
 
         playerProperties.sprinting = false;
         playerProperties.is_aiming = true;
-
-        float targetFov = minFov / zoom;
-        UpdateCameraFov(targetFov);
 
         if (!isAimTransitionActive)
         {
@@ -139,7 +143,7 @@ public class AdsBehaviour : MonoBehaviour
         is_aiming = false;
         dot_position = false;
 
-        UpdateCameraFov(minFov);
+        targetCameraFov = minFov;
 
         if (isAimTransitionActive || (aimCoroutine == null && transform.localPosition != original_ads_position))
         {
@@ -159,43 +163,41 @@ public class AdsBehaviour : MonoBehaviour
             if (adsReference == null) yield break;
 
             elapsed += Time.deltaTime;
-            float t = elapsed / adsTimer;
+            float linearT = elapsed / adsTimer;
+            
+            // --- MELHORIA DE SUAVIDADE 1 ---
+            // Avalia o tempo linear na curva cinematográfica (Ease In Out)
+            float smoothT = aimCurve.Evaluate(linearT);
 
             if (aiming)
             {
-                // 1. Obtém o centro global alvo original (posição de repouso)
                 Vector3 centerGlobalTarget = transform.parent != null 
                     ? transform.parent.TransformPoint(original_ads_position) 
                     : original_ads_position;
 
-                // 2. Aplica o offset no eixo Z (forward) baseado na orientação do pai da arma (ou da câmera)
-                // Se você quiser aproximar ou afastar a arma do rosto ao mirar, adicionamos essa direção:
                 Vector3 forwardDirection = transform.parent != null ? transform.parent.forward : transform.forward;
                 centerGlobalTarget += forwardDirection * zOffset;
 
-                // 3. Descobre o vetor de offset do ponto de referência para o transform atual
                 Vector3 offsetGlobal = adsReference.position - transform.position;
-
-                // 4. Subtrai o offset para alinhar o adsReference com o alvo centralizado + offset Z
                 Vector3 targetGlobalPosition = centerGlobalTarget - offsetGlobal;
 
-                // 5. Converte para o espaço local do pai para realizar o Lerp suavemente
                 Vector3 targetLocalPosition = transform.parent != null 
                     ? transform.parent.InverseTransformPoint(targetGlobalPosition) 
                     : targetGlobalPosition;
 
-                transform.localPosition = Vector3.Lerp(startLocalPosition, targetLocalPosition, t);
+                // Transiciona usando o t suavizado
+                transform.localPosition = Vector3.Lerp(startLocalPosition, targetLocalPosition, smoothT);
             }
             else
             {
-                // Retorna suavemente para a posição original de Hipfire
-                transform.localPosition = Vector3.Lerp(startLocalPosition, original_ads_position, t);
+                // Retorno suave para o Hipfire
+                transform.localPosition = Vector3.Lerp(startLocalPosition, original_ads_position, smoothT);
             }
 
             yield return null;
         }
 
-        // Ajuste milimétrico final após o término do loop
+        // Ajuste milimétrico final
         if (aiming && adsReference != null)
         {
             Vector3 centerGlobalTarget = transform.parent != null ? transform.parent.TransformPoint(original_ads_position) : original_ads_position;
@@ -210,27 +212,29 @@ public class AdsBehaviour : MonoBehaviour
                 : targetGlobalPosition;
 
             dot_position = true;
+            targetCameraFov = minFov / zoom;
         }
         else if (!aiming)
         {
             transform.localPosition = original_ads_position;
+            targetCameraFov = minFov;
         }
 
         aimCoroutine = null;
     }
 
-    private void UpdateCameraFov(float targetFov)
+    private void ApplyCameraFovLerp()
     {
         if (player_camera == null) return;
 
-        float lerpSpeed = 10f * Time.deltaTime;
-        if (playerProperties != null && !playerProperties.is_reloading)
-        {
-            player_camera.fieldOfView = Mathf.Lerp(player_camera.fieldOfView, targetFov, lerpSpeed);
-        }
-        else
-        {
-            player_camera.fieldOfView = Mathf.Lerp(player_camera.fieldOfView, minFov, lerpSpeed);
-        }
+        // --- MELHORIA DE SUAVIDADE 2 ---
+        // Alterado de interpolação dependente de frame rígido para um amortecimento progressivo exponencial estável
+        float targetFov = (playerProperties != null && playerProperties.is_reloading) ? minFov : targetCameraFov;
+        
+        player_camera.fieldOfView = Mathf.Lerp(
+            player_camera.fieldOfView, 
+            targetFov, 
+            1f - Mathf.Exp(-fovLerpSpeed * Time.deltaTime))
+        ;
     }
 }

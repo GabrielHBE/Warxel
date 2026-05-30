@@ -551,34 +551,34 @@ public class Jet : Vehicle
             float mouseYFreeLook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
             float mouseXFreeLook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
-            Vector3 currentEuler = currentSeat.playerCamera.transform.localEulerAngles;
+            Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
             float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
             float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
 
             currentX = Mathf.Clamp(currentX + mouseYFreeLook, -80f, 20f);
             currentY = Mathf.Clamp(currentY + mouseXFreeLook, -90f, 90f);
 
-            currentSeat.playerCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+            currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
         }
         else
         {
-            currentSeat.playerCamera.transform.localRotation = Quaternion.Lerp(currentSeat.playerCamera.transform.localRotation, Quaternion.identity, Time.deltaTime * 3);
+            currentSeat.activeCamera.transform.localRotation = Quaternion.Lerp(currentSeat.activeCamera.transform.localRotation, Quaternion.identity, Time.deltaTime * 3);
         }
     }
 
     protected void Zoom()
     {
         /*
-        if (!currentSeat.playerCamera.enabled) return;
+        if (!currentSeat.activeCamera.enabled) return;
 
         float targetFov = Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key) ? (minFov / mainCannon.zoom) : minFov;
-        currentSeat.playerCamera.fieldOfView = Mathf.Lerp(currentSeat.playerCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
+        currentSeat.activeCamera.fieldOfView = Mathf.Lerp(currentSeat.activeCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
         */
     }
 
     protected override void CameraController()
     {
-        if (currentSeat.playerCamera == null) return;
+        if (currentSeat.activeCamera == null) return;
         Zoom();
     }
 

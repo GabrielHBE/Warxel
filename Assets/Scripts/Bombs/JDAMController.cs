@@ -53,16 +53,16 @@ public class JDAMController : BombsController
                 if (!jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(true);
                 UpdateJDAMCamera();
                 jdam_camera.enabled = true;
-                if (vehicle.currentSeat.playerCamera != null)
-                    vehicle.currentSeat.playerCamera.enabled = false;
+                if (vehicle.currentSeat.activeCamera != null)
+                    vehicle.currentSeat.activeCamera.enabled = false;
             }
             else
             {
                 if (!vehicle.currentSeat.seatHUD.activeSelf) vehicle.currentSeat.seatHUD.SetActive(true);
                 if (jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(false);
                 jdam_camera.enabled = false;
-                if (vehicle.currentSeat.playerCamera != null)
-                    vehicle.currentSeat.playerCamera.enabled = true;
+                if (vehicle.currentSeat.activeCamera != null)
+                    vehicle.currentSeat.activeCamera.enabled = true;
             }
         }
     }
@@ -214,6 +214,6 @@ public class JDAMController : BombsController
         if (!vehicle.currentSeat.seatHUD.activeSelf) vehicle.currentSeat.seatHUD.SetActive(true);
         if (jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(false);
         jdam_camera.enabled = false;
-        vehicle.currentSeat.playerController.playerCamera.enabled = true;
+        vehicle.currentSeat.activeCamera.enabled = true;
     }
 }

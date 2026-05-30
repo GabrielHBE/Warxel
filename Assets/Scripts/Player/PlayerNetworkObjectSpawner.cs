@@ -48,15 +48,9 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
     public void ServerSpawnBullet(GameObject bulletPrefab, Bullet.BulletData data, NetworkObject shooter, string weaponshooted_name = null)
     {
         GameObject instantiaded_obj = Instantiate(bulletPrefab, data.position, data.rotation);
-        Spawn(instantiaded_obj, shooter.Owner);
-
         Bullet bullet = instantiaded_obj.GetComponent<Bullet>();
-        if (bullet != null)
-        {
-            //GameObject weaponPrefab = LocateWeaponPrefabByName(weaponshooted_name);
-            GameObject weaponPrefab = null;
-            bullet.CreateBullet(data, transform, weaponPrefab);
-        }
+        Spawn(instantiaded_obj, shooter.Owner);
+        bullet.CreateBullet(data, transform, null);
     }
 
     private GameObject LocateWeaponPrefabByName(string weapon_name)

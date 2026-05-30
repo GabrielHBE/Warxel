@@ -2,7 +2,7 @@ using System;
 using FishNet.Object;
 using UnityEngine;
 
-public class Helicopter : Vehicle
+public class Helicopter : Vehicle, ICurrentRotationUIValues
 {
     #region Inspector Variables
 
@@ -277,6 +277,7 @@ public class Helicopter : Vehicle
             Explode(transform.position, transform.position.normalized, LayerMask.NameToLayer("Voxel"), 1);
         }
     }
+    #endregion
 
     [ServerRpc]
     private void CmdRequestEnableFireEffects()
@@ -333,7 +334,12 @@ public class Helicopter : Vehicle
 
     protected override void CameraController() { }
 
+    #region Interface Implementations
     public override float GetMaxThrottle() => heliProperties.max_lift_force;
+
+    public float GetXRotation() => transform.eulerAngles.x;
+    public float GetYRotation() => transform.eulerAngles.y;
+    public float GetZRotation() => transform.eulerAngles.z;
     #endregion
 
 }

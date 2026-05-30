@@ -78,7 +78,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         float mouseY_freelook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
         float mouseX_freelook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
-        Vector3 currentEuler = helicopter.currentSeat.playerCamera.transform.localEulerAngles;
+        Vector3 currentEuler = helicopter.currentSeat.activeCamera.transform.localEulerAngles;
 
         float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
         float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
@@ -89,7 +89,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         currentX = Mathf.Clamp(currentX, -80f, 20f);
         currentY = Mathf.Clamp(currentY, -90f, 90f);
 
-        helicopter.currentSeat.playerCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+        helicopter.currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
     }
 
     public void RotateGun(Transform gunTransform)
@@ -110,23 +110,23 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         gunTransform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
     }
 
-    private void Fire(Transform shootPos)
+    private void Fire()
     {
         properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
         current_spread += properties.spread;
 
         // Chama a lógica de rede
-        CmdFireGunner(shootPos.position, shootPos.rotation, shootPos.forward);
+        CmdFireGunner();
     }
 
     [ServerRpc]
-    private void CmdFireGunner(Vector3 pos, Quaternion rot, Vector3 forward)
+    private void CmdFireGunner()
     {
         Bullet.BulletData data = new Bullet.BulletData
         {
-            position = pos,
-            rotation = rot,
-            direction = forward,
+            position = shootPos.position,
+            rotation = shootPos.rotation,
+            direction = shootPos.forward,
             speed = properties.muzzle_velocity,
             dropMultiplier = properties.bullet_drop,
             infantaryDamage = properties.infantary_damage,
@@ -141,7 +141,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
             delaytoEnableForNonOwner = 0,
         };
 
-        GameObject bulletObj = Instantiate(properties.bullefPref.gameObject, pos, rot);
+        GameObject bulletObj = Instantiate(properties.bullefPref.gameObject, shootPos);
         Spawn(bulletObj, Owner);
 
         bulletObj.GetComponent<Bullet>().CreateBullet(data, transform.root);
@@ -210,7 +210,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
             if (next_time_to_fire <= 0f)
             {
-                Fire(shootPos);
+                Fire();
                 next_time_to_fire = properties.interval;
                 current_overheat += dt + 0.05f; // Ajuste fino do ganho de calor por tiro
             }

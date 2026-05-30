@@ -8,7 +8,7 @@ public class VehicleSeats
 {
     [Header("Seat Configuration")]
     public SeatType seatType;
-    public Camera playerCamera;
+    public Camera seatCamera;
     public GameObject seatHUD;
 
     [Header("Seat Armory")]
@@ -20,24 +20,25 @@ public class VehicleSeats
     public Transform vehicleRightHandTarget;
 
     [Header("Runtime References (Auto-assigned)")]
-    public bool isOccupied;
-    public PlayerProperties playerProperties;
-    public PlayerController playerController;
-    public Rigidbody playerRigidbody;
-    public GameObject playerGameObject;
-    public PlayerAnimation playerAnimation;
-
+    [HideInInspector] public bool isOccupied;
+    [HideInInspector] public Camera playerCamera;
+    [HideInInspector] public PlayerProperties playerProperties;
+    [HideInInspector] public PlayerController playerController;
+    [HideInInspector] public Rigidbody playerRigidbody;
+    [HideInInspector] public GameObject playerGameObject;
+    [HideInInspector] public PlayerAnimation playerAnimation;
 
     [Header("Transform References")]
     public Transform playerSeat;
+    public Transform exitPosition;
 
     [NonSerialized] public NetworkConnection authorizedConnection;
+    [HideInInspector] public Camera activeCamera;
 
     public void EnterSeat(PlayerProperties playerProperties, PlayerController playerController, Transform playerSeat, Rigidbody playerRigidbody, GameObject playerGameObject)
     {
         if (vehicleArmory != null && vehicleArmory.Length > 0)
         {
-
             currentArmory = vehicleArmory[0].GetComponent<IVehicleArmory>();
             currentArmory.ActivateArmory();
         }
@@ -79,6 +80,24 @@ public class VehicleSeats
             seatHUD.SetActive(true);
         }
 
+        if (seatCamera != null)
+        {
+            activeCamera = seatCamera;
+
+            seatCamera.enabled = true;
+            seatCamera.GetComponent<AudioListener>().enabled = true;
+
+            playerController.playerCamera.enabled = false;
+            playerController.playerCamera.GetComponent<AudioListener>().enabled = false;
+        }
+        else
+        {
+            activeCamera = playerCamera;
+
+            playerController.playerCamera.enabled = true;
+            playerController.playerCamera.GetComponent<AudioListener>().enabled = true;
+        }
+
         isOccupied = true;
 
     }
@@ -89,11 +108,11 @@ public class VehicleSeats
         playerAnimation.ActivateCurrentWeapon();
         if (playerAnimation != null)
         {
-           playerAnimation.SetVehicleIKTargets(null, null);
+            playerAnimation.SetVehicleIKTargets(null, null);
         }
 
         //Player Controls Exit State
-        playerController.first_person_player_components.SetActive(true);
+        //playerController.first_person_player_components.SetActive(true);
         playerController.soldierHudManager.UpdateItemsVisibility(true);
         playerController.HideOwnerItems(true);
         playerProperties.is_in_vehicle = false;
@@ -126,6 +145,12 @@ public class VehicleSeats
             playerAnimation.SetVehicleIKTargets(null, null);
         }
 
+        if (seatCamera != null)
+        {
+            seatCamera.enabled = false;
+            seatCamera.GetComponent<AudioListener>().enabled = false;
+        }
+
         if (seatHUD != null) seatHUD.SetActive(false);
 
         playerRigidbody = null;
@@ -134,6 +159,7 @@ public class VehicleSeats
         playerController = null;
         playerCamera = null;
         isOccupied = false;
+        activeCamera = null;
     }
 
     private void DeactivateAllArmory()
@@ -172,8 +198,8 @@ public class VehicleSeats
             {
                 NetworkObject nObj = armoryObj.GetComponent<NetworkObject>();
                 if (nObj != null)
-                {   
-                
+                {
+
                     if (conn != null)
                     {
                         Debug.Log("Setando autoridade para: " + nObj.gameObject.name);
@@ -184,7 +210,7 @@ public class VehicleSeats
                         Debug.Log("Removendo autoridade para: " + nObj.gameObject.name);
                         nObj.RemoveOwnership();
                     }
-                        
+
                 }
             }
         }

@@ -13,19 +13,16 @@ public class Weapon : MonoBehaviour
     [Header("HUD")]
     [SerializeField] private SoldierHudManager soldierHudManager;
 
-
     [Header("Muzzle Flashes")]
     [SerializeField] private List<GameObject> muzzle_flashes = new List<GameObject>();
 
     [Header("Instances")]
+    [SerializeField] private DummyBullet dummyBullet;
     [SerializeField] private PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
     [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private Camera player_camera;
     [SerializeField] private SwitchWeapon switchWeapon;
-
-    // Nova referência necessária
-    private AdsBehaviour adsBehaviour;
 
     [Header("Sounds")]
     public AudioSource switch_fire_mode_sound;
@@ -34,40 +31,32 @@ public class Weapon : MonoBehaviour
     [HideInInspector] public bool can_aim = true;
     [HideInInspector] public bool can_shoot = true;
 
+    private AdsBehaviour adsBehaviour;
     private bool can_reload;
     private float reload_cooldown;
     private float next_time_to_fire = 0f;
     [HideInInspector] public bool did_shoot = false;
-
     private int current_fire_mode = 0;
-
     private float burst_timer = 0f;
     private int bullets_shot_in_current_burst = 0;
     private bool is_bursting;
     private bool is_last_bullet;
     private bool is_first_shot;
     private int recoil_position_in_array = 0;
-
     private WeaponSounds weaponSounds;
     [HideInInspector] public WeaponProperties weaponProperties;
     private PlayerController playerController;
     private Shell shell;
     [HideInInspector] public WeaponAnimation weaponAnimation;
     private Sight sight_attatchment;
-
-
     private float current_spread;
-
     private bool restarted;
     private int reserve_ammo;
     private float crouch_recoil_multiplier = 0.8f;
-
     private float time_to_contatenate = 0;
     private GameObject current_muzzle_flash;
 
-
     #region Unity Lifecycle Methods
-
     void Awake()
     {
         restarted = false;
@@ -581,6 +570,9 @@ public class Weapon : MonoBehaviour
             vehicleDamage = weaponProperties.vehicle_damage,
             delaytoEnableForNonOwner = 0.2f,
         };
+
+        DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
+        instantiatedDummyBullet.CreateBullet(data, playerController.transform);
 
         NetworkObject shooterNetObj = playerController.GetComponent<NetworkObject>();
         playerNetworkObjectSpawner.ServerSpawnBullet(weaponProperties.bulletPref.gameObject, data, shooterNetObj, weaponProperties.gameObject.name);

@@ -177,7 +177,7 @@ public class AttackHelicopter : Helicopter
         float mouseY_freelook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
         float mouseX_freelook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
-        Vector3 currentEuler = currentSeat.playerCamera.transform.localEulerAngles;
+        Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
 
         float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
         float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
@@ -188,14 +188,14 @@ public class AttackHelicopter : Helicopter
         currentX = Mathf.Clamp(currentX, -80f, 20f);
         currentY = Mathf.Clamp(currentY, -90f, 90f);
 
-        currentSeat.playerCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+        currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
     }
 
 
     private void ReturnToCenter()
     {
-        currentSeat.playerCamera.transform.localRotation = Quaternion.Lerp(
-            currentSeat.playerCamera.transform.localRotation,
+        currentSeat.activeCamera.transform.localRotation = Quaternion.Lerp(
+            currentSeat.activeCamera.transform.localRotation,
             Quaternion.identity,
             Time.deltaTime * 3
         );

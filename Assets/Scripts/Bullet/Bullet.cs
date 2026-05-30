@@ -1,5 +1,4 @@
 using System.Collections;
-using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
@@ -59,43 +58,11 @@ public class Bullet : NetworkBehaviour
         public float delaytoEnableForNonOwner;
     }
 
-    #region Unity Lifecycle (Initialization)
-
-    void Awake()
-    {
-        HideVisuals();
-    }
-
-    void OnEnable()
-    {
-        HideVisuals();
-    }
-
-    // Força o objeto a ficar invisível localmente no exato milissegundo em que nasce/renasce
-    private void HideVisuals()
-    {
-        if (meshRenderer != null)
-        {
-            meshRenderer.enabled = false;
-        }
-
-        if (trail != null)
-        {
-            trail.enabled = false;
-            trail.Clear(); // Essencial: Limpa os rastros antigos caso o FishNet use Object Pooling
-        }
-    }
-
-    #endregion
-
     #region Bullet Creation
     [ObserversRpc]
     public void CreateBullet(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
-        meshRenderer.enabled = false;
-        if (trail != null) trail.enabled = false;
-
-        SetDirection(data.direction, data.speed, data.dropMultiplier);
+        SetDirection(data.direction, data.speed);
 
         ignoredTransform = ignoredObject;
         shoot_root = root;
@@ -110,8 +77,7 @@ public class Bullet : NetworkBehaviour
         can_damage_vehicles = data.canDamageVehicles;
         vehicle_damage = data.vehicleDamage;
         delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
-
-
+        bulletDropMultiplier = data.dropMultiplier;
         if (data.size != 0) transform.localScale *= data.size;
 
         if (IsServerInitialized)
@@ -120,37 +86,40 @@ public class Bullet : NetworkBehaviour
             Invoke(nameof(DespawnLocalSafe), 10f);
         }
 
+        lastPosition = transform.position;
+
         if (!IsOwner)
         {
-            meshRenderer.enabled = false;
+            StartCoroutine(EnableViewForNonOwners());
+        }
+        else
+        {
+            // Garante que o dono NUNCA veja a bala, caso venha ativada por engano
+            if (meshRenderer != null) meshRenderer.enabled = false;
             if (trail != null) trail.enabled = false;
         }
 
-        lastPosition = transform.position;
     }
 
-    public void SetDirection(Vector3 direction, float speed, float dropMultiplier)
+    public void SetDirection(Vector3 direction, float speed)
     {
         original_position = transform.localPosition;
-        /*
-        rb.useGravity = false;
-        if (TryGetComponent<FishNet.Component.Transforming.NetworkTransform>(out var nt))
-        {
-            nt.enabled = false;
-        }
-        */
-
         rb.isKinematic = false;
         rb.linearVelocity = direction * speed;
-
-        bulletDropMultiplier = dropMultiplier;
     }
 
+    private IEnumerator EnableViewForNonOwners()
+    {
+        // Aguarda o tempo exato definido na variável
+        yield return new WaitForSeconds(delaytoEnableForNonOwner);
+
+        // Ativa os visuais após o delay
+        if (meshRenderer != null) meshRenderer.enabled = true;
+        if (trail != null) trail.enabled = true;
+    }
     #endregion
 
     #region Updates
-
-    // 1. Coloque o Array aqui em cima, nas variáveis globais da classe!
     private RaycastHit[] hit_results = new RaycastHit[128];
 
     void FixedUpdate()
@@ -210,20 +179,11 @@ public class Bullet : NetworkBehaviour
             lastPosition = currentPosition;
         }
     }
-    float time_to_enable_view;
+
     void Update()
     {
-        if (!IsOwner && !meshRenderer.enabled)
-        {
-            time_to_enable_view += Time.deltaTime;
-            if (time_to_enable_view > delaytoEnableForNonOwner)
-            {
-                EnableBulletView();
-            }
-        }
 
-        if (!IsOwner) return;
-
+        // Restante da sua lógica original de dano e dropoff
         if (infantary_damage > minimum_damage && damage_dropoff != 0)
         {
             timer += Time.deltaTime;
@@ -233,9 +193,7 @@ public class Bullet : NetworkBehaviour
                 timer = 0;
             }
         }
-
     }
-
     #endregion
 
     private void HandleBulletHit(GameObject hitObject, Vector3 hitPoint, Vector3 hitNormal, Collider collider)
@@ -449,12 +407,6 @@ public class Bullet : NetworkBehaviour
     #endregion
 
     #region Extras
-    private void EnableBulletView()
-    {
-        meshRenderer.enabled = true;
-        if (trail != null) trail.enabled = true;
-    }
-
     void Ricochet(Vector3 position)
     {
         did_ricochet = true;
@@ -463,9 +415,7 @@ public class Bullet : NetworkBehaviour
         // NEW: Use CmdPlayHitSound instead of direct method
         soundEffects.CmdPlayHitSound(BulletSoundEffect.HitSoundType.Ricochet, position);
     }
-
     #endregion
-
 
     #region Despawning
 

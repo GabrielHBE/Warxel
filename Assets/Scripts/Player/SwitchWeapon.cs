@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -41,11 +40,10 @@ public class SwitchWeapon : MonoBehaviour
     private bool isReturning = false;
     private float switchTimer = 0f;
     private bool setupOnce = true;
-    
-    
+
+
     private WeaponProperties weaponProperties;
-    
-    private WeaponHolder weaponHolder;
+
     private Vector3 originalPosition;
     private Quaternion originalQuaternionRotation;
 
@@ -60,7 +58,7 @@ public class SwitchWeapon : MonoBehaviour
         Gadget1 = 3,
         Gadget2 = 4
     }
-    
+
     public void Initialize()
     {
 
@@ -378,10 +376,10 @@ public class SwitchWeapon : MonoBehaviour
         if (weaponProperties != null)
         {
             playerController.UpdateWeaponProperties(weaponProperties.speed_change, weaponProperties.weapon_apply_recoil_speed, weaponProperties.weapon_reset_recoil_speed);
+            WeaponHolder wh = weaponProperties.GetComponent<WeaponHolder>();
+            wh.ResetWeaponState();
         }
 
-        weaponHolder = GetComponentInChildren<WeaponHolder>();
-        weaponHolder?.SetHandsToWeapon(0);
         //if (weapon != null) weapon.ads_position.transform.localPosition = Vector3.zero;
     }
 

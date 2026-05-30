@@ -63,8 +63,8 @@ public abstract class Missiles : NetworkBehaviour
 
     protected virtual void OnCollisionEnter(Collision collision)
     {
-        if (!IsSpawned || hasExploded) return;
-
+        if (!IsSpawned || hasExploded || collision.gameObject == parent_gameobject) return;
+        
         GameObject ignoreGoInExplosion = null;
 
         trail.Stop(true, ParticleSystemStopBehavior.StopEmitting);
@@ -72,7 +72,6 @@ public abstract class Missiles : NetworkBehaviour
         trail.transform.localScale = Vector3.one;
         Destroy(trail.gameObject, trail.main.duration + trail.main.startLifetime.constantMax);
 
-        if (collision.gameObject == parent_gameobject) return;
 
         hasExploded = true;
 

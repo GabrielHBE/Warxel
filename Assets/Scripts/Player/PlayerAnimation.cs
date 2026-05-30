@@ -692,7 +692,7 @@ public class PlayerAnimation : NetworkBehaviour
             // Cria nova arma
             GameObject weaponPrefab = GetWeaponPrefab(index);
             if (weaponPrefab == null) return;
-
+            
             // Instancia a nova arma
             current_weapon = Instantiate(weaponPrefab, itens_parent);
             //current_weapon.transform.localPosition = Vector3.zero;

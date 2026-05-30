@@ -3,9 +3,6 @@ using UnityEngine;
 public class WeaponAnimation : MonoBehaviour
 {
 
-    [Header("Hand Positions")]
-    public GameObject left_hand;
-    public GameObject right_hand;
     [HideInInspector] public AnimationClip fireClip;
     private AnimationClip reloadClip;
 

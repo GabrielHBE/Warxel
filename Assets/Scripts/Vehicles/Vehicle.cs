@@ -18,7 +18,6 @@ public abstract class Vehicle : NetworkBehaviour,
     public FactionManager.Faction vehicle_faction;
     public VehicleCustomizableParts[] customizableParts;
     public Transform spot_position;
-    public Transform exit_vehicle_position;
     public int vehicle_kills;
 
     [Header("Seats Configuration")]
@@ -28,7 +27,7 @@ public abstract class Vehicle : NetworkBehaviour,
     private readonly SyncList<string> occupantsNames = new SyncList<string>();
 
     [Header("References & Components")]
-    [SerializeField] protected Rigidbody rb;
+    public Rigidbody rb;
     [SerializeField] protected GameObject fire_effects_parent;
     [SerializeField] protected AudioDistortionFilter distortion;
     [SerializeField] protected AudioSource crash_sound;
@@ -176,10 +175,10 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (player == null) return;
 
-        Quaternion spawnRotation = Quaternion.Euler(0, exit_vehicle_position.rotation.eulerAngles.y, 0);
-        float yPos = exit_vehicle_position.position.y > 0 ? exit_vehicle_position.position.y : 0.1f;
+        Quaternion spawnRotation = Quaternion.Euler(0, currentSeat.exitPosition.rotation.eulerAngles.y, 0);
+        float yPos = currentSeat.exitPosition.position.y > 0 ? currentSeat.exitPosition.position.y : 0.1f;
 
-        player.transform.position = new Vector3(exit_vehicle_position.position.x, yPos, exit_vehicle_position.position.z);
+        player.transform.position = new Vector3(currentSeat.exitPosition.position.x, yPos, currentSeat.exitPosition.position.z);
         player.transform.rotation = spawnRotation;
     }
 

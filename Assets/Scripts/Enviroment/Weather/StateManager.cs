@@ -80,7 +80,7 @@ public class StateManager : NetworkBehaviour
 
     private void UpdateNetworkTime()
     {
-        weatherState.NetworkTime.Value += (Time.deltaTime * 3600f) / 1;
+        weatherState.NetworkTime.Value += (Time.deltaTime * 3600f) / 20;
     }
 
     private void UpdateWeatherFromAPI()

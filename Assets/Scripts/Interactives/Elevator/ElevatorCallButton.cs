@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class ElevatorCallButton : MonoBehaviour, Button
+public class ElevatorCallButton : InteractiveButton
 {
     public int floor;
     [SerializeField] private GameObject door;
@@ -9,7 +9,7 @@ public class ElevatorCallButton : MonoBehaviour, Button
 
     bool can_move_door = false;
     
-    public void Interact()
+    public override void Interact()
     {
         can_move_door = true;
         if (elevator != null)

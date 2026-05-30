@@ -22,6 +22,10 @@ public class C4Detonator : Gadget
     private float detonateTimer = 0f;
     private int detonateIndex = 0;
 
+    void OnEnable()
+    {
+        AdsBehaviour.Instance.Setup(null, 0, 0);
+    }
 
     void Update()
     {

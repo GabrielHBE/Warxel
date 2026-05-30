@@ -36,7 +36,7 @@ public class Shell : Mag
 
     void HandToShell()
     {
-        weaponHolder.LeftHand_WeaponToMag(0.3f);
+        weaponHolder.LeftHandToMag(0.3f);
     }
 
     public void Reload()
@@ -117,7 +117,7 @@ public class Shell : Mag
             transform.localRotation = original_rot;
             mesh.enabled = true;
             hand_to_shell = true;
-            weaponHolder.LeftHand_MagToWeapon(0.5f);
+            weaponHolder.LeftHandToWeapon(0.5f);
             hand_to_weapon = false;
         }
     }

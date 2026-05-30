@@ -249,12 +249,11 @@ public class PlayerSpawnController : NetworkBehaviour
     [ServerRpc]
     private void SpawnVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehicle)
     {
-        NetworkManager manager = InstanceFinder.NetworkManager;
 
         GameObject spawnedObject = Instantiate(vehicle.gameObject, spawnPosition, spawnRotation);
         NetworkObject spawnedNetworkObject = spawnedObject.GetComponent<NetworkObject>();
 
-        manager.ServerManager.Spawn(spawnedNetworkObject);
+        Spawn(spawnedNetworkObject);
 
         var vehicleSpawed = spawnedObject.GetComponent<Vehicle>();
         if (vehicleSpawed != null && vehicleSpawed.IsSpawned)
@@ -282,13 +281,11 @@ public class PlayerSpawnController : NetworkBehaviour
     [ServerRpc]
     private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        NetworkManager manager = InstanceFinder.NetworkManager;
-
         GameObject spawnedObject = Instantiate(player_prefab, spawnPosition, spawnRotation);
         NetworkObject spawnedNetworkObject = spawnedObject.GetComponent<NetworkObject>();
 
         // Spawna o objeto para o owner específico
-        manager.ServerManager.Spawn(spawnedNetworkObject, Owner);
+        Spawn(spawnedNetworkObject, Owner);
 
         player_instantiated = spawnedObject;
 
@@ -300,8 +297,6 @@ public class PlayerSpawnController : NetworkBehaviour
     [TargetRpc]
     private void TargetOnSpawnPlayerComplete(NetworkConnection conn, GameObject spawnedPlayer)
     {
-        // Este método só executa no cliente alvo (o owner)
-        // O parâmetro conn é o NetworkConnection do cliente alvo
 
         player_instantiated = spawnedPlayer;
         is_respawning = false;
@@ -324,8 +319,7 @@ public class PlayerSpawnController : NetworkBehaviour
             playerController.GetComponent<PlayerProperties>().player_name.Value = AccountManager.Instance.account_name;
             WeaponProperties[] weaponProperties = player_instantiated.GetComponentsInChildren<WeaponProperties>(true);
             foreach (WeaponProperties wp in weaponProperties)
-            {
-                wp.GetComponent<WeaponHolder>().SetHands();
+            { 
                 wp.Initialize();
             }
 

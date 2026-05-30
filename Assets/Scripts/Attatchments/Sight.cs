@@ -3,11 +3,23 @@ using UnityEngine;
 
 public class Sight : Attatchment
 {
-    [Header("Changes")]
+    [Header("Settings")]
     public Transform adsPosition;
+    public SightType sightType;
+    
+    [Header("Changes")]
     public float zoom_change;
     public float ads_speed_change;
     public float sway_change;
     public string reticle;
+
+
+    public enum SightType
+    {
+        CloseRange,
+        MediumRange,
+        LongRange,
+        ExtremeLongRange
+    }
 
 }

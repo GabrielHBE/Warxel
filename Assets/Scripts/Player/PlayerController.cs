@@ -60,6 +60,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public LayerMask groundLayer;
 
     [Header("Private References")]
+    [SerializeField] private SwitchWeapon switchWeapon;
     [SerializeField] private WeaponIcon weaponIcon;
     [SerializeField] private float footstepSound_interval = 0.45f;
     [SerializeField] private CameraShake cameraShake;
@@ -862,7 +863,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     {
         if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, interactivesLayer))
         {
-            Button button = hit.collider.GetComponent<Button>();
+            InteractiveButton button = hit.collider.GetComponent<InteractiveButton>();
             button?.Interact();
         }
     }

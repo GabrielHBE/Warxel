@@ -164,7 +164,7 @@ public class ScoutHelicopter : Helicopter
         float mouseY = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
         float mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
-        Vector3 currentEuler = currentSeat.playerCamera.transform.localEulerAngles;
+        Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
         float currentX = NormalizeAngle(currentEuler.x);
         float currentY = NormalizeAngle(currentEuler.y);
 
@@ -174,13 +174,13 @@ public class ScoutHelicopter : Helicopter
         currentX = Mathf.Clamp(currentX, -80f, 20f);
         currentY = Mathf.Clamp(currentY, -90f, 90f);
 
-        currentSeat.playerCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+        currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
     }
 
     private void ReturnToCenter()
     {
-        currentSeat.playerCamera.transform.localRotation = Quaternion.Lerp(
-            currentSeat.playerCamera.transform.localRotation,
+        currentSeat.activeCamera.transform.localRotation = Quaternion.Lerp(
+            currentSeat.activeCamera.transform.localRotation,
             Quaternion.identity,
             Time.deltaTime * 3
         );
@@ -241,17 +241,17 @@ public class ScoutHelicopter : Helicopter
 
     void Zoom()
     {
-        if (currentSeat.playerCamera.enabled)
+        if (currentSeat.activeCamera.enabled)
         {
             if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
             {
                 float targetFov = minFov / heliProperties.zoom;
-                currentSeat.playerCamera.fieldOfView = Mathf.Lerp(currentSeat.playerCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
+                currentSeat.activeCamera.fieldOfView = Mathf.Lerp(currentSeat.activeCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
             }
             else
             {
-                currentSeat.playerCamera.fieldOfView = Mathf.Lerp(
-                    currentSeat.playerCamera.fieldOfView,
+                currentSeat.activeCamera.fieldOfView = Mathf.Lerp(
+                    currentSeat.activeCamera.fieldOfView,
                     minFov,
                     4 * Time.deltaTime);
             }

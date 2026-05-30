@@ -31,7 +31,7 @@ public class ScopeAimShake : MonoBehaviour
         if (playerProperties == null || cameraShake == null || !gameObject.activeSelf) return;
 
         // O jogador quer segurar a respiração se estiver mirando E apertando o botão
-        bool wantsToHoldBreath = playerProperties.is_aiming && Input.GetKey(KeyBinds.Instance.PLAYER_holdBreathKey);
+        bool wantsToHoldBreath = playerProperties.is_aiming && Input.GetKey(Settings.Instance._keybinds.PLAYER_holdBreathKey);
 
         // Atualiza a matemática do fôlego e cooldown
         UpdateBreathMechanic(wantsToHoldBreath);

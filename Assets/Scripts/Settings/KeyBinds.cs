@@ -3,24 +3,6 @@ using UnityEngine;
 public class KeyBinds : MonoBehaviour
 {
 
-    public static KeyBinds Instance; // Singleton global
-
-    private void Awake()
-    {
-        // Se já existe uma instância, destrói a nova
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        // Define como global
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
-    }
-
-
-
     [Header("Player")]
     public KeyCode PLAYER_moveFowardKey = KeyCode.W;
     public KeyCode PLAYER_moveBackwardsdKey = KeyCode.S;
@@ -33,7 +15,7 @@ public class KeyBinds : MonoBehaviour
     public KeyCode PLAYER_proneKey = KeyCode.C;
     public KeyCode PLAYER_leanLeftKey = KeyCode.Q;
     public KeyCode PLAYER_leanRightKey = KeyCode.E;
-    public KeyCode PLAYER_rollKey = KeyCode.Z;
+    public KeyCode PLAYER_rollKey = KeyCode.LeftAlt;
     public KeyCode PLAYER_activateNightNision = KeyCode.N;
     public KeyCode PLAYER_spotKey = KeyCode.Q;
     public KeyCode PLAYER_holdBreathKey = KeyCode.LeftShift;
