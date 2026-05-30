@@ -92,6 +92,11 @@ public class Weapon : MonoBehaviour
             shoot();
         }
 
+        if (!playerProperties.is_firing)
+        {
+            current_spread = Spread.ResetSpread(current_spread, weaponProperties.base_spread);
+        }
+
         if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey))
         {
             HandleFireModeSwitch();
@@ -458,7 +463,6 @@ public class Weapon : MonoBehaviour
         recoil_position_in_array = 0;
         playerProperties.is_firing = false;
         is_first_shot = false;
-        current_spread = weaponProperties.base_spread;
     }
 
     private void StartBurst()
@@ -519,9 +523,7 @@ public class Weapon : MonoBehaviour
         for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
         {
             UpdateRecoilPosition();
-            UpdateBarrelSpread();
             SpawnBullet();
-            UpdateSpread();
         }
 
         if (weaponSounds != null)
@@ -540,23 +542,18 @@ public class Weapon : MonoBehaviour
         }
     }
 
-    private void UpdateBarrelSpread()
-    {
-        weaponProperties.barrel.transform.localRotation = new Quaternion(
-            UnityEngine.Random.Range(-current_spread, current_spread) / 1000,
-            UnityEngine.Random.Range(-current_spread, current_spread) / 1000,
-            UnityEngine.Random.Range(-current_spread, current_spread) / 1000,
-            weaponProperties.barrel.transform.localRotation.w
-        );
-    }
-
     private void SpawnBullet()
     {
+        Quaternion finalRotation = Spread.CalculateSpreadRotation(weaponProperties.barrel.transform, current_spread);
+        if (current_spread < weaponProperties.max_spread)
+        {
+            current_spread = Spread.AddSpread(current_spread, weaponProperties.spread_increaser);
+        }
         Bullet.BulletData data = new Bullet.BulletData
         {
             position = weaponProperties.barrel.transform.position,
-            rotation = weaponProperties.barrel.transform.rotation,
-            direction = weaponProperties.barrel.transform.forward,
+            rotation = finalRotation,
+            direction = finalRotation * Vector3.forward,
             speed = weaponProperties.muzzle_velocity,
             dropMultiplier = weaponProperties.bullet_drop,
             infantaryDamage = weaponProperties.infantry_damage,
@@ -578,19 +575,7 @@ public class Weapon : MonoBehaviour
         playerNetworkObjectSpawner.ServerSpawnBullet(weaponProperties.bulletPref.gameObject, data, shooterNetObj, weaponProperties.gameObject.name);
     }
 
-    private void UpdateSpread()
-    {
-        if (playerProperties.is_aiming)
-        {
-            current_spread += weaponProperties.spread_increaser;
-        }
-        else
-        {
-            current_spread += weaponProperties.spread_increaser * 1.5f;
-        }
 
-        current_spread = Mathf.Clamp(current_spread, weaponProperties.base_spread, weaponProperties.max_spread);
-    }
 
     IEnumerator ApplyVisualRecoilOffset()
     {

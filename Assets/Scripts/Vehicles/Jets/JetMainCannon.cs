@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class JetMainCannon : NetworkBehaviour, IVehicleArmory
 {
+    [SerializeField] private DummyBullet dummyBullet;
+
     [Header("Bullet Config")]
     public float muzzle_velocity;
     public float bullet_drop;
@@ -85,48 +87,57 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
 
         if (Time.time >= _nextFireTime)
         {
-            // Aumenta o spread a cada tiro
-            _currentSpread = Mathf.Min(_currentSpread + spread_increase_per_shot, max_spread);
 
-            Quaternion finalRotation = CalculateSpreadRotation();
-            CmdFire(shootPosition.position, finalRotation);
+            Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPosition, _currentSpread);
+            if(_currentSpread < max_spread)
+            {
+                _currentSpread = Spread.AddSpread(_currentSpread, spread_increase_per_shot);
+            }
+
+            Bullet.BulletData data = new Bullet.BulletData
+            {
+                position = shootPosition.position,
+                rotation = finalRotation,
+                direction = finalRotation * Vector3.forward,
+                speed = muzzle_velocity,
+                dropMultiplier = bullet_drop,
+                infantaryDamage = infantary_damage,
+                damageDropoff = damage_dropoff,
+                damageDropoffTimer = damage_dropoff_timer,
+                destructionForce = destruction_force,
+                minimumDamage = minimum_damage,
+                hsMultiplier = 2,
+                size = 1,
+                canDamageVehicles = true,
+                vehicleDamage = vehicle_damage
+            };
+
+            DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
+            instantiatedDummyBullet.CreateBullet(data);
+
+            CmdFire(data);
 
             _nextFireTime = Time.time + _interval;
         }
 
         _overheatAmount += deltaTime;
-        _rotationValue = fire_rate; // Define a velocidade de rotação visual
+        _rotationValue = fire_rate;
 
         if (_overheatAmount >= overheat_time) _isOverheated = true;
     }
 
     private void StopFire(float deltaTime)
     {
-        // Recupera o spread gradualmente quando não está atirando
-        _currentSpread = Mathf.MoveTowards(_currentSpread, 0f, deltaTime * spread_recovery_speed);
+        _currentSpread = Spread.ResetSpread(_currentSpread, 0f, spread_recovery_speed);
 
-        // Desacelera a rotação visual
         _rotationValue = Mathf.Lerp(_rotationValue, 0f, deltaTime * 3f);
 
-        // Lógica de resfriamento (mais lento se estiver superaquecido)
         float coolSpeed = _isOverheated ? (deltaTime / 2f) : deltaTime;
         _overheatAmount = Mathf.MoveTowards(_overheatAmount, 0f, coolSpeed);
 
         if (_overheatAmount <= 0) _isOverheated = false;
 
         ManageAudio(false);
-    }
-
-    private Quaternion CalculateSpreadRotation()
-    {
-        // Gera um desvio aleatório baseado no spread atual
-        Vector3 randomSpread = new Vector3(
-            Random.Range(-_currentSpread, _currentSpread),
-            Random.Range(-_currentSpread, _currentSpread),
-            Random.Range(-_currentSpread, _currentSpread)
-        ) / 10f;
-
-        return shootPosition.rotation * Quaternion.Euler(randomSpread);
     }
 
     private void ManageAudio(bool isShooting)
@@ -157,28 +168,10 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    [ServerRpc]
-    private void CmdFire(Vector3 pos, Quaternion rot)
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdFire(Bullet.BulletData data)
     {
-        Transform bulletObj = Instantiate(bulletPref, pos, rot);
-        Bullet.BulletData data = new Bullet.BulletData
-        {
-            position = pos,
-            rotation = rot,
-            direction = rot * Vector3.forward,
-            speed = muzzle_velocity,
-            dropMultiplier = bullet_drop,
-            infantaryDamage = infantary_damage,
-            damageDropoff = damage_dropoff,
-            damageDropoffTimer = damage_dropoff_timer,
-            destructionForce = destruction_force,
-            minimumDamage = minimum_damage,
-            hsMultiplier = 2,
-            size = 1,
-            canDamageVehicles = true,
-            vehicleDamage = vehicle_damage
-        };
-
+        Transform bulletObj = Instantiate(bulletPref, data.position, data.rotation);
         Spawn(bulletObj.gameObject, Owner);
         bulletObj.GetComponent<Bullet>()?.CreateBullet(data, transform.root);
     }

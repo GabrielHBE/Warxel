@@ -3,7 +3,9 @@ using FishNet.Object;
 using System.Collections.Generic;
 
 public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
-{   
+{
+    [SerializeField] private DummyBullet dummyBullet;
+
     private bool isActive = true;
     public ScoutHelicopterMainMinigunProperties properties;
 
@@ -29,8 +31,8 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
         if (!IsOwner)
         {
             CoolDownCannon(Time.deltaTime);
-           return; 
-        } 
+            return;
+        }
 
         if (!isActive)
         {
@@ -88,8 +90,36 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 
                 if (shootPosition != null)
                 {
-                    Quaternion finalRotation = CalculateSpreadRotation(shootPosition);
-                    ShootBullet(shootPosition.position, finalRotation);
+                    Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPosition, _currentSpread);
+
+                    if (_currentSpread < properties.max_spread)
+                    {
+                        _currentSpread = Spread.AddSpread(_currentSpread, properties.spread);
+                    }
+
+                    Bullet.BulletData data = new Bullet.BulletData
+                    {
+                        position = shootPosition.position,
+                        rotation = finalRotation,
+                        direction = finalRotation * Vector3.forward,
+                        speed = properties.muzzle_velocity,
+                        dropMultiplier = properties.bullet_drop,
+                        infantaryDamage = properties.infantary_damage,
+                        damageDropoff = properties.damage_dropoff,
+                        damageDropoffTimer = properties.damage_dropoff_timer,
+                        destructionForce = properties.destruction_force,
+                        minimumDamage = properties.minimum_damage,
+                        hsMultiplier = 2,
+                        size = 1,
+                        canDamageVehicles = true,
+                        vehicleDamage = properties.vehicle_damage,
+                        delaytoEnableForNonOwner = 0,
+                    };
+
+                    DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
+                    instantiatedDummyBullet.CreateBullet(data);
+
+                    CmdShootBullet(data);
                 }
             }
         }
@@ -101,16 +131,6 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 
         if (properties.shoot_sound != null && IsOwner)
             properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
-    }
-
-    private Quaternion CalculateSpreadRotation(Transform shootPosition)
-    {
-        float spreadX = Random.Range(-_currentSpread, _currentSpread) / 10f;
-        float spreadY = Random.Range(-_currentSpread, _currentSpread) / 10f;
-        float spreadZ = Random.Range(-_currentSpread, _currentSpread) / 10f;
-
-        Quaternion spreadRotation = Quaternion.Euler(spreadX, spreadY, spreadZ);
-        return shootPosition.rotation * spreadRotation;
     }
 
     private void ApplyHeat(float deltaTime)
@@ -125,7 +145,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 
     private void CoolDownCannon(float deltaTime)
     {
-        _currentSpread = 0;
+        _currentSpread = Spread.ResetSpread(_currentSpread);
 
         float coolSpeed = _isOverheated ? (deltaTime / 2f) : deltaTime;
         _overheatAmount = Mathf.MoveTowards(_overheatAmount, 0f, coolSpeed);
@@ -145,32 +165,14 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
     }
 
     [ServerRpc(RequireOwnership = true)]
-    private void ShootBullet(Vector3 position, Quaternion rotation)
+    private void CmdShootBullet(Bullet.BulletData data)
     {
         if (properties.bulletPref == null)
             return;
 
-        Transform bulletObj = Instantiate(properties.bulletPref, position, rotation);
+        Transform bulletObj = Instantiate(properties.bulletPref, data.position, data.rotation);
         bulletObj.localScale *= 2;
 
-        Bullet.BulletData data = new Bullet.BulletData
-        {
-            position = position,
-            rotation = rotation,
-            direction = rotation * Vector3.forward,
-            speed = properties.muzzle_velocity,
-            dropMultiplier = properties.bullet_drop,
-            infantaryDamage = properties.infantary_damage,
-            damageDropoff = properties.damage_dropoff,
-            damageDropoffTimer = properties.damage_dropoff_timer,
-            destructionForce = properties.destruction_force,
-            minimumDamage = properties.minimum_damage,
-            hsMultiplier = 2,
-            size = 1,
-            canDamageVehicles = true,
-            vehicleDamage = properties.vehicle_damage,
-            delaytoEnableForNonOwner = 0,
-        };
 
         Spawn(bulletObj.gameObject, Owner);
         bulletObj.GetComponent<Bullet>()?.CreateBullet(data, transform.root);

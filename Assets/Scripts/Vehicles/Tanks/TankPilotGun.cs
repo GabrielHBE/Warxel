@@ -6,8 +6,9 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
 {
     [Header("Properties")]
     [SerializeField] private TankPilotGunProperties tankPilotGunProperties;
-    
+
     [Header("Instances")]
+    [SerializeField] private DummyBullet dummyBullet;
     [SerializeField] private Transform pilotGunShootPos;
     [SerializeField] private Transform tankGunnerGun;
 
@@ -54,7 +55,7 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         if (!IsOwner) return;
 
         bool isShooting = Input.GetKey(Settings.Instance._keybinds.TANK_shoot_key);
-        
+
         if (isShooting && !is_pilot_gun_overheated)
         {
             wasFiringThisFrame = true;
@@ -64,7 +65,29 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
                 if (tankContext != null) tankContext.PlayWeaponSound(tankPilotGunProperties.shoot_shound);
                 ApplyMachineGunRecoil();
 
-                CmdShootMachineGun(pilotGunShootPos.position, pilotGunShootPos.rotation, pilotGunShootPos.forward);
+                Bullet.BulletData data = new Bullet.BulletData
+                {
+                    position = pilotGunShootPos.position,
+                    rotation = pilotGunShootPos.rotation,
+                    direction = pilotGunShootPos.forward,
+                    speed = tankPilotGunProperties.muzzle_velocity,
+                    dropMultiplier = tankPilotGunProperties.bullet_drop,
+                    infantaryDamage = tankPilotGunProperties.infantary_damage,
+                    damageDropoff = tankPilotGunProperties.damage_dropoff,
+                    damageDropoffTimer = tankPilotGunProperties.damage_dropoff_timer,
+                    destructionForce = tankPilotGunProperties.destruction_force,
+                    minimumDamage = tankPilotGunProperties.minimum_damage,
+                    hsMultiplier = 2,
+                    size = 1,
+                    canDamageVehicles = false,
+                    vehicleDamage = tankPilotGunProperties.vehicle_damage,
+                    delaytoEnableForNonOwner = 0,
+                };
+
+                DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
+                instantiatedDummyBullet.CreateBullet(data, transform);
+
+                CmdShootMachineGun(data);
 
                 pilot_gun_next_time_to_fire = tankPilotGunProperties.interval;
             }
@@ -76,30 +99,10 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    [ServerRpc]
-    private void CmdShootMachineGun(Vector3 position, Quaternion rotation, Vector3 direction)
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdShootMachineGun(Bullet.BulletData data)
     {
-        Transform bulletObj = Instantiate(tankPilotGunProperties.bullefPref, position, rotation);
-
-        Bullet.BulletData data = new Bullet.BulletData
-        {
-            position = position,
-            rotation = rotation,
-            direction = direction,
-            speed = tankPilotGunProperties.muzzle_velocity,
-            dropMultiplier = tankPilotGunProperties.bullet_drop,
-            infantaryDamage = tankPilotGunProperties.infantary_damage,
-            damageDropoff = tankPilotGunProperties.damage_dropoff,
-            damageDropoffTimer = tankPilotGunProperties.damage_dropoff_timer,
-            destructionForce = tankPilotGunProperties.destruction_force,
-            minimumDamage = tankPilotGunProperties.minimum_damage,
-            hsMultiplier = 2,
-            size = 1,
-            canDamageVehicles = false,
-            vehicleDamage = tankPilotGunProperties.vehicle_damage,
-            delaytoEnableForNonOwner = 0,
-        };
-
+        Transform bulletObj = Instantiate(tankPilotGunProperties.bullefPref, data.position, data.rotation);
         Spawn(bulletObj.gameObject, Owner);
 
         Bullet bullet = bulletObj.GetComponent<Bullet>();
@@ -131,9 +134,9 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
     {
         isGunnerGunRecoiling = true;
 
-        float recoilDistance = 0.4f; 
-        float recoilDuration = tankPilotGunProperties.interval / 2; 
-        float returnDuration = tankPilotGunProperties.interval / 2; 
+        float recoilDistance = 0.4f;
+        float recoilDuration = tankPilotGunProperties.interval / 2;
+        float returnDuration = tankPilotGunProperties.interval / 2;
 
         Vector3 localRecoilDirection = -Vector3.forward;
         Vector3 recoilPosition = gunnerGunOriginalLocalPosition + (localRecoilDirection * recoilDistance);
@@ -176,7 +179,7 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         float deltaTime = Time.deltaTime;
         float coolSpeed = is_pilot_gun_overheated ? (deltaTime / 3f) : deltaTime / 2;
         pilot_gun_overheat_amount = Mathf.MoveTowards(pilot_gun_overheat_amount, 0f, coolSpeed);
-        
+
         if (pilot_gun_overheat_amount <= 0)
         {
             is_pilot_gun_overheated = false;

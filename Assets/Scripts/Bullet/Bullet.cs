@@ -30,12 +30,8 @@ public class Bullet : NetworkBehaviour
     private bool did_ricochet;
     private float timer;
     private float delaytoEnableForNonOwner;
-
-    // Variável de controle para o despawn
     private bool isDespawning;
-
     private Vector3 lastPosition;
-
     private Transform ignoredTransform;
     private GameObject shoot_root;
 
@@ -62,12 +58,35 @@ public class Bullet : NetworkBehaviour
     [ObserversRpc]
     public void CreateBullet(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
-        SetDirection(data.direction, data.speed);
 
+        if (data.size != 0) transform.localScale *= data.size;
+        delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
+        voxCollider.destructionRadius = data.destructionForce;
+
+        if (IsServerInitialized)
+        {
+            StartCoroutine(DespawnTimer());
+        }
+
+        if (!IsOwner)
+        {
+            StartCoroutine(EnableViewForNonOwners());
+            return;
+        }
+
+        SetBulletProperties(data, ignoredObject, root);
+        
+    }
+
+    private void SetBulletProperties(BulletData data, Transform ignoredObject = null, GameObject root = null)
+    {
+        SetDirection(data.direction, data.speed);
+        
+        original_position = transform.localPosition;
+        
         ignoredTransform = ignoredObject;
         shoot_root = root;
         isDespawning = false;
-        voxCollider.destructionRadius = data.destructionForce;
         did_ricochet = false;
         infantary_damage = data.infantaryDamage;
         damage_dropoff = data.damageDropoff;
@@ -76,44 +95,19 @@ public class Bullet : NetworkBehaviour
         hs_multiplier = data.hsMultiplier;
         can_damage_vehicles = data.canDamageVehicles;
         vehicle_damage = data.vehicleDamage;
-        delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
         bulletDropMultiplier = data.dropMultiplier;
-        if (data.size != 0) transform.localScale *= data.size;
-
-        if (IsServerInitialized)
-        {
-            // Usando o novo método seguro no Invoke
-            Invoke(nameof(DespawnLocalSafe), 10f);
-        }
-
         lastPosition = transform.position;
-
-        if (!IsOwner)
-        {
-            StartCoroutine(EnableViewForNonOwners());
-        }
-        else
-        {
-            // Garante que o dono NUNCA veja a bala, caso venha ativada por engano
-            if (meshRenderer != null) meshRenderer.enabled = false;
-            if (trail != null) trail.enabled = false;
-        }
-
     }
 
     public void SetDirection(Vector3 direction, float speed)
     {
-        original_position = transform.localPosition;
-        rb.isKinematic = false;
         rb.linearVelocity = direction * speed;
     }
 
     private IEnumerator EnableViewForNonOwners()
     {
-        // Aguarda o tempo exato definido na variável
         yield return new WaitForSeconds(delaytoEnableForNonOwner);
 
-        // Ativa os visuais após o delay
         if (meshRenderer != null) meshRenderer.enabled = true;
         if (trail != null) trail.enabled = true;
     }
@@ -124,9 +118,9 @@ public class Bullet : NetworkBehaviour
 
     void FixedUpdate()
     {
-        rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
-
         if (!IsOwner) return;
+
+        rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
 
         if (bullet_collider.isTrigger)
         {
@@ -138,28 +132,24 @@ public class Bullet : NetworkBehaviour
             {
                 int layerMask = ~(1 << LayerMask.NameToLayer("Projectile") | 1 << LayerMask.NameToLayer("Player"));
 
-                // 2. Agora o Raycast preenche o Array global, não gerando MAIS NENHUM lixo na memória!
                 int hits = Physics.RaycastNonAlloc(lastPosition, direction.normalized, hit_results, distance, layerMask);
 
                 if (hits > 0)
                 {
-                    // 3. Vamos achar o hit mais próximo manualmente. É muito mais leve do que usar System.Array.Sort
+
                     RaycastHit closestHit = default;
                     float minDistance = float.MaxValue;
                     bool foundValidHit = false;
 
-                    // O loop vai APENAS até a quantidade de "hits", ignorando os espaços nulos do Array
                     for (int i = 0; i < hits; i++)
                     {
                         RaycastHit hit = hit_results[i];
 
-                        // Ignora o atirador e os filhos dele
                         if (ignoredTransform != null && hit.collider.transform.IsChildOf(ignoredTransform))
                         {
                             continue;
                         }
 
-                        // Se a distância for menor que a gravada, salvamos como o hit mais próximo
                         if (hit.distance < minDistance)
                         {
                             minDistance = hit.distance;
@@ -168,20 +158,20 @@ public class Bullet : NetworkBehaviour
                         }
                     }
 
-                    // Se achou um alvo válido, processa o tiro
                     if (foundValidHit)
                     {
                         HandleBulletHit(closestHit.collider.gameObject, closestHit.point, closestHit.normal, closestHit.collider);
                     }
                 }
             }
-            // Atualiza a posição antiga para o próximo frame
+
             lastPosition = currentPosition;
         }
     }
 
     void Update()
     {
+        if (!IsOwner) return;
 
         // Restante da sua lógica original de dano e dropoff
         if (infantary_damage > minimum_damage && damage_dropoff != 0)
@@ -360,8 +350,7 @@ public class Bullet : NetworkBehaviour
         PlayerController player = collision.GetComponentInParent<PlayerController>();
         PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
 
-        // Verificamos APENAS a variável real da rede. Ignoramos propriedades corrompidas.
-        if (player == null || playerProperties.is_dead.Value) return;
+        if (playerProperties.is_dead.Value) return;
 
         float start_hp = playerProperties.hp.Value;
 
@@ -414,6 +403,12 @@ public class Bullet : NetworkBehaviour
 
         // NEW: Use CmdPlayHitSound instead of direct method
         soundEffects.CmdPlayHitSound(BulletSoundEffect.HitSoundType.Ricochet, position);
+    }
+
+    private IEnumerator DespawnTimer()
+    {
+        yield return new WaitForSeconds(10f);
+        DespawnLocalSafe();
     }
     #endregion
 

@@ -4,6 +4,7 @@ using System.Collections;
 
 public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 {
+    [SerializeField] private DummyBullet dummyBullet;
     [SerializeField] private AttackHelicopter helicopter;
     [SerializeField] private Camera gunnerGunCamera;
     public AttackHelicopterGunnerProperties properties;
@@ -113,20 +114,18 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     private void Fire()
     {
         properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
-        current_spread += properties.spread;
+        Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPos, current_spread);
 
-        // Chama a lógica de rede
-        CmdFireGunner();
-    }
+        if (current_spread < properties.max_spread)
+        {
+            current_spread = Spread.AddSpread(current_spread, properties.spread);
+        }
 
-    [ServerRpc]
-    private void CmdFireGunner()
-    {
         Bullet.BulletData data = new Bullet.BulletData
         {
             position = shootPos.position,
             rotation = shootPos.rotation,
-            direction = shootPos.forward,
+            direction = finalRotation * Vector3.forward,
             speed = properties.muzzle_velocity,
             dropMultiplier = properties.bullet_drop,
             infantaryDamage = properties.infantary_damage,
@@ -141,6 +140,16 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
             delaytoEnableForNonOwner = 0,
         };
 
+        DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
+        instantiatedDummyBullet.CreateBullet(data);
+
+        // Chama a lógica de rede
+        CmdFireGunner(data);
+    }
+
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdFireGunner(Bullet.BulletData data)
+    {
         GameObject bulletObj = Instantiate(properties.bullefPref.gameObject, shootPos);
         Spawn(bulletObj, Owner);
 
@@ -187,8 +196,9 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     private void StopFire()
     {
-        current_spread = 0;
-        // Lógica de resfriamento (mais lento se estiver superaquecido)
+        current_spread = Spread.ResetSpread(current_spread);
+
+
         float coolSpeed = is_overheated ? (Time.deltaTime / 2f) : Time.deltaTime;
         current_overheat = Mathf.MoveTowards(current_overheat, 0f, coolSpeed);
 
@@ -206,7 +216,6 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
         if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key) && !is_overheated)
         {
-            current_spread = Mathf.Clamp(current_spread, 0, properties.max_spread);
 
             if (next_time_to_fire <= 0f)
             {
@@ -217,12 +226,6 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
             if (current_overheat >= properties.overheat_time) is_overheated = true;
 
-            // Aplica spread visual
-            shootPos.localRotation = Quaternion.Euler(
-                Random.Range(-current_spread, current_spread) / 10f,
-                Random.Range(-current_spread, current_spread) / 10f,
-                0f
-            );
         }
         else
         {

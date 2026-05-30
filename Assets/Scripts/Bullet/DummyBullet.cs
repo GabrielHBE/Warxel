@@ -20,7 +20,6 @@ public class DummyBullet : MonoBehaviour
 
     public void SetDirection(Vector3 direction, float speed)
     {
-        rb.isKinematic = false;
         rb.linearVelocity = direction * speed;
     }
 
