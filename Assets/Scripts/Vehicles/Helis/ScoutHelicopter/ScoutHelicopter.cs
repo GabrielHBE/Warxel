@@ -170,7 +170,7 @@ public class ScoutHelicopter : Helicopter
         currentY += mouseX;
 
         currentX = Mathf.Clamp(currentX, -80f, 20f);
-        currentY = Mathf.Clamp(currentY, -90f, 90f);
+        currentY = Mathf.Clamp(currentY, -89f, 89f);
 
         currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
     }

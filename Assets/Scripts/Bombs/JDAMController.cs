@@ -15,6 +15,9 @@ public class JDAMController : BombsController
     public override void OnOwnershipClient(NetworkConnection prevOwner)
     {
         base.OnOwnershipClient(prevOwner);
+        
+        if (jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(false);
+
         if (IsOwner) CmdRequestInitializeBombs();
     }
 

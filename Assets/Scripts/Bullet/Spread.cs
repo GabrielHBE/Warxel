@@ -30,7 +30,6 @@ public static class Spread
             return 0;
         }
 
-        float newSpread = Mathf.Lerp(currentSpread, baseSpread, Time.deltaTime * spreadRecoveryTime);
-        return newSpread;
+        return Mathf.Lerp(currentSpread, baseSpread, Time.deltaTime * spreadRecoveryTime);
     }
 }

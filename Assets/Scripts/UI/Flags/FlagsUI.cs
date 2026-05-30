@@ -4,13 +4,12 @@ using UnityEngine.UI;
 
 public class FlagsUI : MonoBehaviour
 {
+    public static FlagsUI Instance { get; private set; }
+
+    [SerializeField] private SetInWorldPositionUI setInWorldPositionUI;
     [SerializeField] private Canvas canvas;
     [SerializeField] private Vector2 imageSize = new Vector2(50f, 50f); // Tamanho da imagem na UI
 
-    private float maxViewDistance = 500f;
-    public static FlagsUI Instance { get; private set; }
-
-    // Classe auxiliar para conectar a Flag ao seu respectivo objeto de UI
     private class FlagUIElement
     {
         public FlagCapture Flag;
@@ -59,26 +58,29 @@ public class FlagsUI : MonoBehaviour
         rectTransform.sizeDelta = imageSize;
 
         // 5. Adiciona à nossa lista para podermos atualizar a posição
-        flagElements.Add(new FlagUIElement
+        FlagUIElement element = new FlagUIElement
         {
             Flag = flag,
             UIImage = imageComponent,
             Rect = rectTransform
-        });
+        };
+
+        flagElements.Add(element);
+
+        setInWorldPositionUI.AddElement(element.Rect, flag.InWorldUIPosition);
     }
 
     void LateUpdate()
     {
-        // Garante que temos uma câmera para calcular a posição na tela
-        if (Camera.main == null) return;
-
-        // Guarda a posição da câmera em uma variável para evitar chamar transform.position várias vezes no loop
-        Vector3 camPos = Camera.main.transform.position;
 
         foreach (var element in flagElements)
         {
             if (element.Flag != null && element.Flag.InWorldUIPosition != null)
             {
+                ChangeColor(element);
+                ChangeOpacity(element);
+
+                /*
                 Vector3 flagWorldPos = element.Flag.InWorldUIPosition.position;
 
                 // <-- NOVA LÓGICA DE DISTÂNCIA -->
@@ -91,8 +93,7 @@ public class FlagsUI : MonoBehaviour
                     element.UIImage.enabled = false;
                     continue;
                 }
-                ChangeColor(element);
-                ChangeOpacity(element);
+                
 
                 // Converte a posição 3D (InWorldUIPosition) para espaço 2D da tela
                 Vector3 screenPos = Camera.main.WorldToScreenPoint(flagWorldPos);
@@ -108,6 +109,7 @@ public class FlagsUI : MonoBehaviour
                     // Esconde a imagem se o jogador estiver olhando para a direção oposta
                     element.UIImage.enabled = false;
                 }
+                */
             }
         }
     }
@@ -132,7 +134,7 @@ public class FlagsUI : MonoBehaviour
 
     private void ChangeOpacity(FlagUIElement element)
     {
-        if (AccountManager.Instance == null) return;
+        if (AccountManager.Instance == null || PlayerController.Instance == null) return;
 
         if (AccountManager.Instance.faction == element.Flag.GetFactionInControl())
         {

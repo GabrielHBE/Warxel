@@ -13,9 +13,6 @@ public class Weapon : MonoBehaviour
     [Header("HUD")]
     [SerializeField] private SoldierHudManager soldierHudManager;
 
-    [Header("Muzzle Flashes")]
-    [SerializeField] private List<GameObject> muzzle_flashes = new List<GameObject>();
-
     [Header("Instances")]
     [SerializeField] private DummyBullet dummyBullet;
     [SerializeField] private PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
@@ -54,7 +51,6 @@ public class Weapon : MonoBehaviour
     private int reserve_ammo;
     private float crouch_recoil_multiplier = 0.8f;
     private float time_to_contatenate = 0;
-    private GameObject current_muzzle_flash;
 
     #region Unity Lifecycle Methods
     void Awake()
@@ -72,7 +68,6 @@ public class Weapon : MonoBehaviour
         if (!restarted || !is_active || SettingsHUD.Instance.is_menu_settings_active)
         {
             playerProperties.is_firing = false;
-            DeleteMuzzle();
             return;
         }
 
@@ -94,7 +89,7 @@ public class Weapon : MonoBehaviour
 
         if (!playerProperties.is_firing)
         {
-            current_spread = Spread.ResetSpread(current_spread, weaponProperties.base_spread);
+            current_spread = Spread.ResetSpread(current_spread, weaponProperties.base_spread, weaponProperties.spread_recovery);
         }
 
         if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey))
@@ -340,7 +335,6 @@ public class Weapon : MonoBehaviour
             {
                 GeneralHudAlertMessages.Instance.CreateMessage("Not enought ammo", 2);
             }
-            DeleteMuzzle();
             return;
         }
 
@@ -362,7 +356,6 @@ public class Weapon : MonoBehaviour
 
         if (weaponProperties.mags[^1] <= 0)
         {
-            DeleteMuzzle();
             playerProperties.is_firing = false;
         }
     }
@@ -459,7 +452,6 @@ public class Weapon : MonoBehaviour
 
     private void ResetShotState()
     {
-        DeleteMuzzle();
         recoil_position_in_array = 0;
         playerProperties.is_firing = false;
         is_first_shot = false;
@@ -518,7 +510,6 @@ public class Weapon : MonoBehaviour
 
     void CreateBullet()
     {
-        CreateMuzzle();
 
         for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
         {
@@ -709,27 +700,6 @@ public class Weapon : MonoBehaviour
 
     #endregion
 
-    #region Muzzle Effects
-
-    private void CreateMuzzle()
-    {
-        if (current_muzzle_flash == null)
-        {
-            int randomIndex = UnityEngine.Random.Range(0, muzzle_flashes.Count);
-            current_muzzle_flash = Instantiate(muzzle_flashes[randomIndex], weaponProperties.barrel.transform);
-        }
-    }
-
-    private void DeleteMuzzle()
-    {
-        if (current_muzzle_flash != null)
-        {
-            Destroy(current_muzzle_flash);
-        }
-    }
-
-    #endregion
-
     #region Bullet Concatenation
 
     private void ConcatenateBullets()
@@ -853,15 +823,10 @@ public class Weapon : MonoBehaviour
 
     private void ExecuteBulletTransfer(int fromPosition, int toPosition, int amount)
     {
-        int old_from_value = weaponProperties.mags[fromPosition];
-        int old_to_value = weaponProperties.mags[toPosition];
 
         weaponProperties.mags[fromPosition] -= amount;
         weaponProperties.mags[toPosition] += amount;
 
-        Debug.Log($"Transferido {amount} munições " +
-                 $"do magazine {fromPosition} ({old_from_value} → {weaponProperties.mags[fromPosition]}) " +
-                 $"para magazine {toPosition} ({old_to_value} → {weaponProperties.mags[toPosition]})");
     }
 
     private void ResetConcatenation()

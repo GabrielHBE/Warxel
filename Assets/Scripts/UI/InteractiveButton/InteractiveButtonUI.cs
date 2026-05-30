@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class InteractiveButtonUI : MonoBehaviour
 {
     public static InteractiveButtonUI Instance { get; private set; }
 
+    [SerializeField] private SetInWorldPositionUI setInWorldPositionUI;
+
     [SerializeField] private InteractiveButtonUIIndicator InteractiveButtonIndicator;
-    private float maxViewDistance = 10f;
     [SerializeField] private Canvas canvas;
 
     private class InteractiveButtonUIElement
@@ -38,12 +38,12 @@ public class InteractiveButtonUI : MonoBehaviour
             InteractiveButton interactiveButton = i.GetComponent<InteractiveButton>();
             if (interactiveButton != null)
             {
-                CreateFlagUI(interactiveButton);
+                CreateButtonUI(interactiveButton);
             }
         }
     }
 
-    private void CreateFlagUI(InteractiveButton interactiveButton)
+    private void CreateButtonUI(InteractiveButton interactiveButton)
     {
 
         InteractiveButtonUIIndicator uiObject = Instantiate(InteractiveButtonIndicator);
@@ -52,17 +52,22 @@ public class InteractiveButtonUI : MonoBehaviour
 
         RectTransform rectTransform = uiObject.GetComponent<RectTransform>();
 
-        interactiveButtonElements.Add(new InteractiveButtonUIElement
+        InteractiveButtonUIElement element = new InteractiveButtonUIElement
         (
             uiObject.gameObject,
             interactiveButton,
             rectTransform,
             interactiveButton.GetInteractionButtonText()
-        ));
+        );
+
+        interactiveButtonElements.Add(element);
 
         uiObject.SetInteractiDesciption(interactiveButton.GetInteractionButtonText());
+
+        setInWorldPositionUI.AddElement(element.Rect, element.InteractiveButton.transform);
     }
 
+    /*
     void LateUpdate()
     {
         // Garante que temos uma câmera para calcular a posição na tela
@@ -84,7 +89,7 @@ public class InteractiveButtonUI : MonoBehaviour
                 // Se a distância for maior que o limite definido, esconde a UI e pula para a próxima
                 if (distanceToCamera > maxViewDistance || PlayerController.Instance == null || SettingsHUD.Instance.is_menu_settings_active)
                 {
-                    element.gameObject.SetActive(false);
+                    if (element.gameObject.activeSelf) element.gameObject.SetActive(false);
                     continue;
                 }
                 // Converte a posição 3D (InWorldUIPosition) para espaço 2D da tela
@@ -93,15 +98,16 @@ public class InteractiveButtonUI : MonoBehaviour
                 // Se o Z for maior que 0, a bandeira está na frente da câmera (visível)
                 if (screenPos.z > 0)
                 {
-                    element.gameObject.SetActive(true);
+                    if (!element.gameObject.activeSelf) element.gameObject.SetActive(true);
                     element.Rect.position = screenPos;
                 }
                 else
                 {
                     // Esconde a imagem se o jogador estiver olhando para a direção oposta
-                    element.gameObject.SetActive(false);
+                    if (element.gameObject.activeSelf) element.gameObject.SetActive(false);
                 }
             }
         }
     }
+    */
 }

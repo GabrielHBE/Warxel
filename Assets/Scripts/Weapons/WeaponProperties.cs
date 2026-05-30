@@ -66,6 +66,7 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public float base_spread;
     public float spread_increaser;
     public float max_spread;
+    public float spread_recovery = 1;
 
     [Header("Recoil")]
     public float[] vertical_recoil = new float[10];
