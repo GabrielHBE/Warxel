@@ -9,7 +9,7 @@ public class ElevatorCallButton : InteractiveButton
 
     bool can_move_door = false;
     
-    public override void Interact()
+    public override void Interact(PlayerController player)
     {
         can_move_door = true;
         if (elevator != null)

@@ -113,6 +113,7 @@ public class VehicleSeats
 
         //Player Controls Exit State
         //playerController.first_person_player_components.SetActive(true);
+        playerController.first_person_player_components.SetActive(true);
         playerController.soldierHudManager.UpdateItemsVisibility(true);
         playerController.HideOwnerItems(true);
         playerProperties.is_in_vehicle = false;

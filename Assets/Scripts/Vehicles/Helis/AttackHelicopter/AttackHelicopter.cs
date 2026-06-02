@@ -83,7 +83,6 @@ public class AttackHelicopter : Helicopter
                 RequestDamage(100);
             }
 
-            minFov = Settings.Instance._video.helicopter_fov;
 
             if (!SettingsHUD.Instance.is_menu_settings_active) HandleVehicleInput();
         }
@@ -135,24 +134,7 @@ public class AttackHelicopter : Helicopter
 
     protected override void CameraController()
     {
-        Zoom();
-    }
 
-    void Zoom()
-    {
-
-        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
-        {
-            float targetFov = minFov / heliProperties.zoom;
-            currentSeat.playerController.playerCamera.fieldOfView = Mathf.Lerp(currentSeat.playerController.playerCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
-        }
-        else
-        {
-            currentSeat.playerController.playerCamera.fieldOfView = Mathf.Lerp(
-                currentSeat.playerController.playerCamera.fieldOfView,
-                minFov,
-                4 * Time.deltaTime);
-        }
     }
 
     private void FreeLook()

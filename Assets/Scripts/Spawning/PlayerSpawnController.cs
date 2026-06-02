@@ -26,14 +26,13 @@ public class PlayerSpawnController : NetworkBehaviour
     [SerializeField] private AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
     [HideInInspector] public GameObject player_instantiated;
+    [HideInInspector] public GameObject vehicle_instantiated;
     private bool is_respawning = false;
     private float original_spawn_delay;
     private Vector3 dragOrigin;
     private Vector3 initialCameraPosition;
     private Quaternion initialCameraRotation;
-
     private Transform map_spawn_camera_pos;
-
     private GameObject[] infantary_spawn_flags;
     private GameObject[] vehicle_spawn_flags;
 
@@ -205,18 +204,17 @@ public class PlayerSpawnController : NetworkBehaviour
     // Criamos essa Coroutine Mestre para gerenciar a ordem dos acontecimentos
     private IEnumerator SpawnSequence(Transform spawn_point, CurrentSpawnType currentSpawnType, Vehicle vehicle = null)
     {
+        yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
+
         if (currentSpawnType == CurrentSpawnType.Infantary)
         {
-            yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
             SpawnPlayer(spawn_point.position, spawn_point.rotation);
         }
         else
         {
-            yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
-            SpawnPlayer(spawn_point.position, spawn_point.rotation);
-            SpawnVehicle(spawn_point.position, spawn_point.rotation, vehicle);
+            // Chama o novo método unificado
+            SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle);
         }
-
     }
 
     private IEnumerator TransitionCameraToSpawnPoint(Transform spawn_point)
@@ -247,47 +245,34 @@ public class PlayerSpawnController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SpawnVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehicle)
+    private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab)
     {
+        // 1. Instancia e Spawna o Player na rede
+        player_instantiated =  Instantiate(player_prefab, spawnPosition, spawnRotation);
+        NetworkObject playerNetObj = player_instantiated.GetComponent<NetworkObject>();
+        Spawn(playerNetObj, Owner);
+  
+        // 2. Instancia e Spawna o Veículo na rede
+        GameObject spawnedVehicle = Instantiate(vehiclePrefab.gameObject, spawnPosition, spawnRotation);
+        Vehicle vScript = spawnedVehicle.GetComponent<Vehicle>();
+        Spawn(spawnedVehicle);
 
-        GameObject spawnedObject = Instantiate(vehicle.gameObject, spawnPosition, spawnRotation);
-        NetworkObject spawnedNetworkObject = spawnedObject.GetComponent<NetworkObject>();
+        // 3. Força a entrada do player (roda direto no servidor, evitando delays)
+        // O método EnterVehicle da classe Vehicle já lida com RPCs de atualizar assentos e transferir Ownership
+        vScript.EnterVehicle(Owner, player_instantiated);
 
-        Spawn(spawnedNetworkObject);
-
-        var vehicleSpawed = spawnedObject.GetComponent<Vehicle>();
-        if (vehicleSpawed != null && vehicleSpawed.IsSpawned)
-        {
-            TargetEnterVehicle(Owner, vehicleSpawed);
-        }
-        else
-        {
-            Debug.LogError("Vehicle not properly spawned in network");
-        }
-    }
-
-    // Essa função é enviada do Servidor direto para a tela do Dono (Owner)
-    [TargetRpc]
-    private void TargetEnterVehicle(NetworkConnection conn, Vehicle spawnedVehicle)
-    {
-        if (player_instantiated != null)
-        {
-            // Agora sim, o código de interação roda na tela do jogador, 
-            // processando a UI corretamente e chamando o servidor no final!
-            player_instantiated.GetComponent<PlayerController>().InteractWithVehicle(spawnedVehicle);
-        }
+        // 4. Atualiza o Cliente original de que o spawn terminou
+        TargetOnSpawnPlayerComplete(Owner, player_instantiated);
     }
 
     [ServerRpc]
     private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        GameObject spawnedObject = Instantiate(player_prefab, spawnPosition, spawnRotation);
-        NetworkObject spawnedNetworkObject = spawnedObject.GetComponent<NetworkObject>();
+        player_instantiated= Instantiate(player_prefab, spawnPosition, spawnRotation);
+        NetworkObject spawnedNetworkObject = player_instantiated.GetComponent<NetworkObject>();
 
         // Spawna o objeto para o owner específico
         Spawn(spawnedNetworkObject, Owner);
-
-        player_instantiated = spawnedObject;
 
         // NOTIFICA APENAS O OWNER usando TargetRpc
         TargetOnSpawnPlayerComplete(Owner, spawnedNetworkObject.gameObject);
@@ -319,7 +304,7 @@ public class PlayerSpawnController : NetworkBehaviour
             playerController.GetComponent<PlayerProperties>().player_name.Value = AccountManager.Instance.account_name;
             WeaponProperties[] weaponProperties = player_instantiated.GetComponentsInChildren<WeaponProperties>(true);
             foreach (WeaponProperties wp in weaponProperties)
-            { 
+            {
                 wp.Initialize();
             }
 

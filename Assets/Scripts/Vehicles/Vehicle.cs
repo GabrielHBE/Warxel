@@ -28,6 +28,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
     [Header("References & Components")]
     public Rigidbody rb;
+    public EnterVehicle enterVehicle;
     [SerializeField] protected GameObject fire_effects_parent;
     [SerializeField] protected AudioDistortionFilter distortion;
     [SerializeField] protected AudioSource crash_sound;
@@ -44,7 +45,6 @@ public abstract class Vehicle : NetworkBehaviour,
     [HideInInspector] public float throttle;
     [HideInInspector] public bool start_engine = false;
     public readonly SyncVar<bool> vehicle_destroyed = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    protected float minFov;
     private bool did_explode = false;
 
     [Header("Health & Damage")]
@@ -75,6 +75,7 @@ public abstract class Vehicle : NetworkBehaviour,
     protected abstract void Move();
     protected abstract void CameraController();
     protected abstract void DestroyAnimation();
+    public abstract float GetMinFov();
     #endregion
 
     #region Player Interaction
@@ -88,8 +89,6 @@ public abstract class Vehicle : NetworkBehaviour,
 
     public virtual void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
-        if (!IsServerInitialized) return;
-
         for (int i = 0; i < vehicleSeats.Length; i++)
         {
             VehicleSeats seat = vehicleSeats[i];
@@ -109,7 +108,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
             if (seat.seatType == VehicleSeats.SeatType.Pilot)
             {
-                GiveOwnershipToPlayer(conn);
+                NetworkObject.GiveOwnership(conn);
             }
 
             NetworkObject playerNetObj = _player.GetComponent<NetworkObject>();
@@ -118,6 +117,13 @@ public abstract class Vehicle : NetworkBehaviour,
 
             break;
         }
+        TargetDisableEnterVehicleUI(conn);
+    }
+
+    [TargetRpc]
+    private void TargetDisableEnterVehicleUI(NetworkConnection conn)
+    {
+        enterVehicle.gameObject.SetActive(false);
     }
 
     [TargetRpc]
@@ -169,6 +175,8 @@ public abstract class Vehicle : NetworkBehaviour,
             playerSeatIndex = -1;
             seat.ExitSeat();
         }
+
+        enterVehicle.gameObject.SetActive(true);
     }
 
     private void RepositionPlayerOnExit(GameObject player)
@@ -274,9 +282,6 @@ public abstract class Vehicle : NetworkBehaviour,
     #region Network Status & Ownership
     [ServerRpc]
     private void RemoveArmoryOwnership(NetworkObject obj) => obj?.RemoveOwnership();
-
-    [ServerRpc(RequireOwnership = false)]
-    private void GiveOwnershipToPlayer(NetworkConnection conn) => NetworkObject.GiveOwnership(conn);
 
     [ServerRpc(RequireOwnership = true)]
     private void RemoveOwnershipFromPlayer() => NetworkObject.RemoveOwnership();
@@ -408,7 +413,7 @@ public abstract class Vehicle : NetworkBehaviour,
     public Vector3 GetLinearVelocity() => rb.linearVelocity;
     public string[] GetOccupantNames() => occupantsNames.ToArray();
     public void AddKill() => vehicle_kills++;
-
+    
     protected virtual void SwitchWeapon()
     {
         if (currentSeat.vehicleArmory == null || currentSeat.vehicleArmory.Length == 0) return;

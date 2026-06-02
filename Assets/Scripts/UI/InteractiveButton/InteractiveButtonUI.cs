@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public class InteractiveButtonUI : MonoBehaviour
@@ -6,7 +5,6 @@ public class InteractiveButtonUI : MonoBehaviour
     public static InteractiveButtonUI Instance { get; private set; }
 
     [SerializeField] private SetInWorldPositionUI setInWorldPositionUI;
-
     [SerializeField] private InteractiveButtonUIIndicator InteractiveButtonIndicator;
     [SerializeField] private Canvas canvas;
 
@@ -26,24 +24,12 @@ public class InteractiveButtonUI : MonoBehaviour
         }
     }
 
-    private List<InteractiveButtonUIElement> interactiveButtonElements = new List<InteractiveButtonUIElement>();
-
     void Awake()
     {
         Instance = this;
-        GameObject[] interactiveButtonsGo = GameObject.FindGameObjectsWithTag("InteractiveButton");
-
-        foreach (GameObject i in interactiveButtonsGo)
-        {
-            InteractiveButton interactiveButton = i.GetComponent<InteractiveButton>();
-            if (interactiveButton != null)
-            {
-                CreateButtonUI(interactiveButton);
-            }
-        }
     }
 
-    private void CreateButtonUI(InteractiveButton interactiveButton)
+    public void CreateButtonUI(InteractiveButton interactiveButton)
     {
 
         InteractiveButtonUIIndicator uiObject = Instantiate(InteractiveButtonIndicator);
@@ -60,54 +46,9 @@ public class InteractiveButtonUI : MonoBehaviour
             interactiveButton.GetInteractionButtonText()
         );
 
-        interactiveButtonElements.Add(element);
-
         uiObject.SetInteractiDesciption(interactiveButton.GetInteractionButtonText());
 
         setInWorldPositionUI.AddElement(element.Rect, element.InteractiveButton.transform);
     }
 
-    /*
-    void LateUpdate()
-    {
-        // Garante que temos uma câmera para calcular a posição na tela
-        if (Camera.main == null) return;
-
-        // Guarda a posição da câmera em uma variável para evitar chamar transform.position várias vezes no loop
-        Vector3 camPos = Camera.main.transform.position;
-
-        foreach (var element in interactiveButtonElements)
-        {
-            if (element.InteractiveButton != null)
-            {
-                Vector3 flagWorldPos = element.InteractiveButton.transform.position;
-
-                // <-- NOVA LÓGICA DE DISTÂNCIA -->
-                // Calcula a distância entre a câmera e a bandeira
-                float distanceToCamera = Vector3.Distance(camPos, flagWorldPos);
-
-                // Se a distância for maior que o limite definido, esconde a UI e pula para a próxima
-                if (distanceToCamera > maxViewDistance || PlayerController.Instance == null || SettingsHUD.Instance.is_menu_settings_active)
-                {
-                    if (element.gameObject.activeSelf) element.gameObject.SetActive(false);
-                    continue;
-                }
-                // Converte a posição 3D (InWorldUIPosition) para espaço 2D da tela
-                Vector3 screenPos = Camera.main.WorldToScreenPoint(flagWorldPos);
-
-                // Se o Z for maior que 0, a bandeira está na frente da câmera (visível)
-                if (screenPos.z > 0)
-                {
-                    if (!element.gameObject.activeSelf) element.gameObject.SetActive(true);
-                    element.Rect.position = screenPos;
-                }
-                else
-                {
-                    // Esconde a imagem se o jogador estiver olhando para a direção oposta
-                    if (element.gameObject.activeSelf) element.gameObject.SetActive(false);
-                }
-            }
-        }
-    }
-    */
 }

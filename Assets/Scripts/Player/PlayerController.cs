@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Xml.Serialization;
 using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
@@ -220,8 +221,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     #endregion
 
     #region Initialization
-
-    [Client]
     public void ConfigureOwner()
     {
 
@@ -855,8 +854,11 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
         Debug.DrawRay(origin, direction * INTERACT_DISTANCE, Color.red, 1f);
 
-        TryInteractWithButton(origin, direction);
-        if (!playerProperties.is_in_vehicle) TryInteractWithVehicle(origin, direction);
+        if (!playerProperties.is_in_vehicle)
+        {
+            TryInteractWithButton(origin, direction);
+        }
+
     }
 
     private void TryInteractWithButton(Vector3 origin, Vector3 direction)
@@ -864,33 +866,16 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, interactivesLayer))
         {
             InteractiveButton button = hit.collider.GetComponent<InteractiveButton>();
-            button?.Interact();
+            button?.Interact(this);
         }
     }
 
-    private void TryInteractWithVehicle(Vector3 origin, Vector3 direction)
+    #endregion
+
+    #region State Management
+
+    public void DisableNightVison()
     {
-        if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, vehicleLayer))
-        {
-            Vehicle vehicle = hit.collider.GetComponent<Vehicle>() ?? hit.collider.GetComponentInParent<Vehicle>();
-
-            if (vehicle != null)
-            {
-                if (playerProperties.selected_class != ClassManager.Class.Pilot)
-                {
-                    GeneralHudAlertMessages.Instance.CreateMessage("Only the pilot Class can drive vehicles", 2);
-                    return;
-                }
-
-                InteractWithVehicle(vehicle);
-            }
-        }
-    }
-
-    public void InteractWithVehicle(Vehicle vehicle)
-    {
-        if (gameObject == null || !gameObject.activeSelf) return;
-
         if (is_night_vision_active)
         {
             is_night_vision_active = false;
@@ -898,7 +883,10 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = false;
             if (nightVision_vignette != null) nightVision_vignette.active = false;
         }
+    }
 
+    public void ResetWeaponAnimation()
+    {
         if (weapon.weaponProperties != null)
         {
             weapon.can_shoot = true;
@@ -907,22 +895,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             weapon.weaponAnimation.FinishReloadAnimation();
 
         }
-
-        RequestEnterVehicle(vehicle, gameObject);
     }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestEnterVehicle(Vehicle vehicle, GameObject player)
-    {
-        if (vehicle == null || player == null || !vehicle.IsSpawned || !player.activeInHierarchy) return;
-
-        //vehicle.NetworkObject.GiveOwnership(Owner);
-        vehicle.EnterVehicle(Owner, player);
-    }
-
-    #endregion
-
-    #region State Management
 
     private void UpdateColliderStateLocal()
     {

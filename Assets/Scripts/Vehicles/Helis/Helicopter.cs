@@ -208,6 +208,11 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
 
     #region Collision & Destruction 
 
+    public override float GetMinFov()
+    {
+        return Settings.Instance._video.helicopter_fov;
+    }
+
     protected override void OnCollisionEnter(Collision collision)
     {
         if (!vehicle_destroyed.Value)
@@ -336,7 +341,6 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
 
     #region Interface Implementations
     public override float GetMaxThrottle() => heliProperties.max_lift_force;
-
     public float GetXRotation() => transform.eulerAngles.x;
     public float GetYRotation() => transform.eulerAngles.y;
     public float GetZRotation() => transform.eulerAngles.z;

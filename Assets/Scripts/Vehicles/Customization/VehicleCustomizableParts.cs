@@ -30,5 +30,6 @@ public enum VehicleCustomizableParts
 
     //General
     Countermeasure,
+    VehicleAim
     
 }

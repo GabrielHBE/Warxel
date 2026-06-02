@@ -74,6 +74,7 @@ public class Jet : Vehicle
 
     protected override void Update()
     {
+        //print(IsOwner);
         if (!IsOwner) return;
 
         UpdateBasicState();
@@ -94,7 +95,7 @@ public class Jet : Vehicle
 
     void LateUpdate()
     {
-        if(is_in_vehicle) SyncPlayerPosition();
+        if (is_in_vehicle) SyncPlayerPosition();
     }
 
     protected void OnCollisionStay(Collision collision)
@@ -166,8 +167,6 @@ public class Jet : Vehicle
     private void HandleInVehicleLogic()
     {
         if (SettingsHUD.Instance.is_menu_settings_active) return;
-
-        minFov = Settings.Instance._video.jet_fov;
 
         if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
 
@@ -414,7 +413,7 @@ public class Jet : Vehicle
         }
 
         ApplyEjectForce(playerRb);
-  
+
     }
 
     private void ApplyEjectForce(Rigidbody player_rb)
@@ -544,6 +543,11 @@ public class Jet : Vehicle
     #endregion
 
     #region Camera & Systems
+
+    public override float GetMinFov()
+    {
+        return Settings.Instance._video.jet_fov;
+    }
     protected void FreeLook()
     {
         if (Input.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
@@ -566,20 +570,10 @@ public class Jet : Vehicle
         }
     }
 
-    protected void Zoom()
-    {
-        /*
-        if (!currentSeat.activeCamera.enabled) return;
-
-        float targetFov = Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key) ? (minFov / mainCannon.zoom) : minFov;
-        currentSeat.activeCamera.fieldOfView = Mathf.Lerp(currentSeat.activeCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
-        */
-    }
 
     protected override void CameraController()
     {
         if (currentSeat.activeCamera == null) return;
-        Zoom();
     }
 
     protected void AfterBurner()

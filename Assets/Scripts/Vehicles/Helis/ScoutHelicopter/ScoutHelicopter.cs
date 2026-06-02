@@ -40,8 +40,6 @@ public class ScoutHelicopter : Helicopter
 
             if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
             {
-                Zoom();
-
                 currentSeat.currentArmory.Shoot();
             }
 
@@ -169,8 +167,8 @@ public class ScoutHelicopter : Helicopter
         currentX += mouseY;
         currentY += mouseX;
 
-        currentX = Mathf.Clamp(currentX, -80f, 20f);
-        currentY = Mathf.Clamp(currentY, -89f, 89f);
+        currentX = Mathf.Clamp(currentX, -80, 40);
+        currentY = Mathf.Clamp(currentY, -90, 90);
 
         currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
     }
@@ -234,43 +232,7 @@ public class ScoutHelicopter : Helicopter
             RequestDamage(100);
         }
 
-        minFov = Settings.Instance._video.helicopter_fov;
     }
-
-    void Zoom()
-    {
-        if (currentSeat.activeCamera.enabled)
-        {
-            if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
-            {
-                float targetFov = minFov / heliProperties.zoom;
-                currentSeat.activeCamera.fieldOfView = Mathf.Lerp(currentSeat.activeCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
-            }
-            else
-            {
-                currentSeat.activeCamera.fieldOfView = Mathf.Lerp(
-                    currentSeat.activeCamera.fieldOfView,
-                    minFov,
-                    4 * Time.deltaTime);
-            }
-        }
-        else
-        {
-            if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_zoom_key))
-            {
-                float targetFov = minFov / heliProperties.zoom;
-                currentSeat.playerController.playerCamera.fieldOfView = Mathf.Lerp(currentSeat.playerController.playerCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
-            }
-            else
-            {
-                currentSeat.playerController.playerCamera.fieldOfView = Mathf.Lerp(
-                    currentSeat.playerController.playerCamera.fieldOfView,
-                    minFov,
-                    4 * Time.deltaTime);
-            }
-        }
-    }
-
     #endregion
 
 }

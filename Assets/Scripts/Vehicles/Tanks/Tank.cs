@@ -74,15 +74,12 @@ public class Tank : Vehicle
 
         if (is_in_vehicle)
         {
-            minFov = Settings.Instance._video.tank_fov;
-
             _exitCooldown += Time.deltaTime;
 
             if (!SettingsHUD.Instance.is_menu_settings_active)
             {
                 SwitchWeapon();
                 HandleShooting();
-                Zoom();
 
                 if (!vehicle_destroyed.Value)
                 {
@@ -503,23 +500,9 @@ public class Tank : Vehicle
     #endregion
 
     #region Systems
-
-    private void Zoom()
+    public override float GetMinFov()
     {
-        if (!currentSeat.activeCamera.enabled) return;
-
-        if (Input.GetKey(Settings.Instance._keybinds.TANK_zoom_key))
-        {
-            float targetFov = minFov / tankProperties.zoom;
-            currentSeat.activeCamera.fieldOfView = Mathf.Lerp(currentSeat.activeCamera.fieldOfView, targetFov, 4 * Time.deltaTime);
-        }
-        else
-        {
-            currentSeat.activeCamera.fieldOfView = Mathf.Lerp(
-                currentSeat.activeCamera.fieldOfView,
-                minFov,
-                4 * Time.deltaTime);
-        }
+        return Settings.Instance._video.tank_fov;
     }
 
     private void UpdateLightState()

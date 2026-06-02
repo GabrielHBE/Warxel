@@ -31,43 +31,51 @@ public class SetInWorldPositionUI : MonoBehaviour
 
     private void Update()
     {
-        if(updateMethod == Updatemehtod.Update) MovePosition();
+        if (updateMethod == Updatemehtod.Update) MovePosition();
     }
-    
+
     private void LateUpdate()
     {
-        if(updateMethod == Updatemehtod.LateUpdate) MovePosition();
+        if (updateMethod == Updatemehtod.LateUpdate) MovePosition();
     }
 
     private void MovePosition()
     {
-        if(Camera.main == null)
+        if (Camera.main == null)
         {
             for (int i = elements.Count - 1; i >= 0; i--)
             {
                 UIWorldMapping map = elements[i];
-                if (map.uiElement.gameObject.activeSelf) map.uiElement.gameObject.SetActive(false);
+                // Proteção caso o uiElement tenha sido destruído enquanto a câmera sumia
+                if (map.uiElement != null && map.uiElement.gameObject.activeSelf)
+                    map.uiElement.gameObject.SetActive(false);
             }
-        
+
             return;
-        } 
+        }
 
         for (int i = elements.Count - 1; i >= 0; i--)
         {
             UIWorldMapping map = elements[i];
 
-            // Se o elemento de UI ou a posição de mundo sumirem/forem destruídos, remove da lista
-            if (map.uiElement == null || map.worldPos == null)
+            // CORREÇÃO AQUI: Primeiro checa se as referências em si são nulas. 
+            // Se worldPos for nulo (destruído), o Unity para a checagem no primeiro '||' e não dá erro.
+            if (map.uiElement == null || map.worldPos == null || !map.worldPos.gameObject.activeSelf)
             {
+                // Se o elemento de UI ainda existir mas o ponto do mundo sumiu, esconde a UI antes de remover
+                if (map.uiElement != null && map.uiElement.gameObject.activeSelf)
+                {
+                    map.uiElement.gameObject.SetActive(false);
+                }
+
                 elements.RemoveAt(i);
                 continue;
             }
 
             float distanceToCamera = Vector3.Distance(Camera.main.transform.position, map.worldPos.position);
 
-            if ((distanceToCamera > viewDistance && disableWithinDistance)|| SettingsHUD.Instance.is_menu_settings_active)
+            if ((distanceToCamera > viewDistance && disableWithinDistance) || SettingsHUD.Instance.is_menu_settings_active)
             {
-                
                 if (map.uiElement.gameObject.activeSelf) map.uiElement.gameObject.SetActive(false);
                 continue;
             }
