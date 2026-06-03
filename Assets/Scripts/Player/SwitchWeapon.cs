@@ -129,9 +129,7 @@ public class SwitchWeapon : MonoBehaviour
 
     void Update()
     {
-
-        if (SettingsHUD.Instance.is_menu_settings_active) return;
-        HandleWeaponSwitchInput();
+        HandleWeaponSwitchInputManager();
 
         if (_switch)
         {
@@ -144,7 +142,7 @@ public class SwitchWeapon : MonoBehaviour
         }
     }
 
-    private void HandleWeaponSwitchInput()
+    private void HandleWeaponSwitchInputManager()
     {
         if (_switch || playerProperties.is_reloading || playerProperties.is_firing || playerProperties.is_dead.Value)
             return;
@@ -160,7 +158,7 @@ public class SwitchWeapon : MonoBehaviour
         }
 
         // Handle number key presses
-        HandleNumberKeyInput();
+        HandleNumberKeyInputManager();
     }
 
     private void SwitchWeaponByScroll(float scrollDirection)
@@ -177,21 +175,21 @@ public class SwitchWeapon : MonoBehaviour
         _switch = true;
     }
 
-    private void HandleNumberKeyInput()
+    private void HandleNumberKeyInputManager()
     {
-        if (Input.GetKeyDown(weapon1) && primary != null && currentWeapon != 1)
+        if (InputManager.GetKeyDown(weapon1) && primary != null && currentWeapon != 1)
         {
             SwitchToWeapon(WeaponSlot.Primary);
         }
-        else if (Input.GetKeyDown(weapon2) && secondary != null && currentWeapon != 2)
+        else if (InputManager.GetKeyDown(weapon2) && secondary != null && currentWeapon != 2)
         {
             SwitchToWeapon(WeaponSlot.Secondary);
         }
-        else if (Input.GetKeyDown(weapon3) && gadget1 != null && currentWeapon != 3)
+        else if (InputManager.GetKeyDown(weapon3) && gadget1 != null && currentWeapon != 3)
         {
             SwitchToWeapon(WeaponSlot.Gadget1);
         }
-        else if (Input.GetKeyDown(weapon4) && gadget2 != null && currentWeapon != 4)
+        else if (InputManager.GetKeyDown(weapon4) && gadget2 != null && currentWeapon != 4)
         {
             SwitchToWeapon(WeaponSlot.Gadget2);
         }

@@ -65,7 +65,7 @@ public class Weapon : MonoBehaviour
         if (weaponProperties != null)
             Reload();
 
-        if (!restarted || !is_active || SettingsHUD.Instance.is_menu_settings_active)
+        if (!restarted || !is_active)
         {
             playerProperties.is_firing = false;
             return;
@@ -75,7 +75,7 @@ public class Weapon : MonoBehaviour
 
         ConcatenateBullets();
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_reloadKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_reloadKey))
         {
             HandleReload();
         }
@@ -92,7 +92,7 @@ public class Weapon : MonoBehaviour
             current_spread = Spread.ResetSpread(current_spread, weaponProperties.base_spread, weaponProperties.spread_recovery);
         }
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey))
         {
             HandleFireModeSwitch();
         }
@@ -325,13 +325,13 @@ public class Weapon : MonoBehaviour
 
     void shoot()
     {
-        bool hold_shoot = Input.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
-        bool press_shoot = Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
+        bool hold_shoot = InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
+        bool press_shoot = InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
 
 
         if (ShouldBlockShooting())
         {
-            if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) && weaponProperties.mags[^1] == 0)
+            if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) && weaponProperties.mags[^1] == 0)
             {
                 GeneralHudAlertMessages.Instance.CreateMessage("Not enought ammo", 2);
             }
@@ -709,7 +709,7 @@ public class Weapon : MonoBehaviour
             return;
         }
 
-        if (Input.GetKey(Settings.Instance._keybinds.WEAPON_composeBulletsKey) &&
+        if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_composeBulletsKey) &&
             !playerProperties.is_firing &&
             !playerProperties.is_reloading)
         {

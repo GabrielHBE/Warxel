@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Xml.Serialization;
 using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
@@ -175,7 +174,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             return;
         }
 
-        HandleDebugInput();
+        HandleDebugInputManager();
         UpdateDamageVignette();
 
         //if (!first_person_player_components.activeSelf) first_person_player_components.SetActive(true);
@@ -193,11 +192,11 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         if (soldierHudManager.deadPlayerHud.gameObject.activeSelf) soldierHudManager.deadPlayerHud.gameObject.SetActive(false);
         death_timer = 0;
 
-        HandleInteractionInput();
-        HandlePlayerInput();
+        HandleInteractionInputManager();
+        HandlePlayerInputManager();
         RotateCamera();
         UpdateRecoil();
-        HandleJumpInput();
+        HandleJumpInputManager();
         HandleEnvironmentEffects();
     }
 
@@ -282,23 +281,23 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     #endregion
 
-    #region Input Handling
+    #region InputManager Handling
 
-    private void HandleDebugInput()
+    private void HandleDebugInputManager()
     {
-        if (Input.GetKeyDown(KeyCode.K)) Revive();
-        if (Input.GetKeyDown(KeyCode.G)) RequestDamage(100);
+        if (InputManager.GetKeyDown(KeyCode.K)) Revive();
+        if (InputManager.GetKeyDown(KeyCode.G)) RequestDamage(100);
     }
 
-    private void HandleInteractionInput()
+    private void HandleInteractionInputManager()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey))
         {
             Interact();
         }
     }
 
-    private void HandlePlayerInput()
+    private void HandlePlayerInputManager()
     {
         if (playerProperties.roll)
         {
@@ -307,7 +306,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         }
         else
         {
-            UpdateMovementInput();
+            UpdateMovementInputManager();
         }
 
         HandleNightVision();
@@ -322,30 +321,30 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         }
     }
 
-    private void UpdateMovementInput()
+    private void UpdateMovementInputManager()
     {
         moveHorizontal = 0;
         moveForward = 0;
 
-        bool moveFwd = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey);
-        bool moveBck = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey);
-        bool moveLft = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey);
-        bool moveRgt = Input.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey);
+        bool moveFwd = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_moveFowardKey);
+        bool moveBck = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_moveBackwardsdKey);
+        bool moveLft = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_moveLeftKey);
+        bool moveRgt = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_moveRightKey);
 
-        if ((moveFwd && moveBck) || SettingsHUD.Instance.is_menu_settings_active)
+        if (moveFwd && moveBck)
             moveForward = 0;
         else if (moveFwd) moveForward = 1;
         else if (moveBck) moveForward = -1;
 
-        if ((moveLft && moveRgt) || SettingsHUD.Instance.is_menu_settings_active)
+        if (moveLft && moveRgt)
             moveHorizontal = 0;
         else if (moveLft) moveHorizontal = -1;
         else if (moveRgt) moveHorizontal = 1;
     }
 
-    private void HandleJumpInput()
+    private void HandleJumpInputManager()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded &&
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded &&
             !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
         {
             readyToJump = false;
@@ -367,7 +366,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         Vector3 origin_ = playerHead.transform.position;
         float distance = colliders_difference * 4.5f;
 
-        bool isSprintingKeyHit = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_sprintKey);
+        bool isSprintingKeyHit = InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_sprintKey);
         bool isSprintOnHold = Settings.Instance._controls.is_sprint_on_hold;
 
         if ((!isSprintOnHold && isSprintingKeyHit) || isSprintOnHold)
@@ -399,7 +398,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void UpdateHoldSprint()
     {
-        playerProperties.sprinting = Input.GetKey(Settings.Instance._keybinds.PLAYER_sprintKey);
+        playerProperties.sprinting = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_sprintKey);
 
         if (playerProperties.sprinting)
         {
@@ -413,7 +412,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         Vector3 origin_ = transform.position;
         float distance = 7f;
 
-        bool isProneKeyHit = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_proneKey);
+        bool isProneKeyHit = InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_proneKey);
         bool isProneOnHold = Settings.Instance._controls.is_prone_on_hold;
 
         if ((!isProneOnHold && isProneKeyHit) || isProneOnHold)
@@ -450,7 +449,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void UpdateHoldProne()
     {
-        playerProperties.is_proned = Input.GetKey(Settings.Instance._keybinds.PLAYER_proneKey);
+        playerProperties.is_proned = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_proneKey);
 
         if (playerProperties.is_proned)
         {
@@ -461,14 +460,14 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void HandleCrouch()
     {
-        bool crouchInput = Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_crouchKey);
-        bool jumpWhileCrouched = playerProperties.crouched && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey);
+        bool crouchInputManager = InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_crouchKey);
+        bool jumpWhileCrouched = playerProperties.crouched && InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey);
         bool isCrouchOnHold = Settings.Instance._controls.is_crouch_on_hold;
 
         Vector3 origin_ = playerProperties.is_proned ? transform.position : playerHead.transform.position;
         float distance = playerProperties.is_proned ? 3f : colliders_difference * 4.5f;
 
-        if ((!isCrouchOnHold && (crouchInput || jumpWhileCrouched)) || isCrouchOnHold)
+        if ((!isCrouchOnHold && (crouchInputManager || jumpWhileCrouched)) || isCrouchOnHold)
         {
             if (playerProperties.crouched || playerProperties.is_proned || isCrouchOnHold)
             {
@@ -499,7 +498,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void UpdateHoldCrouch()
     {
-        playerProperties.crouched = Input.GetKey(Settings.Instance._keybinds.PLAYER_crouchKey);
+        playerProperties.crouched = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_crouchKey);
 
         if (playerProperties.crouched)
         {
@@ -512,7 +511,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     {
         timeBetweenRolls -= Time.deltaTime;
 
-        if (CanRoll() && Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey))
+        if (CanRoll() && InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey))
         {
             ExecuteRoll();
         }
@@ -655,7 +654,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void UpdateGroundCheck()
     {
-        bool is_holding_roll = Input.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
+        bool is_holding_roll = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
         Vector3 rayOrigin = transform.position + Vector3.up;
 
         grounded = Physics.SphereCast(
@@ -719,7 +718,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void HandleNightVision()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision))
         {
             is_night_vision_active = !is_night_vision_active;
 
@@ -748,7 +747,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void RotateCamera()
     {
-        if (playerProperties.roll || SettingsHUD.Instance.is_menu_settings_active || playerProperties.is_in_vehicle) return;
+        if (playerProperties.roll || playerProperties.is_in_vehicle) return;
 
         HandleHorizontalRotation();
         HandleVerticalRotation();
@@ -764,7 +763,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void HandleHorizontalRotation()
     {
-        float mouseX = Input.GetAxis("Mouse X") * currentMouseSensitivity;
+        float mouseX = InputManager.GetAxis("Mouse X") * currentMouseSensitivity;
 
         horizontalRecoilCurrent = Mathf.SmoothDamp(
             horizontalRecoilCurrent,
@@ -780,7 +779,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void HandleVerticalRotation()
     {
-        float mouseVertical = Input.GetAxis("Mouse Y") * currentMouseSensitivity;
+        float mouseVertical = InputManager.GetAxis("Mouse Y") * currentMouseSensitivity;
         if (Settings.Instance._controls.invert_vertical_infantary_mouse)
         {
             mouseVertical *= -1;

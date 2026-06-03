@@ -26,7 +26,7 @@ public class SideGrip : Attatchment
     {
         if (!gameObject.activeSelf) return;
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_activateSideGrip))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_activateSideGrip))
         {
             if (weaponProperties != null) StartCoroutine(Shake(weaponProperties.weapon.transform));
             if (cameraShake != null) cameraShake.RequestShake(0.5f);

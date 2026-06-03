@@ -135,7 +135,7 @@ public class Jet : Vehicle
     #region Main Update & Physics Loops
     protected void HandleFlightPhysics()
     {
-        bool canFly = start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && currentSeat.seatType == VehicleSeats.SeatType.Pilot;
+        bool canFly = start_engine && is_in_vehicle && currentSeat.seatType == VehicleSeats.SeatType.Pilot;
 
         if (canFly)
         {
@@ -166,17 +166,15 @@ public class Jet : Vehicle
     }
     private void HandleInVehicleLogic()
     {
-        if (SettingsHUD.Instance.is_menu_settings_active) return;
-
-        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
-
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
+        
         HandleDebugInput();
         PilotBehaviour();
     }
 
     private void HandleDebugInput()
     {
-        if (Input.GetKeyDown(KeyCode.P))
+        if (InputManager.GetKeyDown(KeyCode.P))
         {
             RequestDamage(100);
         }
@@ -235,8 +233,8 @@ public class Jet : Vehicle
     private void ThrottleInput()
     {
         moveForward = 0;
-        bool speedUp = Input.GetKey(Settings.Instance._keybinds.JET_speedUpKey);
-        bool speedDown = Input.GetKey(Settings.Instance._keybinds.JET_speedDownKey);
+        bool speedUp = InputManager.GetKey(Settings.Instance._keybinds.JET_speedUpKey);
+        bool speedDown = InputManager.GetKey(Settings.Instance._keybinds.JET_speedDownKey);
 
         if (speedUp && !speedDown) moveForward = 1;
         else if (speedDown && !speedUp) moveForward = -1;
@@ -313,8 +311,8 @@ public class Jet : Vehicle
 
     private void ProcessMouseRotationInput()
     {
-        mouseX = Math.Clamp(Input.GetAxis("Mouse X") * Settings.Instance._controls.jet_sensibility, -_properties.max_rotation_value, _properties.max_rotation_value);
-        mouseY = Math.Clamp(Input.GetAxis("Mouse Y") * Settings.Instance._controls.jet_sensibility, -_properties.max_pitch_value, _properties.max_pitch_value);
+        mouseX = Math.Clamp(InputManager.GetAxis("Mouse X") * Settings.Instance._controls.jet_sensibility, -_properties.max_rotation_value, _properties.max_rotation_value);
+        mouseY = Math.Clamp(InputManager.GetAxis("Mouse Y") * Settings.Instance._controls.jet_sensibility, -_properties.max_pitch_value, _properties.max_pitch_value);
     }
 
     private void ApplyDragFromPitch()
@@ -327,8 +325,8 @@ public class Jet : Vehicle
 
     protected void HandlePitchKeys()
     {
-        if (Input.GetKey(Settings.Instance._keybinds.JET_pitchUpKey)) mouseY = _properties.max_pitch_value;
-        if (Input.GetKey(Settings.Instance._keybinds.JET_pitchDownKey)) mouseY = -_properties.max_pitch_value;
+        if (InputManager.GetKey(Settings.Instance._keybinds.JET_pitchUpKey)) mouseY = _properties.max_pitch_value;
+        if (InputManager.GetKey(Settings.Instance._keybinds.JET_pitchDownKey)) mouseY = -_properties.max_pitch_value;
     }
 
     protected void ApplyRotationTorque()
@@ -354,8 +352,8 @@ public class Jet : Vehicle
 
     protected void HandleLeanInput()
     {
-        if (Input.GetKey(Settings.Instance._keybinds.JET_yawLeftKey)) leanValue = -1;
-        else if (Input.GetKey(Settings.Instance._keybinds.JET_yawRightKey)) leanValue = 1;
+        if (InputManager.GetKey(Settings.Instance._keybinds.JET_yawLeftKey)) leanValue = -1;
+        else if (InputManager.GetKey(Settings.Instance._keybinds.JET_yawRightKey)) leanValue = 1;
         else leanValue = 0;
     }
     #endregion
@@ -389,7 +387,7 @@ public class Jet : Vehicle
 
     protected void HandleExitInput()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && _exitCooldown > 0.1f)
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && _exitCooldown > 0.1f)
         {
             _turbineSmoke.SetActive(false);
 
@@ -517,7 +515,7 @@ public class Jet : Vehicle
 
     protected override void StartStopEngine()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
             start_engine = !start_engine;
             if (start_engine) _properties.interior_turbine.Play();
@@ -550,10 +548,10 @@ public class Jet : Vehicle
     }
     protected void FreeLook()
     {
-        if (Input.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
+        if (InputManager.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
         {
-            float mouseYFreeLook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
-            float mouseXFreeLook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
+            float mouseYFreeLook = InputManager.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
+            float mouseXFreeLook = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
             Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
             float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
@@ -578,7 +576,7 @@ public class Jet : Vehicle
 
     protected void AfterBurner()
     {
-        if (Input.GetKey(Settings.Instance._keybinds.JET_boostKey) && moveForward > 0)
+        if (InputManager.GetKey(Settings.Instance._keybinds.JET_boostKey) && moveForward > 0)
             _afterburnerSpeedModifier += Time.deltaTime * 50;
         else
             _afterburnerSpeedModifier -= Time.deltaTime * 50;

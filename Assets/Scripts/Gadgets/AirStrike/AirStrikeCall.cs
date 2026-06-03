@@ -57,7 +57,7 @@ public class AirStrikeCall : Gadget
 
         UpdateLaser();
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) && remainingCooldown <= 0)
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) && remainingCooldown <= 0)
         {
             if (Physics.Raycast(new Ray(laserPos.position, laserPos.forward), out RaycastHit hit, distance))
             {

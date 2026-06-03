@@ -77,7 +77,7 @@ public class AdsBehaviour : MonoBehaviour
     {
         bool canAim = CanAim();
 
-        if (canAim && Input.GetKey(Settings.Instance._keybinds.WEAPON_aimKey))
+        if (canAim && InputManager.GetKey(Settings.Instance._keybinds.WEAPON_aimKey))
         {
             StartAiming();
         }
@@ -91,7 +91,7 @@ public class AdsBehaviour : MonoBehaviour
     {
         bool canAim = CanAim();
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
         {
             is_aiming = !is_aiming;
         }

@@ -125,7 +125,7 @@ public class ScoutHelicopter : Helicopter
 
         FreeLook();
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
 
         if (start_engine && !vehicle_destroyed.Value)
             HandleThrottleControls();
@@ -149,7 +149,7 @@ public class ScoutHelicopter : Helicopter
 
     private void HandlePilotFreeLook()
     {
-        if (Input.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
+        if (InputManager.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
             ApplyFreeLookRotation();
         else
             ReturnToCenter();
@@ -157,8 +157,8 @@ public class ScoutHelicopter : Helicopter
 
     private void ApplyFreeLookRotation()
     {
-        float mouseY = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
-        float mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
+        float mouseY = InputManager.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
+        float mouseX = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
         float currentX = NormalizeAngle(currentEuler.x);
@@ -195,7 +195,7 @@ public class ScoutHelicopter : Helicopter
     {
         exit_cooldown += Time.deltaTime;
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
         {
             currentSeat.playerController.playerCamera.enabled = true;
             ExitVehicle();
@@ -227,7 +227,7 @@ public class ScoutHelicopter : Helicopter
     #region HELPER METHODS
     private void HandleDebugInput()
     {
-        if (Input.GetKeyDown(KeyCode.P))
+        if (InputManager.GetKeyDown(KeyCode.P))
         {
             RequestDamage(100);
         }

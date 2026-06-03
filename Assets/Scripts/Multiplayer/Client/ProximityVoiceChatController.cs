@@ -11,7 +11,7 @@ public class ProximityVoiceChatController : NetworkBehaviour
     {
         if (!IsOwner) return;
 
-        bool isPressingKey = Input.GetKey(Settings.Instance._audio.in_world_voip_key);
+        bool isPressingKey = InputManager.GetKey(Settings.Instance._audio.in_world_voip_key);
 
         if (isPressingKey && !isTalking)
         {

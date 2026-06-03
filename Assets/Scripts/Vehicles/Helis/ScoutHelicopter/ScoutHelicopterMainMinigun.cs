@@ -39,7 +39,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
             CoolDownCannon(Time.deltaTime);
         }
 
-        UpdateWeapon(Time.deltaTime, isActive && Input.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key));
+        UpdateWeapon(Time.deltaTime, isActive && InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key));
     }
 
     public void UpdateWeapon(float deltaTime, bool isShooting)
@@ -211,7 +211,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
     {
         float deltaTime = Time.deltaTime;
         // Verifica se a tecla está pressionada (usando o sistema de Settings do seu projeto)
-        bool isInputPressed = Input.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key);
+        bool isInputPressed = InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key);
         bool canShoot = !_isOverheated && isInputPressed;
 
         // Timer de segurança para evitar disparos acidentais (cliques ultra rápidos)

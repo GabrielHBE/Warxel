@@ -1,6 +1,4 @@
-using System;
 using System.Collections;
-using System.IO.Compression;
 using UnityEngine;
 
 public class SwayNBobScript : MonoBehaviour
@@ -235,7 +233,7 @@ public class SwayNBobScript : MonoBehaviour
         Sway();
         BobOffset();
         BobRotation();
-        GetInput();
+        GetInputManager();
         CompositePositionRotation();
 
         transform.localPosition = Vector3.Lerp(transform.localPosition,
@@ -245,8 +243,8 @@ public class SwayNBobScript : MonoBehaviour
 
     }
 
-    Vector2 walkInput;
-    Vector2 lookInput;
+    Vector2 walkInputManager;
+    Vector2 lookInputManager;
 
     void Sprinting()
     {
@@ -275,30 +273,20 @@ public class SwayNBobScript : MonoBehaviour
     }
 
 
-    void GetInput()
+    void GetInputManager()
     {
-        walkInput.x = playerController.moveHorizontal;
-        walkInput.y = playerController.moveForward;
-        walkInput = walkInput.normalized;
+        walkInputManager.x = playerController.moveHorizontal;
+        walkInputManager.y = playerController.moveForward;
+        walkInputManager = walkInputManager.normalized;
 
-        if (!SettingsHUD.Instance.is_menu_settings_active)
-        {
-            lookInput.x = Input.GetAxis("Mouse X");
-            lookInput.y = Input.GetAxis("Mouse Y");
-        }
-        else
-        {
-            lookInput.x = 0;
-            lookInput.y = 0;
-        }
-
+        lookInputManager.x = InputManager.GetAxis("Mouse X");
+        lookInputManager.y = InputManager.GetAxis("Mouse Y");
 
     }
 
-
     void Sway()
     {
-        Vector3 invertLook = (lookInput * -step).normalized;
+        Vector3 invertLook = (lookInputManager * -step).normalized;
         invertLook.x = Mathf.Clamp(invertLook.x, -maxStepDistance, maxStepDistance);
         invertLook.y = Mathf.Clamp(invertLook.y, -maxStepDistance, maxStepDistance);
 
@@ -308,90 +296,13 @@ public class SwayNBobScript : MonoBehaviour
     void SwayRotation()
     {
 
-        Vector2 invertLook = (lookInput * -rotationStep).normalized;
+        Vector2 invertLook = (lookInputManager * -rotationStep).normalized;
         invertLook.x = Mathf.Clamp(invertLook.x, -maxRotationStep, maxRotationStep);
         invertLook.y = Mathf.Clamp(invertLook.y, -maxRotationStep, maxRotationStep);
         swayEulerRot = new Vector3(invertLook.y, invertLook.x, invertLook.x).normalized;
 
     }
 
-
-    /*
-    void CompositePositionRotation()
-    {
-        // Cache de Time.deltaTime
-        float deltaTime = Time.deltaTime;
-
-        Quaternion combinedRotation;
-        Vector3 combinedPosition;
-
-
-        float x_input_amount = Input.GetAxis("Mouse X");
-
-        
-        if (!isAiming)
-        {
-            combinedRotation = sprintTargetWeaponRotation * Quaternion.Euler(swayEulerRot) * Quaternion.Euler(bobEulerRotation);
-            combinedPosition = sprintTargetWeaponPosition + swayPos + bobPosition;
-        }
-        else
-        {
-            float divisor = isFiring ? 10f : 2f;
-            combinedRotation = sprintTargetWeaponRotation * Quaternion.Euler(swayEulerRot / divisor) * Quaternion.Euler(bobEulerRotation / divisor);
-            combinedPosition = sprintTargetWeaponPosition + swayPos / divisor + bobPosition / divisor;
-        }
-
-        // Otimizar interpolações
-        if (!isGrounded)
-        {
-            float tiltAmount = Input.GetAxis("Horizontal") * 10f;
-            Quaternion targetRotation = Quaternion.Euler(15, x_input_amount * 2, -tiltAmount);
-
-
-            myTransform.localRotation = Quaternion.Lerp(
-                myTransform.localRotation,
-                combinedRotation * targetRotation,
-                deltaTime * smoothRot
-            );
-
-            myTransform.localPosition = Vector3.Lerp(
-                myTransform.localPosition,
-                new Vector3(combinedPosition.x, combinedPosition.y - 0.01f, combinedPosition.z),
-                deltaTime * smooth
-            );
-
-            do_land_camera_chake_once = true;
-        }
-        else
-        {
-
-            Quaternion targetRotation = Quaternion.Euler(0, x_input_amount, 0);
-            if (do_land_camera_chake_once)
-            {
-                StartCoroutine(JumpWeaponShake());
-                do_land_camera_chake_once = false;
-            }
-
-            myTransform.localRotation = Quaternion.Lerp(
-                myTransform.localRotation,
-                combinedRotation * targetRotation,
-                deltaTime * smoothRot
-            );
-
-            myTransform.localPosition = Vector3.Lerp(
-                myTransform.localPosition,
-                combinedPosition,
-                deltaTime * smooth
-            );
-
-            // Otimizar reticle
-            Vector3 reticlePos = new Vector3(combinedPosition.x / 2, combinedPosition.y / 2, reticleTransform.localPosition.z);
-            reticleTransform.localPosition = Vector3.Lerp(reticleTransform.localPosition, reticlePos, deltaTime * smooth);
-        }
-    }
-    */
-
-
     void CompositePositionRotation()
     {
         float deltaTime = Time.deltaTime;
@@ -399,13 +310,13 @@ public class SwayNBobScript : MonoBehaviour
         Quaternion combinedRotation;
         Vector3 combinedPosition;
 
-        // Reutilizar os valores já obtidos em GetInput()
-        float x_input_amount = lookInput.x;
-        float y_input_amount = lookInput.y;
+        // Reutilizar os valores já obtidos em GetInputManager()
+        float x_InputManager_amount = lookInputManager.x;
+        float y_InputManager_amount = lookInputManager.y;
 
         // Aplicar clamp
-        x_input_amount = Mathf.Clamp(x_input_amount, -5f, 5f);
-        y_input_amount = Mathf.Clamp(y_input_amount, -5f, 5f);
+        x_InputManager_amount = Mathf.Clamp(x_InputManager_amount, -5f, 5f);
+        y_InputManager_amount = Mathf.Clamp(y_InputManager_amount, -5f, 5f);
 
         // Multiplicadores (ajuste conforme necessidade)
         const int yRotationMultiplier = 4; // Ajuste para valores por SEGUNDO
@@ -413,9 +324,9 @@ public class SwayNBobScript : MonoBehaviour
         const int xRotationMultiplier = 4;
 
         // Agora escalado por deltaTime
-        float enhancedYRotation = x_input_amount * yRotationMultiplier;
-        float enhancedZRotation = x_input_amount * zRotationMultiplier;
-        float enhancedXRotation = y_input_amount * xRotationMultiplier;
+        float enhancedYRotation = x_InputManager_amount * yRotationMultiplier;
+        float enhancedZRotation = x_InputManager_amount * zRotationMultiplier;
+        float enhancedXRotation = y_InputManager_amount * xRotationMultiplier;
 
 
         float verticalAimMoveRotation = 0f;
@@ -455,7 +366,7 @@ public class SwayNBobScript : MonoBehaviour
 
         if (!isGrounded)
         {
-            float tiltAmount = Input.GetAxis("Horizontal") * 10f;
+            float tiltAmount = InputManager.GetAxis("Horizontal") * 10f;
 
             Quaternion targetRotation = Quaternion.Euler(15, enhancedYRotation, -tiltAmount + enhancedZRotation);
 
@@ -515,8 +426,8 @@ public class SwayNBobScript : MonoBehaviour
 
     void BobOffset()
     {
-        // Otimizar verificação de input
-        float axis_bob = (Input.GetAxis("Vertical") != 0 || Input.GetAxis("Horizontal") != 0) ? 1 : 0;
+        // Otimizar verificação de InputManager
+        float axis_bob = (InputManager.GetAxis("Vertical") != 0 || InputManager.GetAxis("Horizontal") != 0) ? 1 : 0;
 
         speedCurve += Time.deltaTime * (isGrounded ? axis_bob * bobExaggeration : 1f) + 0.005f;
 
@@ -525,19 +436,19 @@ public class SwayNBobScript : MonoBehaviour
         float sinCurve = curveSin;
         float groundedMultiplier = isGrounded ? 1 : 0;
 
-        bobPosition.x = (cosCurve * bobLimit.x * groundedMultiplier) - (walkInput.x * travelLimit.x);
-        bobPosition.y = (sinCurve * bobLimit.y) - (Input.GetAxis("Vertical") * travelLimit.y);
-        bobPosition.z = -(walkInput.y * travelLimit.z);
+        bobPosition.x = (cosCurve * bobLimit.x * groundedMultiplier) - (walkInputManager.x * travelLimit.x);
+        bobPosition.y = (sinCurve * bobLimit.y) - (InputManager.GetAxis("Vertical") * travelLimit.y);
+        bobPosition.z = -(walkInputManager.y * travelLimit.z);
     }
 
     void BobRotation()
     {
-        bool isMoving = walkInput != Vector2.zero;
+        bool isMoving = walkInputManager != Vector2.zero;
         float sin2x = Mathf.Sin(2 * speedCurve);
 
         bobEulerRotation.x = isMoving ? current_multiplier.x * sin2x : current_multiplier.x * (sin2x / 2);
         bobEulerRotation.y = isMoving ? current_multiplier.y * curveCos : 0;
-        bobEulerRotation.z = isMoving ? current_multiplier.z * curveCos * walkInput.x : 0;
+        bobEulerRotation.z = isMoving ? current_multiplier.z * curveCos * walkInputManager.x : 0;
     }
 
     IEnumerator JumpWeaponShake()
@@ -619,6 +530,5 @@ public class SwayNBobScript : MonoBehaviour
 
         shakeOffset = Vector3.zero;
     }
-
 
 }

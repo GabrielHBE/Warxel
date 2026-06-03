@@ -101,7 +101,7 @@ public class Shell : Mag
             }
         }
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) || weaponProperties.mags[^1] == weaponProperties.bullets_per_mag)
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) || weaponProperties.mags[^1] == weaponProperties.bullets_per_mag)
         {
             playerProperties.is_reloading = false;
             weapon.weaponAnimation.FinishReloadAnimation();

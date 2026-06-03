@@ -29,7 +29,7 @@ public class Countermeasures : NetworkBehaviour, IsVehicleCustomizationPart
 
     protected virtual void Update()
     {
-        if (Input.GetKeyDown(use_countermeasure_key) && vehicle.is_in_vehicle && reload_countermeasures_duration <= 0) UseCountermeasure();
+        if (InputManager.GetKeyDown(use_countermeasure_key) && vehicle.is_in_vehicle && reload_countermeasures_duration <= 0) UseCountermeasure();
     }
 
     public virtual void SetUseCountermeasureKey(KeyCode use_countermeasure_key)

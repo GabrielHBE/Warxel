@@ -33,7 +33,7 @@ public abstract class MissileController : NetworkBehaviour, IsVehicleCustomizati
 
     protected virtual void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R) && is_active)
+        if (InputManager.GetKeyDown(KeyCode.R) && is_active)
         {
             RequestDestroyMissiles();
         }
@@ -236,7 +236,7 @@ public abstract class MissileController : NetworkBehaviour, IsVehicleCustomizati
     //IVehicleArmory
     public void Shoot()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.JET_shootVehicleKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.JET_shootVehicleKey))
         {
             ShootMissile();
         }

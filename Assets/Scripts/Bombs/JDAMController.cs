@@ -50,7 +50,7 @@ public class JDAMController : BombsController
 
         if (isActive)
         {
-            if (Input.GetKey(KeyCode.Mouse1))
+            if (InputManager.GetKey(KeyCode.Mouse1))
             {
                 if (vehicle.currentSeat.seatHUD.activeSelf) vehicle.currentSeat.seatHUD.SetActive(false);
                 if (!jdamCameraHud.gameObject.activeSelf) jdamCameraHud.gameObject.SetActive(true);
@@ -181,7 +181,7 @@ public class JDAMController : BombsController
 
     public override void Shoot()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.JET_shootVehicleKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.JET_shootVehicleKey))
         {
             if (CanShoot())
             {

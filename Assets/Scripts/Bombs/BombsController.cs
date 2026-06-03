@@ -38,7 +38,7 @@ public abstract class BombsController : NetworkBehaviour, IsVehicleCustomization
     {
         if (!IsSpawned) return;
 
-        if (Input.GetKeyDown(KeyCode.R) && isActive && IsOwner)
+        if (InputManager.GetKeyDown(KeyCode.R) && isActive && IsOwner)
         {
             RequestDestroyBombs();
         }

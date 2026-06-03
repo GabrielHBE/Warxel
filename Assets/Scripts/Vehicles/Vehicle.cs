@@ -441,7 +441,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
         for (int i = 0; i < weaponKeys.Length; i++)
         {
-            if (Input.GetKeyDown(weaponKeys[i]) && i < currentSeat.vehicleArmory.Length)
+            if (InputManager.GetKeyDown(weaponKeys[i]) && i < currentSeat.vehicleArmory.Length)
             {
                 ChangeArmory(i);
                 break;

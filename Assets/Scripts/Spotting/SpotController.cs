@@ -22,7 +22,7 @@ public class SpotController : NetworkBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_spotKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_spotKey))
         {
             print("Apertou o botao");
             TrySpotTarget();

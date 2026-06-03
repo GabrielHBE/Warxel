@@ -62,7 +62,7 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
     {
         float deltaTime = Time.deltaTime;
         // Verifica se a tecla está pressionada (usando o sistema de Settings do seu projeto)
-        bool isInputPressed = Input.GetKey(Settings.Instance._keybinds.JET_shootVehicleKey);
+        bool isInputPressed = InputManager.GetKey(Settings.Instance._keybinds.JET_shootVehicleKey);
         bool canShoot = !_isOverheated && isInputPressed;
 
         // Timer de segurança para evitar disparos acidentais (cliques ultra rápidos)

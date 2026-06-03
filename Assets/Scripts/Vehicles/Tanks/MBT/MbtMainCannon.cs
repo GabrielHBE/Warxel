@@ -49,7 +49,7 @@ public class MbtMainCannon : NetworkBehaviour, IVehicleArmory
 
     public void Shoot()
     {
-        if (cannon_shoot_delay == tankMainShell.reload_time && Input.GetKeyDown(Settings.Instance._keybinds.TANK_shoot_key))
+        if (cannon_shoot_delay == tankMainShell.reload_time && InputManager.GetKeyDown(Settings.Instance._keybinds.TANK_shoot_key))
         {
             if (main_cannon_sound != null) main_cannon_sound.Play();
 

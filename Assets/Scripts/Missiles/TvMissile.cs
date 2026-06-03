@@ -30,8 +30,8 @@ public class TvMissile : Missiles
         }
 
 
-        float mouseX = Math.Clamp(Input.GetAxis("Mouse X"), -turnSpeed, turnSpeed) * (turnSpeed / 2);
-        float mouseY = Math.Clamp(Input.GetAxis("Mouse Y"), -turnSpeed, turnSpeed) * (turnSpeed / 2);
+        float mouseX = Math.Clamp(InputManager.GetAxis("Mouse X"), -turnSpeed, turnSpeed) * (turnSpeed / 2);
+        float mouseY = Math.Clamp(InputManager.GetAxis("Mouse Y"), -turnSpeed, turnSpeed) * (turnSpeed / 2);
 
         rb.AddTorque(transform.forward * -mouseX / 15, ForceMode.Force);
         rb.AddTorque(transform.right * -mouseY, ForceMode.Force);

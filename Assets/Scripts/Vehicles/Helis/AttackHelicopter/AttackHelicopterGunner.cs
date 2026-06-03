@@ -53,7 +53,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     private void HandleSwitchCamera()
     {
-        if (Input.GetKeyDown(Settings.Instance._keybinds.HELICOPTER_switch_camera_key))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.HELICOPTER_switch_camera_key))
         {
             current_camera += 1;
             if (current_camera > 2)
@@ -76,8 +76,8 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     private void ApplyFreeLookRotation()
     {
-        float mouseY_freelook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
-        float mouseX_freelook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
+        float mouseY_freelook = InputManager.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
+        float mouseX_freelook = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = helicopter.currentSeat.activeCamera.transform.localEulerAngles;
 
@@ -95,8 +95,8 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     public void RotateGun(Transform gunTransform)
     {
-        float mouseX = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
-        float mouseY = Input.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
+        float mouseX = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
+        float mouseY = InputManager.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = gunTransform.localEulerAngles;
         float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
@@ -214,7 +214,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         float dt = Time.deltaTime;
         next_time_to_fire -= dt;
 
-        if (Input.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key) && !is_overheated)
+        if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key) && !is_overheated)
         {
 
             if (next_time_to_fire <= 0f)

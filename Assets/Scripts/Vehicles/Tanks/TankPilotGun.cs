@@ -54,7 +54,7 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
     {
         if (!IsOwner) return;
 
-        bool isShooting = Input.GetKey(Settings.Instance._keybinds.TANK_shoot_key);
+        bool isShooting = InputManager.GetKey(Settings.Instance._keybinds.TANK_shoot_key);
 
         if (isShooting && !is_pilot_gun_overheated)
         {

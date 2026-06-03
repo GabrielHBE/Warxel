@@ -130,12 +130,12 @@ public class PlayerSpawnController : NetworkBehaviour
     private void HandleCameraDrag()
     {
 
-        if (Input.GetMouseButtonDown(0))
+        if (InputManager.GetMouseButtonDown(0))
         {
             dragOrigin = Input.mousePosition;
         }
 
-        if (Input.GetMouseButton(0))
+        if (InputManager.GetMouseButton(0))
         {
             Vector3 pos = spawn_camera.ScreenToViewportPoint(Input.mousePosition - dragOrigin);
 

@@ -50,19 +50,19 @@ public class MedBox : Gadget
             if (!med_box_thrown)
             {
 
-                if (Input.GetKey(Settings.Instance._keybinds.WEAPON_shootKey))
+                if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey))
                 {
                     SelfHeal();
                 }
 
                 // Verifica duplo clique para a tecla de mirar
-                if (Input.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
+                if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
                 {
                     CheckForDoubleClick();
                 }
 
                 // Mantém a funcionalidade normal de curar outros enquanto segura a tecla
-                if (Input.GetKey(Settings.Instance._keybinds.WEAPON_aimKey) && aimKeyPressCount < 2)
+                if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_aimKey) && aimKeyPressCount < 2)
                 {
                     HealOthers();
                 }
@@ -72,7 +72,7 @@ public class MedBox : Gadget
 
         if(med_box_thrown)
         {
-            if (Input.GetKey(Settings.Instance._keybinds.PLAYER_interactKey))
+            if (InputManager.GetKey(Settings.Instance._keybinds.PLAYER_interactKey))
             {
                 Ray ray = new Ray(playerController.playerCamera.transform.position, playerController.playerCamera.transform.forward);
                 RaycastHit hit;

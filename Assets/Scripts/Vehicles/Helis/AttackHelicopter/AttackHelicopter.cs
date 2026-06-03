@@ -29,7 +29,7 @@ public class AttackHelicopter : Helicopter
 
     protected override void FixedUpdate()
     {
-        if (start_engine && is_in_vehicle && !SettingsHUD.Instance.is_menu_settings_active && !vehicle_destroyed.Value && currentSeat != null && currentSeat.seatType == VehicleSeats.SeatType.Pilot && IsOwner)
+        if (start_engine && is_in_vehicle && !vehicle_destroyed.Value && currentSeat != null && currentSeat.seatType == VehicleSeats.SeatType.Pilot && IsOwner)
         {
             Move();
             Rotate();
@@ -78,13 +78,12 @@ public class AttackHelicopter : Helicopter
             SyncPlayerPosition();
 
             SwitchWeapon();
-            if (Input.GetKeyDown(KeyCode.P))
+            if (InputManager.GetKeyDown(KeyCode.P))
             {
                 RequestDamage(100);
             }
 
-
-            if (!SettingsHUD.Instance.is_menu_settings_active) HandleVehicleInput();
+            HandleVehicleInputManager();
         }
     }
 
@@ -92,14 +91,14 @@ public class AttackHelicopter : Helicopter
 
     #region Input Handling 
 
-    private void HandleVehicleInput()
+    private void HandleVehicleInputManager()
     {
         if (currentSeat.seatType == VehicleSeats.SeatType.Pilot && !vehicle_destroyed.Value) StartStopEngine();
         CameraController();
         FreeLook();
         if (!vehicle_destroyed.Value) Shoot();
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
         
         if (start_engine == true)
         {
@@ -114,7 +113,7 @@ public class AttackHelicopter : Helicopter
     {
         exit_cooldown += Time.deltaTime;
 
-        if (Input.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
         {
             currentSeat.playerController.playerCamera.enabled = true;
 
@@ -144,7 +143,7 @@ public class AttackHelicopter : Helicopter
 
     private void HandlePilotFreeLook()
     {
-        if (Input.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
+        if (InputManager.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
         {
             ApplyFreeLookRotation();
         }
@@ -156,8 +155,8 @@ public class AttackHelicopter : Helicopter
 
     private void ApplyFreeLookRotation()
     {
-        float mouseY_freelook = Input.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
-        float mouseX_freelook = Input.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
+        float mouseY_freelook = InputManager.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
+        float mouseX_freelook = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
 
         Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
 

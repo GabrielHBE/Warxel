@@ -428,7 +428,7 @@ public class PlayerAnimation : NetworkBehaviour
         anim.SetBool("ProneTransition", playerProperties.isProneTransition);
         anim.SetBool("Roll", playerProperties.roll);
         anim.SetBool("Dead", playerProperties.is_dead.Value);
-        anim.SetFloat("Rotation", Input.GetAxis("Mouse X"));
+        anim.SetFloat("Rotation", InputManager.GetAxis("Mouse X"));
         anim.SetBool("HasLeftHandHolder", leftHand_target != null);
         anim.SetBool("IsGrounded", playerProperties.isGrounded);
         anim.SetBool("InVehicle", playerProperties.is_in_vehicle);
