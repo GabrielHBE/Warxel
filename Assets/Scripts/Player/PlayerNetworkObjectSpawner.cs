@@ -3,69 +3,35 @@ using UnityEngine;
 
 public class PlayerNetworkObjectSpawner : NetworkBehaviour
 {
-    [HideInInspector] private GameObject playerNetworkObjectPrefab;
+
     [SerializeField] private WeaponProperties[] weapon_prefabs;
-
-    #region Sounds
-    [ServerRpc(RequireOwnership = false)]
-    public void CmdPlayWeaponSound(string weapon_name, Vector3 position)
-    {
-        RpcPlayWeaponSound(weapon_name, position);
-    }
-
-    [ObserversRpc(ExcludeOwner = true)]
-    private void RpcPlayWeaponSound(string weapon_name, Vector3 position)
-    {
-        // Procura a arma pelo nome na lista do Spawner
-        GameObject weaponPrefab = LocateWeaponPrefabByName(weapon_name);
-
-        if (weaponPrefab != null)
-        {
-            // Busca os sons originais dentro do Prefab da arma
-            WeaponSounds ws = weaponPrefab.GetComponentInChildren<WeaponSounds>();
-
-            if (ws != null && ws.shoot_sound != null)
-            {
-                // Instancia localmente para os inimigos/aliados ouvirem
-                GameObject duplicatedObject = Instantiate(ws.shoot_sound.gameObject, position, Quaternion.identity);
-                AudioDistanceController controller = duplicatedObject.GetComponent<AudioDistanceController>();
-
-                if (controller != null)
-                {
-                    controller.StartGrowth();
-                }
-                else
-                {
-                    ws.shoot_sound.PlayOneShot(ws.shoot_sound.clip);
-                }
-            }
-        }
-    }
-    #endregion
 
     #region Bullet
     [ServerRpc(RequireOwnership = true)]
-    public void ServerSpawnBullet(GameObject bulletPrefab, Bullet.BulletData data, NetworkObject shooter, string weaponshooted_name = null)
+    public void ServerSpawnBullet(NetworkObject bulletPref, Bullet.BulletData data, string weaponshooted_name = null)
     {
-        GameObject instantiaded_obj = Instantiate(bulletPrefab, data.position, data.rotation);
-        Bullet bullet = instantiaded_obj.GetComponent<Bullet>();
-        Spawn(instantiaded_obj, shooter.Owner);
-        bullet.CreateBullet(data, transform, null);
-    }
-
-    private GameObject LocateWeaponPrefabByName(string weapon_name)
-    {
-        if (string.IsNullOrEmpty(weapon_name)) return null;
-
-        // Limpa o "(Clone)" e espaços em branco que possam vir na string
-        string clean_name = weapon_name.Replace("(Clone)", "");
-
-        foreach (WeaponProperties weapon in weapon_prefabs)
+        // Proteção: Se o prefab chegar nulo, cancela a execução antes de estourar o erro
+        if (bulletPref == null)
         {
-            if (weapon.gameObject.name == clean_name) return weapon.gameObject;
+            Debug.LogError("ServerSpawnBullet: O bulletPref veio nulo! Verifique se o Prefab está na lista de 'Spawnable Prefabs' do NetworkManager.");
+            return;
         }
 
-        return null;
+        // 1. Retira o objeto do pool do FishNet
+        NetworkObject pooledNetworkObj = NetworkManager.GetPooledInstantiated(bulletPref, IsServerInitialized);
+        
+        // 2. IMPORTANTÍSSIMO: Atualiza a posição e rotação no servidor ANTES de enviar para a rede
+        pooledNetworkObj.transform.position = data.position;
+        pooledNetworkObj.transform.rotation = data.rotation;
+
+        // 3. Pega o componente da Bullet
+        Bullet bullet = pooledNetworkObj.GetComponent<Bullet>();
+
+        // 4. Faz o Spawn na rede definindo quem é o Dono (Owner)
+        Spawn(pooledNetworkObj, Owner);
+
+        // 5. Executa a inicialização que vai propagar os dados e ativar a física via ObserversRpc
+        bullet.CreateBullet(data, transform, this.gameObject);
     }
     #endregion
 
@@ -86,10 +52,4 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
 
     }
     #endregion
-
-
-    public GameObject GetSpawnedPlayerNetworkObject()
-    {
-        return playerNetworkObjectPrefab;
-    }
 }

@@ -32,17 +32,22 @@ public class Jdam : Bombs
         rb.AddForce(gravityForce, ForceMode.Acceleration);
     }
 
-    [ServerRpc]
+    
     public override void ShootBomb()
     {
         if (didShoot) return;
-        CmdShoot();
+        
+        SoundManager.Instance.RequestPlay2dSound(shootSound.name, shootSoundProperties);
+
+        RequestShootBomb();
     }
+
+    [ServerRpc]
+    private void RequestShootBomb() => CmdShoot();
 
     [ObserversRpc]
     private void CmdShoot()
     {
-        CreateSound(shoot_sound);
         bomb_collider.enabled = true;
 
         if (trailRenderer != null) trailRenderer.enabled = true;

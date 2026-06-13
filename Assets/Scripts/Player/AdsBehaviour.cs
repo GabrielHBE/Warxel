@@ -24,16 +24,16 @@ public class AdsBehaviour : MonoBehaviour
     private bool is_aiming;
     private Vector3 original_ads_position;
     private float zoom;
-    
     [SerializeField] private float zOffset;
-
     private Coroutine aimCoroutine;
     private bool isAimTransitionActive;
-    
     private float targetCameraFov;
+
+    private bool canUpdate;
 
     public void Setup(Transform adsReference, float adsTimer, float zoom)
     {
+        canUpdate = true;
         this.adsReference = adsReference;
         this.adsTimer = adsTimer;
         this.zoom = zoom;
@@ -49,7 +49,7 @@ public class AdsBehaviour : MonoBehaviour
 
     void Update()
     {
-        if (adsReference == null) return;
+        if (adsReference == null || !canUpdate) return;
         
         if (SettingsHUD.Instance.is_menu_settings_active)
         {
@@ -237,4 +237,7 @@ public class AdsBehaviour : MonoBehaviour
             1f - Mathf.Exp(-fovLerpSpeed * Time.deltaTime))
         ;
     }
+
+    public void EnableUpdate() => canUpdate = true;
+    public void DisableUpdate() => canUpdate = false;
 }

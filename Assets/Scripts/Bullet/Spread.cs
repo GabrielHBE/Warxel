@@ -2,23 +2,28 @@ using UnityEngine;
 
 public static class Spread
 {
+    private static float minModifier = 0.9f;
+    private static float maxModifier = 1.1f;
+
     public static Quaternion CalculateSpreadRotation(Transform shootPosition, float currentSpread)
     {
         Vector3 randomSpread = new Vector3(
             Random.Range(-currentSpread, currentSpread),
             Random.Range(-currentSpread, currentSpread),
             Random.Range(-currentSpread, currentSpread)
-        ) / 10;
+        );
 
         return shootPosition.rotation * Quaternion.Euler(randomSpread);
     }
 
-    public static float AddSpread(float currentSpread, float spreadIncreaser)
+    public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread)
     {
-        float minModifier = 0.9f;
-        float maxModifier = 1.1f;
-
         float randomizedIncreaser = spreadIncreaser * Random.Range(minModifier, maxModifier);
+
+        if(currentSpread + randomizedIncreaser > maxSpread)
+        {
+            return maxSpread;
+        }
 
         return currentSpread + randomizedIncreaser;
     }
@@ -29,7 +34,7 @@ public static class Spread
         {
             return 0;
         }
-
-        return Mathf.Lerp(currentSpread, baseSpread, Time.deltaTime * spreadRecoveryTime);
+        
+        return Mathf.MoveTowards(currentSpread, baseSpread, Time.deltaTime * spreadRecoveryTime);
     }
 }

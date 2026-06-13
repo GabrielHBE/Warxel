@@ -6,10 +6,13 @@ public class StromManager : NetworkBehaviour
     [Header("System References")]
     [SerializeField] private WeatherStateManager weatherState;
 
+    [Header("Sounds")]
+    [SerializeField] private AudioClip thunderSound; // Mudei para AudioClip
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+
     [Header("Strom Effects")]
     [SerializeField] private GameObject lightningEffectPrefab; // Mudei para GameObject
-    [SerializeField] private AudioClip thunderSound; // Mudei para AudioClip
-
+    
     [Header("Lightning Settings")]
     [SerializeField] private float minLightningInterval = 5f;
     [SerializeField] private float lightningDestroyDelay = 2f;
@@ -55,34 +58,9 @@ public class StromManager : NetworkBehaviour
         if (ps != null)
             ps.Play();
 
-        // Cria um GameObject para o som do trovão na posição do raio
-        CreateThunderSoundAtPosition(lightningPosition);
+        SoundManager.Instance.RequestPlay3dSound(thunderSound.name, soundProperties, lightningPosition, true);
 
-        // Destroi o efeito visual após o delay
         StartCoroutine(DestroyAfterDelay(lightningGO, lightningDestroyDelay));
-    }
-
-    private void CreateThunderSoundAtPosition(Vector3 position)
-    {
-        if (thunderSound == null) return;
-
-        // Cria um GameObject temporário para tocar o som
-        GameObject audioObject = new GameObject("ThunderSound");
-        audioObject.transform.position = position;
-
-        // Adiciona e configura o AudioSource
-        AudioSource audioSource = audioObject.AddComponent<AudioSource>();
-        audioSource.clip = thunderSound;
-        audioSource.spatialBlend = 0.7f; // Som 3D
-        audioSource.rolloffMode = AudioRolloffMode.Linear;
-        audioSource.maxDistance = 500f; // Distância máxima para ouvir o trovão
-        audioSource.Play();
-
-        // Spawna o objeto na rede para todos ouvirem
-        //Spawn(audioObject);
-
-        // Destroi o objeto após o som terminar
-        Destroy(audioObject, thunderSound.length + 0.1f);
     }
 
     private Vector3 GetRandomLightningPosition()

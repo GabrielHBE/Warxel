@@ -4,6 +4,7 @@ using UnityEngine;
 public class JetMainCannon : NetworkBehaviour, IVehicleArmory
 {
     [SerializeField] private DummyBullet dummyBullet;
+    [SerializeField] private NetworkObject serverBullet;
 
     [Header("Bullet Config")]
     public float muzzle_velocity;
@@ -89,10 +90,8 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
         {
 
             Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPosition, _currentSpread);
-            if(_currentSpread < max_spread)
-            {
-                _currentSpread = Spread.AddSpread(_currentSpread, spread_increase_per_shot);
-            }
+
+            _currentSpread = Spread.AddSpread(_currentSpread, spread_increase_per_shot, max_spread);
 
             Bullet.BulletData data = new Bullet.BulletData
             {
@@ -107,13 +106,12 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
                 destructionForce = destruction_force,
                 minimumDamage = minimum_damage,
                 hsMultiplier = 2,
-                size = 1,
                 canDamageVehicles = true,
                 vehicleDamage = vehicle_damage
             };
 
-            DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
-            instantiatedDummyBullet.CreateBullet(data);
+            DummyBullet instantiatedDummyBullet = ObjectPooling.Instance.GetLocalPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>();
+            if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
 
             CmdFire(data);
 
@@ -171,9 +169,9 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
     [ServerRpc(RequireOwnership = true)]
     private void CmdFire(Bullet.BulletData data)
     {
-        Transform bulletObj = Instantiate(bulletPref, data.position, data.rotation);
-        Spawn(bulletObj.gameObject, Owner);
-        bulletObj.GetComponent<Bullet>()?.CreateBullet(data, transform.root);
+        Bullet bullet = NetworkManager.GetPooledInstantiated(serverBullet, IsServerInitialized).GetComponent<Bullet>();
+        Spawn(bullet, Owner);
+        bullet.CreateBullet(data, transform.root, null);
     }
 
     // Implementação IVehicleArmory

@@ -1,10 +1,8 @@
 using System.Collections;
-using System.Collections.Generic;
-using FishNet;
 using FishNet.Object;
 using UnityEngine;
 
-public class Weapon : MonoBehaviour
+public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
 {
     [Header("State")]
     public bool is_active;
@@ -13,8 +11,11 @@ public class Weapon : MonoBehaviour
     [Header("HUD")]
     [SerializeField] private SoldierHudManager soldierHudManager;
 
-    [Header("Instances")]
+    [Header("Bullets")]
     [SerializeField] private DummyBullet dummyBullet;
+    [SerializeField] private NetworkObject serverBullet;
+
+    [Header("Instances")]
     [SerializeField] private PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
     [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
@@ -27,7 +28,7 @@ public class Weapon : MonoBehaviour
     [Header("Variables")]
     [HideInInspector] public bool can_aim = true;
     [HideInInspector] public bool can_shoot = true;
-
+    private Coroutine applyRotationRecoilCoroutine;
     private AdsBehaviour adsBehaviour;
     private bool can_reload;
     private float reload_cooldown;
@@ -49,15 +50,18 @@ public class Weapon : MonoBehaviour
     private float current_spread;
     private bool restarted;
     private int reserve_ammo;
-    private float crouch_recoil_multiplier = 0.8f;
     private float time_to_contatenate = 0;
+    private string ammo;
+    private Quaternion initialRotation;
 
     #region Unity Lifecycle Methods
     void Awake()
     {
+        initialRotation = transform.localRotation;
         restarted = false;
         adsBehaviour = GetComponent<AdsBehaviour>();
     }
+
 
     void Update()
     {
@@ -80,15 +84,35 @@ public class Weapon : MonoBehaviour
             HandleReload();
         }
 
-        if (soldierHudManager.mag_counter_hud != null && weaponProperties != null) soldierHudManager.mag_counter_hud.UpdateMagCount(0, weaponProperties.mags);
+        if (weaponProperties != null)
+        {
+            ammo = weaponProperties.mags[^1].ToString("F0") + " / ";
+            for (int i = 0; i < weaponProperties.mags.Count - 1; i++)
+            {
+                ammo += weaponProperties.mags[i].ToString("F0") + " ";
+            }
+
+            soldierHudManager.SetCurrentAmmo(ammo);
+        }
 
         if (can_shoot && !playerProperties.is_reloading)
         {
-            shoot();
+            Shoot();
         }
 
         if (!playerProperties.is_firing)
         {
+            if (applyRotationRecoilCoroutine != null)
+            {
+                StopCoroutine(applyRotationRecoilCoroutine);
+            }
+
+            transform.localRotation = Quaternion.Lerp(
+                transform.localRotation,
+                initialRotation,
+                Time.deltaTime * 5
+            );
+
             current_spread = Spread.ResetSpread(current_spread, weaponProperties.base_spread, weaponProperties.spread_recovery);
         }
 
@@ -102,10 +126,9 @@ public class Weapon : MonoBehaviour
     #endregion
 
     #region Initialization
-
     public void Restart()
     {
-
+        transform.localRotation = initialRotation;
         weaponProperties = GetComponentInChildren<WeaponProperties>();
         weaponAnimation = GetComponent<WeaponAnimation>();
         playerController = GetComponentInParent<PlayerController>();
@@ -123,7 +146,7 @@ public class Weapon : MonoBehaviour
         restarted = true;
 
         weaponProperties.weapon.transform.localPosition = weaponProperties.initial_potiion;
-        weaponProperties.weapon.transform.localRotation = weaponProperties.inicial_rotation;
+        weaponProperties.weapon.transform.localRotation = weaponProperties.initial_rotation;
 
         if (sight_attatchment != null)
         {
@@ -134,6 +157,7 @@ public class Weapon : MonoBehaviour
             AdsBehaviour.Instance.Setup(null, weaponProperties.ads_speed, weaponProperties.zoom);
         }
 
+        current_spread = weaponProperties.base_spread;
 
         SwitchFireMode();
     }
@@ -323,7 +347,7 @@ public class Weapon : MonoBehaviour
 
     #region Shooting
 
-    void shoot()
+    void Shoot()
     {
         bool hold_shoot = InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
         bool press_shoot = InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
@@ -510,15 +534,13 @@ public class Weapon : MonoBehaviour
 
     void CreateBullet()
     {
-
         for (int i = 0; i < weaponProperties.bullets_per_shot; i++)
         {
             UpdateRecoilPosition();
             SpawnBullet();
         }
 
-        if (weaponSounds != null)
-            weaponSounds.ShootSound();
+        if (weaponSounds != null) weaponSounds.ShootSound();
     }
 
     private void UpdateRecoilPosition()
@@ -536,10 +558,9 @@ public class Weapon : MonoBehaviour
     private void SpawnBullet()
     {
         Quaternion finalRotation = Spread.CalculateSpreadRotation(weaponProperties.barrel.transform, current_spread);
-        if (current_spread < weaponProperties.max_spread)
-        {
-            current_spread = Spread.AddSpread(current_spread, weaponProperties.spread_increaser);
-        }
+
+        current_spread = Spread.AddSpread(current_spread, weaponProperties.spread_increaser, weaponProperties.max_spread);
+
         Bullet.BulletData data = new Bullet.BulletData
         {
             position = weaponProperties.barrel.transform.position,
@@ -553,20 +574,33 @@ public class Weapon : MonoBehaviour
             destructionForce = weaponProperties.destruction_force,
             minimumDamage = weaponProperties.minimum_damage,
             hsMultiplier = weaponProperties.headshot_multiplier,
-            size = weaponProperties.bullet_size,
             canDamageVehicles = weaponProperties.can_damage_vehicles,
             vehicleDamage = weaponProperties.vehicle_damage,
             delaytoEnableForNonOwner = 0.2f,
         };
+        // 1. Pega o objeto do Pool (ele vem desativado)
+        GameObject pooledObj = ObjectPooling.Instance.GetLocalPooledItem(dummyBullet.gameObject);
 
-        DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
-        instantiatedDummyBullet.CreateBullet(data, playerController.transform);
+        if (pooledObj != null)
+        {
+            // 2. IMPORTANTÍSSIMO: Atualiza a posição e rotação ANTES de ativar e mover
+            pooledObj.transform.position = weaponProperties.barrel.transform.position;
+            pooledObj.transform.rotation = finalRotation;
+            pooledObj.transform.SetParent(null); // Tira de dentro do container do Pool
 
-        NetworkObject shooterNetObj = playerController.GetComponent<NetworkObject>();
-        playerNetworkObjectSpawner.ServerSpawnBullet(weaponProperties.bulletPref.gameObject, data, shooterNetObj, weaponProperties.gameObject.name);
+            // 3. Ativa o Game Object para ele aparecer na cena
+            pooledObj.SetActive(true);
+
+            // 4. Inicializa os dados da bala
+            DummyBullet instantiatedDummyBullet = pooledObj.GetComponent<DummyBullet>();
+            if (instantiatedDummyBullet != null)
+            {
+                instantiatedDummyBullet.CreateBullet(data, playerController.transform);
+            }
+        }
+
+        playerNetworkObjectSpawner.ServerSpawnBullet(serverBullet, data, weaponProperties.gameObject.name);
     }
-
-
 
     IEnumerator ApplyVisualRecoilOffset()
     {
@@ -575,60 +609,30 @@ public class Weapon : MonoBehaviour
 
         ApplyRecoilToCamera(vr, hr);
 
-        float randomizedHr = RandomizeHorizontalRecoil(hr);
-        float randomizedVr = UnityEngine.Random.Range(0, vr);
-
         Vector3 recoilOffset = GetRecoilOffset();
         Vector3 start = weaponProperties.initial_potiion;
         Vector3 target = start + recoilOffset;
 
-        Quaternion weaponRotation = CalculateWeaponRotation(randomizedHr, randomizedVr);
+        //Quaternion weaponRotation = CalculateWeaponRotation();
+        //applyRotationRecoilCoroutine = StartCoroutine(ApplyRotationRecoilAnimation(weaponRotation));
 
-        yield return StartCoroutine(ApplyRecoilAnimation(start, target, weaponRotation));
+        yield return StartCoroutine(ApplyPositionRecoilAnimation(start, target));
     }
 
     private void ApplyRecoilToCamera(float vr, float hr)
     {
         if (!is_first_shot || weaponProperties.mags[^1] == 1)
         {
-            if (playerProperties.crouched || playerProperties.is_proned)
-            {
-                playerController.ApplyCameraRecoil(
-                    (vr * weaponProperties.first_shoot_increaser) * crouch_recoil_multiplier,
-                    (hr * weaponProperties.first_shoot_increaser) / 1.3f
-                );
-            }
-            else
-            {
-                playerController.ApplyCameraRecoil(
-                    vr * weaponProperties.first_shoot_increaser,
-                    hr * weaponProperties.first_shoot_increaser
-                );
-            }
+            playerController.ApplyCameraRecoil(
+                vr * weaponProperties.first_shoot_increaser,
+                hr * weaponProperties.first_shoot_increaser
+            );
+
             is_first_shot = true;
         }
         else
         {
-            if (playerProperties.crouched || playerProperties.is_proned)
-            {
-                playerController.ApplyCameraRecoil(vr * crouch_recoil_multiplier, hr * crouch_recoil_multiplier);
-            }
-            else
-            {
-                playerController.ApplyCameraRecoil(vr, hr);
-            }
-        }
-    }
-
-    private float RandomizeHorizontalRecoil(float hr)
-    {
-        if (hr < 0)
-        {
-            return UnityEngine.Random.Range(hr, hr * -1);
-        }
-        else
-        {
-            return UnityEngine.Random.Range(-hr, hr);
+            playerController.ApplyCameraRecoil(vr, hr);
         }
     }
 
@@ -643,27 +647,60 @@ public class Weapon : MonoBehaviour
             );
     }
 
-    private Quaternion CalculateWeaponRotation(float hr, float vr)
+    private Quaternion CalculateWeaponRotation()
     {
         if (playerProperties.is_aiming)
         {
             return new Quaternion(
-                weaponProperties.weapon.transform.localRotation.x + UnityEngine.Random.Range(hr / -weaponProperties.weapon_stability, 0),
-                weaponProperties.weapon.transform.localRotation.y + UnityEngine.Random.Range(vr / -weaponProperties.weapon_stability, vr / weaponProperties.weapon_stability),
-                weaponProperties.weapon.transform.localRotation.z + UnityEngine.Random.Range((weaponProperties.horizontal_recoil_media / 40 + weaponProperties.vertical_recoil_media / 40) / -2, 0),
-                weaponProperties.weapon.transform.localRotation.w
+                transform.localRotation.x + -weaponProperties.weapon_stability / 500,
+                transform.localRotation.y + weaponProperties.weapon_stability / 500,
+                transform.localRotation.z + -weaponProperties.weapon_stability / 500,
+                transform.localRotation.w
             );
         }
 
         return new Quaternion(
-            weaponProperties.weapon.transform.localRotation.x + UnityEngine.Random.Range(-0.02f, 0.02f),
-            weaponProperties.weapon.transform.localRotation.y + UnityEngine.Random.Range(-0.02f, 0.02f),
-            weaponProperties.weapon.transform.localRotation.z + UnityEngine.Random.Range(-0.02f, 0.02f),
-            weaponProperties.weapon.transform.localRotation.w
+            transform.localRotation.x + Random.Range(-0.02f, 0.02f),
+            transform.localRotation.y + Random.Range(-0.02f, 0.02f),
+            transform.localRotation.z + Random.Range(-0.02f, 0.02f),
+            transform.localRotation.w
         );
     }
 
-    private IEnumerator ApplyRecoilAnimation(Vector3 start, Vector3 target, Quaternion weaponRotation)
+    private IEnumerator ApplyRotationRecoilAnimation(Quaternion weaponRotation)
+    {
+        // 1. Salva a rotação inicial (ponto de partida fixo)
+        Quaternion initialRotation = transform.localRotation;
+
+        // 2. Define qual será o alvo real do recuo
+        Quaternion targetRotation = weaponRotation;
+
+        // Se o mouse estiver indo para baixo, o alvo será apenas 50% do recuo total
+        if (InputManager.GetAxis("Mouse Y") < 0)
+        {
+            targetRotation = Quaternion.Slerp(initialRotation, weaponRotation, 0.5f);
+        }
+
+        float elapsed = 0f;
+        float totalDuration = weaponProperties.weapon_apply_recoil_speed + weaponProperties.weapon_reset_recoil_speed;
+
+        // 3. Loop da animação
+        while (elapsed < totalDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / totalDuration;
+
+            // Suaviza a curva (Ease-Out: começa rápido e desacelera no topo)
+            float smoothT = Mathf.Sin(t * Mathf.PI * 0.5f);
+
+            // 4. Interpola do ponto inicial fixo até o alvo que definimos acima
+            transform.localRotation = Quaternion.Slerp(initialRotation, targetRotation, smoothT);
+
+            yield return null;
+        }
+    }
+
+    private IEnumerator ApplyPositionRecoilAnimation(Vector3 start, Vector3 target)
     {
         float elapsed = 0f;
 
@@ -671,11 +708,6 @@ public class Weapon : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             weaponProperties.weapon.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.weapon_apply_recoil_speed);
-            weaponProperties.weapon.transform.localRotation = Quaternion.Lerp(
-                weaponProperties.weapon.transform.localRotation,
-                weaponRotation,
-                elapsed / weaponProperties.weapon_apply_recoil_speed
-            );
             yield return null;
         }
 
@@ -689,11 +721,7 @@ public class Weapon : MonoBehaviour
                 start,
                 elapsed / weaponProperties.weapon_apply_recoil_speed
             );
-            weaponProperties.weapon.transform.localRotation = Quaternion.Lerp(
-                weaponProperties.weapon.transform.localRotation,
-                weaponProperties.inicial_rotation,
-                elapsed / weaponProperties.weapon_reset_recoil_speed
-            );
+
             yield return null;
         }
     }
@@ -834,6 +862,10 @@ public class Weapon : MonoBehaviour
         playerProperties.is_composing_bullets = false;
         time_to_contatenate = weaponProperties.time_to_transfer_bullets;
     }
+    #endregion
 
+    #region  Interface Implementations
+    public float GetCurrentSpread() => current_spread;
+    public float GetMaxSpread() => weaponProperties.max_spread;
     #endregion
 }

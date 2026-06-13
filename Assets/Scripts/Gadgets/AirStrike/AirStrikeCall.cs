@@ -39,21 +39,17 @@ public class AirStrikeCall : Gadget
         // Calcula o tempo restante de cooldown
         float remainingCooldown = Mathf.Max(0, nextAvailableTime - Time.time);
         
-        if (gadgetComponents.soldierHudManager.mag_counter_hud != null)
+        if (soldierHudManager != null)
         {
             if (remainingCooldown > 0)
             {
-                gadgetComponents.soldierHudManager.mag_counter_hud.UpdateMagCount("Wait: " + remainingCooldown.ToString("F1"));
+                soldierHudManager.SetCurrentAmmo("Wait: " + remainingCooldown.ToString("F1"));
             }
             else
             {
-                gadgetComponents.soldierHudManager.mag_counter_hud.UpdateMagCount("Ready!");
+                soldierHudManager.SetCurrentAmmo("Ready!");
             }
         }
-
-        gadgetComponents.left_hand.transform.position = leftHandPos.position;
-        gadgetComponents.right_hand.transform.position = transform.position;
-        gadgetComponents.right_hand.transform.rotation = transform.rotation;
 
         UpdateLaser();
 

@@ -28,19 +28,20 @@ public class TowMissile : Missiles
 
     }
 
-    [ServerRpc(RequireOwnership = false)]
     public override void Shoot(Vector3 direction)
     {
-        CmndShoot(direction);
+        SoundManager.Instance.RequestPlay2dSound(shootSound.name, shootSoundProperties);
 
+        RequestShoot(direction);
     }
+    
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestShoot(Vector3 direction) => CmndShoot(direction);
 
     [ObserversRpc]
     private void CmndShoot(Vector3 direction)
     {
         didShoot = true;
-
-        CreateSound(shoot_sound);
         missile_collider.enabled = true;
 
         transform.SetParent(null);

@@ -97,7 +97,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     [SerializeField] private float maxScrollYIncreaser = 100f;
 
     [Header("Sound Effects")]
-    [SerializeField] private AudioSource audio_source;
     [SerializeField] private AudioClip purchase_item_sfx;
     [SerializeField] private AudioClip purchase_denial_item_sfx;
     [SerializeField] private AudioClip select_item_item_sfx;
@@ -111,7 +110,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
 
     //Statics
-    [HideInInspector] public static AudioSource reference_audio_source;
     [HideInInspector] public static AudioClip reference_purchase_item_sfx;
     [HideInInspector] public static AudioClip reference_purchase_denial_item_sfx;
     [HideInInspector] public static Sprite locked_item_image;
@@ -224,7 +222,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         locked_item_image = lockedItemImage;
         BuyWeaponButton = buy_weapon_button;
 
-        reference_audio_source = audio_source;
         reference_purchase_item_sfx = purchase_item_sfx;
         reference_purchase_denial_item_sfx = purchase_denial_item_sfx;
 
@@ -725,8 +722,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void EquipItem(GameObject item)
     {
-        audio_source.clip = select_item_item_sfx;
-        audio_source.Play();
+        if (select_item_item_sfx != null) SoundManager.Play2dSoundLocal(select_item_item_sfx, SoundManager.SoundProperties.Default);
 
         switch (_currentLoadoutOption)
         {
@@ -1089,7 +1085,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             }
         }
     }
-
     #endregion
 
     #region Navigation
@@ -1218,21 +1213,11 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         damageDropoffTimerText.text = wp.damage_dropoff_timer.ToString("F2") + "s";
         spreadIncreaserText.text = wp.spread_increaser.ToString("F2");
         maxSpreadText.text = wp.max_spread.ToString("F2");
-        if (wp.horizontal_recoil_media < 0)
-        {
-            horizontalRecoilText.text = Math.Abs(wp.horizontal_recoil_media).ToString("F2") + "  <-";
-        }
-        else if (wp.horizontal_recoil_media > 0)
-        {
-            horizontalRecoilText.text = wp.horizontal_recoil_media.ToString("F2") + "  ->";
-        }
-        else
-        {
-            horizontalRecoilText.text = "0.00";
-        }
 
+        horizontalRecoilText.text = string.Join(" / ", wp.horizontal_recoil.Select(v => v.ToString("F2")));
+        verticalRecoilText.text = string.Join(" / ", wp.vertical_recoil.Select(v => v.ToString("F2")));
 
-        verticalRecoilText.text = wp.vertical_recoil_media.ToString("F2");
+        //verticalRecoilText.text = wp.vertical_recoil_media.ToString("F2");
         firstShotRecoilIncreaserText.text = "x" + wp.first_shoot_increaser.ToString("F1");
         magCountText.text = wp.mag_count.ToString();
         bulletsPerMagText.text = wp.bullets_per_mag.ToString();
@@ -1480,8 +1465,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         {
             if (AccountManager.Instance.battle_coins < _weaponProperties.battle_coins_to_unlock)
             {
-                reference_audio_source.clip = reference_purchase_denial_item_sfx;
-                reference_audio_source.Play();
+                SoundManager.Play2dSoundLocal(reference_purchase_denial_item_sfx, SoundManager.SoundProperties.Default);
                 return;
             }
 
@@ -1502,8 +1486,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             // Reconfigura os eventos para permitir seleção
             SetupEvents();
 
-            reference_audio_source.clip = reference_purchase_item_sfx;
-            reference_audio_source.Play();
+            SoundManager.Play2dSoundLocal(reference_purchase_item_sfx, SoundManager.SoundProperties.Default);
             AccountManager.Instance.RemoveBattleCoin(_weaponProperties.battle_coins_to_unlock);
             UnlockedWeapons.UnlockWeapon(_weaponProperties.weapon_name);
         }

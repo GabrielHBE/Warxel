@@ -3,9 +3,6 @@ using System;
 
 public class AttatchmentManager : MonoBehaviour
 {
-    [SerializeField] private GameObject left_hand_target;
-    [SerializeField] private GameObject right_hand_target;
-
     // Constante para o valor mínimo de recoil
     private const float MIN_RECOIL_VALUE = 0.1f;
     private const float MAX_RECOIL_VALUE = 10f;
@@ -25,11 +22,13 @@ public class AttatchmentManager : MonoBehaviour
         public float reload_speed_change;
         public float ads_speed_change;
         public float pick_up_weapon_speed_change;
+        public float store_weapon_speed_change;
 
         // Barrel
         public float muzzle_lightning_change;
         public float muzzle_velocity_change;
         public float shoot_pith_change;
+        public float shoot_volume_change;
         public float spread_change;
 
         // Sight
@@ -68,7 +67,6 @@ public class AttatchmentManager : MonoBehaviour
         Grip[] grips = GetComponentsInChildren<Grip>(true);
         foreach (Grip grip in grips)
         {
-            grip.left_hand_holder = left_hand_target;
             grip.gameObject.SetActive(false);
         }
 
@@ -126,7 +124,8 @@ public class AttatchmentManager : MonoBehaviour
             weapon_stability_change = g.weapon_stability_change,
             reload_speed_change = g.reload_speed_change,
             ads_speed_change = g.ads_speed_change,
-            pick_up_weapon_speed_change = g.pick_up_weapon_speed_change
+            pick_up_weapon_speed_change = g.pick_up_weapon_speed_change,
+            store_weapon_speed_change = g.store_weapon_speed_change
         };
     }
 
@@ -198,6 +197,8 @@ public class AttatchmentManager : MonoBehaviour
 
         wp.current_attachment_points += grip.points;
         wp.first_shoot_increaser += grip.first_shoot_change;
+        wp.pick_up_weapon_speed += grip.pick_up_weapon_speed_change;
+        wp.store_weapon_speed += grip.store_weapon_speed_change;
         wp.weapon_stability += grip.weapon_stability_change;
         wp.reload_time += grip.reload_speed_change;
         wp.ads_speed += grip.ads_speed_change;
@@ -205,6 +206,9 @@ public class AttatchmentManager : MonoBehaviour
 
     private void AddBarrelStats(WeaponProperties wp, AttachmentData barrel)
     {
+        // Boa prática: Adicionado o Null Check que faltava aqui também
+        if (wp == null || barrel == null) return;
+
         for (int i = 0; i < wp.vertical_recoil.Length; i++)
         {
             wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] + barrel.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
@@ -212,16 +216,20 @@ public class AttatchmentManager : MonoBehaviour
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
         {
-            wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
+            // Se o recuo for para a esquerda (negativo), subtraímos o valor para trazê-lo para perto de zero
+            if (wp.horizontal_recoil[i] < 0)
+                wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
+            else
+                wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
         }
 
         wp.current_attachment_points += barrel.points;
         wp.first_shoot_increaser += barrel.first_shoot_change;
         wp.muzzle_velocity += barrel.muzzle_velocity_change;
-        wp.weapon_sound.shoot_sound.pitch += barrel.shoot_pith_change;
+        wp.weapon_sound.shootSoundProperties.pitch += barrel.shoot_pith_change;
+        wp.weapon_sound.shootSoundProperties.volume += barrel.shoot_volume_change;
         wp.spread_increaser += barrel.spread_change;
     }
-
     private void AddSightStats(WeaponProperties wp, AttachmentData sight)
     {
         wp.current_attachment_points += sight.points;
@@ -288,6 +296,8 @@ public class AttatchmentManager : MonoBehaviour
 
         wp.current_attachment_points -= grip.points;
         wp.first_shoot_increaser -= grip.first_shoot_change;
+        wp.pick_up_weapon_speed -= grip.pick_up_weapon_speed_change;
+        wp.store_weapon_speed -= grip.store_weapon_speed_change;
         wp.weapon_stability -= grip.weapon_stability_change;
         wp.reload_time -= grip.reload_speed_change;
         wp.ads_speed -= grip.ads_speed_change;
@@ -306,13 +316,18 @@ public class AttatchmentManager : MonoBehaviour
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
         {
-            wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
+            // Inverte exatamente a lógica aplicada no Add
+            if (wp.horizontal_recoil[i] < 0)
+                wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
+            else
+                wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
         }
 
         wp.current_attachment_points -= barrel.points;
         wp.first_shoot_increaser -= barrel.first_shoot_change;
         wp.muzzle_velocity -= barrel.muzzle_velocity_change;
-        wp.weapon_sound.shoot_sound.pitch -= barrel.shoot_pith_change;
+        wp.weapon_sound.shootSoundProperties.pitch -= barrel.shoot_pith_change;
+        wp.weapon_sound.shootSoundProperties.volume -= barrel.shoot_volume_change;
         wp.spread_increaser -= barrel.spread_change;
 
         ResetAttachmentDataToZero(barrel);

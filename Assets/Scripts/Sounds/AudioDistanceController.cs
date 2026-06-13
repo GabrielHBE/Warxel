@@ -9,7 +9,7 @@ public class AudioDistanceController : MonoBehaviour
     private float growthSpeed = 2000f;
 
     [Header("Audio Settings")]
-    private AudioSource audioSource;
+    [SerializeField] private AudioSource audioSource;
     public bool playOnEnter = true;
     public bool stopOnExit = false;
     public bool preventRepeating = true;
@@ -24,7 +24,7 @@ public class AudioDistanceController : MonoBehaviour
     [SerializeField] private float cameraShakeIntensity = 2;
     [SerializeField] private float cameraShakeDuration = 1;
 
-    private SphereCollider sphereCollider;
+    [SerializeField] private SphereCollider sphereCollider;
     private bool isGrowing = false;
     private float currentSize;
 
@@ -35,22 +35,6 @@ public class AudioDistanceController : MonoBehaviour
     private Dictionary<GameObject, AudioClip> currentSoundForObject = new Dictionary<GameObject, AudioClip>();
 
     private float initialGrowth = 0;
-
-    void Awake()
-    {
-        audioSource = GetComponent<AudioSource>();
-        if (audioSource == null)
-        {
-
-            audioSource = gameObject.AddComponent<AudioSource>();
-        }
-
-        finalGrowth = audioSource.maxDistance;
-
-        // Configurar o AudioSource para ser 3D
-        audioSource.spatialBlend = 1f; // Áudio totalmente 3D
-        audioSource.rolloffMode = AudioRolloffMode.Linear;
-    }
 
     void Update()
     {
@@ -67,15 +51,28 @@ public class AudioDistanceController : MonoBehaviour
         }
     }
 
+    public void Setup(AudioClip clip, SoundManager.SoundProperties soundProperties)
+    {
+        audioSource.playOnAwake = false;
+        audioSource.clip = clip;
+        audioSource.priority = soundProperties.priority;
+        audioSource.volume = soundProperties.volume;
+        audioSource.pitch = soundProperties.pitch;
+        audioSource.panStereo = soundProperties.stereoPan;
+        audioSource.spatialBlend = 0;
+        audioSource.reverbZoneMix = soundProperties.reverbZoneMix;
+        audioSource.dopplerLevel = soundProperties.dopplerLevel;
+        audioSource.spread = soundProperties.spread;
+        audioSource.rolloffMode = soundProperties.rolloffMode;
+        audioSource.minDistance = soundProperties.minDistance;
+        audioSource.maxDistance = soundProperties.maxDistance;
+
+        finalGrowth = audioSource.maxDistance;
+
+    }
+
     public void StartGrowth()
     {
-        transform.SetParent(null);
-        sphereCollider = GetComponent<SphereCollider>();
-        if (sphereCollider == null)
-        {
-            sphereCollider = gameObject.AddComponent<SphereCollider>();
-        }
-
         sphereCollider.isTrigger = true;
         currentSize = initialGrowth;
         sphereCollider.radius = currentSize;
@@ -293,6 +290,16 @@ public class AudioDistanceController : MonoBehaviour
         if (currentSoundForObject.ContainsKey(targetObject))
             return currentSoundForObject[targetObject];
         return null;
+    }
+
+    public void SetCollider(SphereCollider sphereCollider)
+    {
+        this.sphereCollider = sphereCollider;
+    }
+
+    public void SetAudioSource(AudioSource audioSource)
+    {
+        this.audioSource = audioSource;
     }
 
     [System.Serializable]

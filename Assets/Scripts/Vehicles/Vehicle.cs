@@ -362,9 +362,6 @@ public abstract class Vehicle : NetworkBehaviour,
             currentSeat.playerController?.RequestDamage(1000);
         }
 
-        PlayExplosionSound();
-        CmdRequestPlayExplosionSound();
-
         GameObject prefabToSpawn = layer == LayerMask.NameToLayer("Ground") ? ground_explosion : crash_explosion;
         GameObject explosion_effect = Instantiate(prefabToSpawn, contact_point, Quaternion.identity);
         Spawn(explosion_effect);
@@ -374,12 +371,6 @@ public abstract class Vehicle : NetworkBehaviour,
 
     [TargetRpc]
     private void TargetForceExitVehicle(NetworkConnection conn) => ExitVehicle();
-
-    [ServerRpc(RequireOwnership = false)]
-    private void CmdRequestPlayExplosionSound() => PlayExplosionSound();
-
-    [ObserversRpc(ExcludeOwner = true)]
-    private void PlayExplosionSound() => HandleSound(crash_sound);
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestDespawn()
@@ -464,18 +455,6 @@ public abstract class Vehicle : NetworkBehaviour,
         currentSeat.currentArmory?.ActivateArmory();
     }
 
-    protected void HandleSound(AudioSource sound)
-    {
-        GameObject duplicatedObject = Instantiate(sound.gameObject, sound.transform.position, Quaternion.identity);
-        if (duplicatedObject.TryGetComponent(out AudioDistanceController controller))
-        {
-            controller.StartGrowth();
-        }
-        else
-        {
-            sound.PlayOneShot(sound.clip);
-        }
-    }
 
     protected bool IsInLayerMask(int layer, LayerMask layerMask) => layerMask == (layerMask | (1 << layer));
     public float GetHp() => hp.Value;

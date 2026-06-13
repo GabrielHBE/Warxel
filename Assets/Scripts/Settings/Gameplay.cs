@@ -17,7 +17,7 @@ public class Gameplay : MonoBehaviour
     public bool show_network_status = true;
     public bool show_level_progression = true;
     public bool show_kill_feed = true;
-    [Range(0.1f, 2f)]
+    [Range(0.1f, 1)]
     public float sight_reticle_size;
     public Color sight_reticle_collor = Color.red;
 

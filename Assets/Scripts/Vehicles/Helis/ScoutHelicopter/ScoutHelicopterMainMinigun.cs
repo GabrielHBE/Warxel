@@ -4,8 +4,6 @@ using System.Collections.Generic;
 
 public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 {
-    [SerializeField] private DummyBullet dummyBullet;
-
     private bool isActive = true;
     public ScoutHelicopterMainMinigunProperties properties;
 
@@ -53,6 +51,8 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
     {
         if (_nextFireTime <= 0f)
         {
+            SoundManager.Instance.RequestPlay3dSound(properties.shoot_sound.name, properties.shootSoundProperties, transform.position, false);
+            SoundManager.Play2dSoundLocal(properties.shoot_sound, properties.shootSoundProperties);
             FireAllMiniguns();
         }
 
@@ -92,10 +92,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
                 {
                     Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPosition, _currentSpread);
 
-                    if (_currentSpread < properties.max_spread)
-                    {
-                        _currentSpread = Spread.AddSpread(_currentSpread, properties.spread);
-                    }
+                    _currentSpread = Spread.AddSpread(_currentSpread, properties.spread, properties.max_spread);
 
                     Bullet.BulletData data = new Bullet.BulletData
                     {
@@ -110,27 +107,25 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
                         destructionForce = properties.destruction_force,
                         minimumDamage = properties.minimum_damage,
                         hsMultiplier = 2,
-                        size = 1,
                         canDamageVehicles = true,
                         vehicleDamage = properties.vehicle_damage,
                         delaytoEnableForNonOwner = 0,
                     };
 
-                    DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
-                    instantiatedDummyBullet.CreateBullet(data);
+                    DummyBullet instantiatedDummyBullet = ObjectPooling.Instance.GetLocalPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
+                    if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
+
+                    //DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
+                    //instantiatedDummyBullet.CreateBullet(data);
 
                     CmdShootBullet(data);
                 }
             }
         }
-
-        RequestPlayShootSound();
         _currentSpread += properties.spread;
         _currentSpread = Mathf.Clamp(_currentSpread, 0, properties.max_spread);
         _nextFireTime = properties.interval;
 
-        if (properties.shoot_sound != null && IsOwner)
-            properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
     }
 
     private void ApplyHeat(float deltaTime)
@@ -170,27 +165,20 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
         if (properties.bulletPref == null)
             return;
 
+        Bullet bullet = NetworkManager.GetPooledInstantiated(properties.bulletPref, IsServerInitialized).GetComponent<Bullet>();
+        Spawn(bullet, Owner);
+        bullet.CreateBullet(data, transform.root, null);
+
+        /*
+
         Transform bulletObj = Instantiate(properties.bulletPref, data.position, data.rotation);
         bulletObj.localScale *= 2;
 
 
         Spawn(bulletObj.gameObject, Owner);
         bulletObj.GetComponent<Bullet>()?.CreateBullet(data, transform.root);
+        */
     }
-
-    [ServerRpc(RequireOwnership = true)]
-    private void RequestPlayShootSound()
-    {
-        PlayShootSoundClientRpc();
-    }
-
-    [ObserversRpc(ExcludeOwner = true)]
-    private void PlayShootSoundClientRpc()
-    {
-        if (properties.shoot_sound != null)
-            properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
-    }
-
     public float GetMaxHeat()
     {
         return properties.overheat_time;

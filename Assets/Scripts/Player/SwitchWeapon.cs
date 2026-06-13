@@ -17,40 +17,36 @@ public class SwitchWeapon : MonoBehaviour
     public GameObject gadget1;
     public GameObject gadget2;
 
-
     [Header("Sounds")]
     public AudioSource zipper;
 
     [Header("Instances")]
     public Reticle reticle;
-    public Transform save;
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private WeaponAnimation weaponAnimation;
     [SerializeField] private SwayNBobScript sway;
     [SerializeField] private Weapon weapon;
 
-    [Header("Timing")]
-    [SerializeField] private float switchDuration = 0.6f;
-    [SerializeField] private float pickUpWeaponSpeed = 60f; // pick_up_weapon_timer * 100
-
     [HideInInspector] public int currentWeapon = 1;
     [HideInInspector] public bool _switch = false;
 
     private bool isReturning = false;
     private float switchTimer = 0f;
+    private float returnTimer = 0f; // Novo timer para a animação de sacar
     private bool setupOnce = true;
 
+    // Controlo de tempos dinâmicos em segundos
+    private float currentStoreDuration = 0.5f;
+    private float currentPickUpDuration = 0.5f;
+    private int targetWeapon = 1;
 
     private WeaponProperties weaponProperties;
 
     private Vector3 originalPosition;
     private Quaternion originalQuaternionRotation;
-
-    private readonly Vector3 savePosition = new(0, -30, 1); // Inicializado diretamente
     private readonly Quaternion saveQuaternionRotation = new(4, 0, 0, 1);
-
-
+    private Vector3 actualSavePosition;
     private enum WeaponSlot
     {
         Primary = 1,
@@ -61,16 +57,21 @@ public class SwitchWeapon : MonoBehaviour
 
     public void Initialize()
     {
-
         InstantiatePrimaryWeapon();
         InstantiateSecodnaryWeapon();
         InstantiateGadget1();
         InstantiateGadget2();
 
+        currentWeapon = 1;
+        targetWeapon = 1;
+
+        // Configura os tempos iniciais caso a inicialização dispare a animação
+        currentStoreDuration = GetStoreSpeed(currentWeapon);
+        currentPickUpDuration = GetPickUpSpeed(targetWeapon);
+
         _switch = true;
         playerProperties.is_reloading = false;
         playerProperties.is_firing = false;
-        currentWeapon = 1;
     }
 
     public void InstantiatePrimaryWeapon()
@@ -84,7 +85,6 @@ public class SwitchWeapon : MonoBehaviour
                 attManager.InitializeAttachments();
                 attManager.LoadAttachmentsFromPlayerPrefs();
             }
-
             primary = g;
         }
     }
@@ -94,15 +94,12 @@ public class SwitchWeapon : MonoBehaviour
         if (secondary != null)
         {
             GameObject g = Instantiate(secondary, weapons_parent);
-
-            // Inicializa e carrega attachments salvos
             AttatchmentManager attManager = g.GetComponent<AttatchmentManager>();
             if (attManager != null)
             {
                 attManager.InitializeAttachments();
                 attManager.LoadAttachmentsFromPlayerPrefs();
             }
-
             secondary = g;
             g.SetActive(false);
         }
@@ -117,6 +114,7 @@ public class SwitchWeapon : MonoBehaviour
             g.SetActive(false);
         }
     }
+
     public void InstantiateGadget2()
     {
         if (gadget2 != null)
@@ -144,60 +142,70 @@ public class SwitchWeapon : MonoBehaviour
 
     private void HandleWeaponSwitchInputManager()
     {
-        if (_switch || playerProperties.is_reloading || playerProperties.is_firing || playerProperties.is_dead.Value)
+        // Bloqueia inputs se já estiver a trocar ou a sacar a arma
+        if (_switch || isReturning || playerProperties.is_reloading || playerProperties.is_firing || playerProperties.is_dead.Value)
             return;
 
-        Vector2 scrollDelta = Mouse.current.scroll.ReadValue();
-        float scrollY = scrollDelta.y;
+        float scrollY = InputManager.GetMouseScroll();
 
-        // Handle mouse wheel scrolling
         if (scrollY != 0f)
         {
             SwitchWeaponByScroll(scrollY);
             return;
         }
 
-        // Handle number key presses
         HandleNumberKeyInputManager();
     }
 
     private void SwitchWeaponByScroll(float scrollDirection)
     {
+        int nextWeapon = currentWeapon;
+
         if (scrollDirection > 0f)
         {
-            currentWeapon = currentWeapon == 4 ? 1 : currentWeapon + 1;
+            nextWeapon = currentWeapon == 4 ? 1 : currentWeapon + 1;
         }
         else if (scrollDirection < 0f)
         {
-            currentWeapon = currentWeapon == 1 ? 4 : currentWeapon - 1;
+            nextWeapon = currentWeapon == 1 ? 4 : currentWeapon - 1;
         }
 
-        _switch = true;
+        if (nextWeapon != currentWeapon)
+        {
+            StartWeaponSwitch(nextWeapon);
+        }
     }
 
     private void HandleNumberKeyInputManager()
     {
         if (InputManager.GetKeyDown(weapon1) && primary != null && currentWeapon != 1)
         {
-            SwitchToWeapon(WeaponSlot.Primary);
+            StartWeaponSwitch((int)WeaponSlot.Primary);
         }
         else if (InputManager.GetKeyDown(weapon2) && secondary != null && currentWeapon != 2)
         {
-            SwitchToWeapon(WeaponSlot.Secondary);
+            StartWeaponSwitch((int)WeaponSlot.Secondary);
         }
         else if (InputManager.GetKeyDown(weapon3) && gadget1 != null && currentWeapon != 3)
         {
-            SwitchToWeapon(WeaponSlot.Gadget1);
+            StartWeaponSwitch((int)WeaponSlot.Gadget1);
         }
         else if (InputManager.GetKeyDown(weapon4) && gadget2 != null && currentWeapon != 4)
         {
-            SwitchToWeapon(WeaponSlot.Gadget2);
+            StartWeaponSwitch((int)WeaponSlot.Gadget2);
         }
     }
 
-    private void SwitchToWeapon(WeaponSlot weaponSlot)
+    // Centraliza o início da troca calculando os tempos em segundos de cada objeto
+    private void StartWeaponSwitch(int nextWeaponSlot)
     {
-        currentWeapon = (int)weaponSlot;
+        targetWeapon = nextWeaponSlot;
+
+        // Obtém a velocidade de guardar do item ATUAL e de sacar do PRÓXIMO item
+        currentStoreDuration = GetStoreSpeed(currentWeapon);
+        currentPickUpDuration = GetPickUpSpeed(targetWeapon);
+
+        switchTimer = 0f;
         _switch = true;
     }
 
@@ -211,12 +219,18 @@ public class SwitchWeapon : MonoBehaviour
 
         switchTimer += Time.deltaTime;
 
-        if (switchTimer <= switchDuration)
+        float t = Mathf.Clamp01(switchTimer / currentStoreDuration);
+
+        // Deixa o movimento suave (acelera no início e desacelera no fim)
+        float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+        // Interpola usando o destino corrigido (actualSavePosition)
+        transform.localPosition = Vector3.Lerp(originalPosition, actualSavePosition, smoothT);
+        transform.localRotation = Quaternion.Lerp(originalQuaternionRotation, saveQuaternionRotation, smoothT);
+
+        if (switchTimer >= currentStoreDuration)
         {
-            AnimateWeaponHide();
-        }
-        else
-        {
+            currentWeapon = targetWeapon;
             ActivateSelectedWeapon();
             ResetSwitchState();
         }
@@ -228,6 +242,11 @@ public class SwitchWeapon : MonoBehaviour
         {
             originalPosition = transform.localPosition;
             originalQuaternionRotation = transform.localRotation;
+
+            // CORREÇÃO: Em vez de ir para -30 (que joga a arma no limbo instantaneamente),
+            // fazemos ela descer apenas 2 unidades abaixo da sua posição original atual.
+            // Você pode ajustar este -2f para mais ou para menos se a arma ainda aparecer na tela.
+            actualSavePosition = new Vector3(originalPosition.x, originalPosition.y - 0.1f, originalPosition.z);
         }
     }
 
@@ -240,13 +259,6 @@ public class SwitchWeapon : MonoBehaviour
             if (weapon != null) weapon.can_aim = false;
             setupOnce = false;
         }
-    }
-
-    private void AnimateWeaponHide()
-    {
-        float lerpSpeed = Time.deltaTime * 0.1f;
-        transform.localPosition = Vector3.Lerp(transform.localPosition, savePosition, lerpSpeed);
-        transform.localRotation = Quaternion.Lerp(transform.localRotation, saveQuaternionRotation, lerpSpeed);
     }
 
     private void ActivateSelectedWeapon()
@@ -306,12 +318,10 @@ public class SwitchWeapon : MonoBehaviour
     private void InitializeWeaponComponents()
     {
         weaponProperties = GetComponentInChildren<WeaponProperties>();
-
         if (weaponProperties != null)
         {
             weaponProperties.Restart();
         }
-
     }
 
     private void ConfigureSwayForWeapon()
@@ -339,6 +349,7 @@ public class SwitchWeapon : MonoBehaviour
         if (gadget != null)
         {
             gadget.SetActive(true);
+            gadget.Reestart();
             ConfigureSwayForGadget(gadget);
         }
     }
@@ -377,13 +388,12 @@ public class SwitchWeapon : MonoBehaviour
             WeaponHolder wh = weaponProperties.GetComponent<WeaponHolder>();
             wh.ResetWeaponState();
         }
-
-        //if (weapon != null) weapon.ads_position.transform.localPosition = Vector3.zero;
     }
 
     private void ResetSwitchState()
     {
         switchTimer = 0f;
+        returnTimer = 0f; // Inicializa o cronómetro de retorno
         isReturning = true;
         _switch = false;
         setupOnce = true;
@@ -391,21 +401,21 @@ public class SwitchWeapon : MonoBehaviour
 
     private void ReturnWeaponToPosition()
     {
-        float returnSpeed = pickUpWeaponSpeed * Time.deltaTime;
+        returnTimer += Time.deltaTime;
 
-        transform.localPosition = Vector3.Lerp(transform.localPosition, originalPosition, returnSpeed);
-        transform.localRotation = Quaternion.Lerp(transform.localRotation, originalQuaternionRotation, returnSpeed);
+        float t = Mathf.Clamp01(returnTimer / currentPickUpDuration);
 
-        if (HasReturnedToOriginalPosition())
+        // Deixa a subida da nova arma suave também
+        float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+        // Saca a arma a partir do destino corrigido de volta para a posição original
+        transform.localPosition = Vector3.Lerp(actualSavePosition, originalPosition, smoothT);
+        transform.localRotation = Quaternion.Lerp(saveQuaternionRotation, originalQuaternionRotation, smoothT);
+
+        if (returnTimer >= currentPickUpDuration)
         {
             CompleteWeaponSwitch();
         }
-    }
-
-    private bool HasReturnedToOriginalPosition()
-    {
-        return Vector3.Distance(transform.localPosition, originalPosition) < 0.01f &&
-               Quaternion.Angle(transform.localRotation, originalQuaternionRotation) < 0.1f;
     }
 
     private void CompleteWeaponSwitch()
@@ -418,7 +428,6 @@ public class SwitchWeapon : MonoBehaviour
 
         isReturning = false;
         sway.enabled = true;
-        // StartCoroutine(cameraShake.PickWeaponShake());
     }
 
     private void SetWeaponActive(GameObject weaponObject, bool active)
@@ -428,4 +437,48 @@ public class SwitchWeapon : MonoBehaviour
             weaponObject.SetActive(active);
         }
     }
+
+    #region Métodos Auxiliares de Captura de Tempo
+
+    private float GetStoreSpeed(int slot)
+    {
+        GameObject obj = GetWeaponObjectBySlot(slot);
+        if (obj == null) return 0.3f; // Fallback caso o slot esteja vazio
+
+        var wp = obj.GetComponentInChildren<WeaponProperties>();
+        if (wp != null) return wp.store_weapon_speed;
+
+        var gd = obj.GetComponentInChildren<Gadget>();
+        if (gd != null) return gd.store_gadget_speed;
+
+        return 0.3f;
+    }
+
+    private float GetPickUpSpeed(int slot)
+    {
+        GameObject obj = GetWeaponObjectBySlot(slot);
+        if (obj == null) return 0.3f;
+
+        var wp = obj.GetComponentInChildren<WeaponProperties>();
+        if (wp != null) return wp.pick_up_weapon_speed;
+
+        var gd = obj.GetComponentInChildren<Gadget>();
+        if (gd != null) return gd.pick_up_gadget_speed;
+
+        return 0.3f;
+    }
+
+    private GameObject GetWeaponObjectBySlot(int slot)
+    {
+        return slot switch
+        {
+            1 => primary,
+            2 => secondary,
+            3 => gadget1,
+            4 => gadget2,
+            _ => null
+        };
+    }
+
+    #endregion
 }

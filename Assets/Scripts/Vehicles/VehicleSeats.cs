@@ -27,6 +27,8 @@ public class VehicleSeats
     [HideInInspector] public Rigidbody playerRigidbody;
     [HideInInspector] public GameObject playerGameObject;
     [HideInInspector] public PlayerAnimation playerAnimation;
+    private SoldierHudManager soldierHudManager;
+
 
     [Header("Transform References")]
     public Transform playerSeat;
@@ -49,6 +51,7 @@ public class VehicleSeats
         this.playerGameObject = playerGameObject;
         this.playerSeat = playerSeat;
         playerCamera = playerController.playerCamera;
+        soldierHudManager = playerController.soldierHudManager;
         this.playerProperties.is_in_vehicle = true;
         playerAnimation = playerController.playerAnimation;
 
@@ -63,27 +66,25 @@ public class VehicleSeats
         {
             playerAnimation.DeactivateCurrentWeapon();
             playerController.first_person_player_components.SetActive(false);
-            playerController.soldierHudManager.UpdateItemsVisibility(false);
             playerController.HideOwnerItems(false);
         }
         else
         {
             playerAnimation.ActivateCurrentWeapon();
             playerController.first_person_player_components.SetActive(true);
-            playerController.soldierHudManager.UpdateItemsVisibility(true);
             playerController.HideOwnerItems(true);
         }
 
         if (seatHUD != null)
         {
             if (seatHUD != null) seatHUD.GetComponent<UIElementsColor>().SetColor(Color.limeGreen, 2);
+            if(soldierHudManager!=null) soldierHudManager.ActivateInVehicleHUD();
             seatHUD.SetActive(true);
         }
 
         if (seatCamera != null)
         {
             activeCamera = seatCamera;
-
             seatCamera.enabled = true;
             seatCamera.GetComponent<AudioListener>().enabled = true;
 
@@ -93,7 +94,6 @@ public class VehicleSeats
         else
         {
             activeCamera = playerCamera;
-
             playerController.playerCamera.enabled = true;
             playerController.playerCamera.GetComponent<AudioListener>().enabled = true;
         }
@@ -114,7 +114,6 @@ public class VehicleSeats
         //Player Controls Exit State
         //playerController.first_person_player_components.SetActive(true);
         playerController.first_person_player_components.SetActive(true);
-        playerController.soldierHudManager.UpdateItemsVisibility(true);
         playerController.HideOwnerItems(true);
         playerProperties.is_in_vehicle = false;
 
@@ -152,7 +151,11 @@ public class VehicleSeats
             seatCamera.GetComponent<AudioListener>().enabled = false;
         }
 
-        if (seatHUD != null) seatHUD.SetActive(false);
+        if (seatHUD != null)
+        {
+            if(soldierHudManager!=null) soldierHudManager.ActivateStandardHUD();
+            seatHUD.SetActive(false);
+        }
 
         playerRigidbody = null;
         playerGameObject = null;
@@ -216,7 +219,6 @@ public class VehicleSeats
             }
         }
     }
-
 
     public enum SeatType
     {

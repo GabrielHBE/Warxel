@@ -83,7 +83,10 @@ public class SwayNBobScript : MonoBehaviour
     [HideInInspector] public float[] vector3Values = new float[3];
     [HideInInspector] public float[] quaternionValues = new float[3];
 
-
+    // Multiplicadores (ajuste conforme necessidade)
+    const int yRotationMultiplier = 4; // Ajuste para valores por SEGUNDO
+    const int zRotationMultiplier = 4;
+    const int xRotationMultiplier = 4;
 
     void Awake()
     {
@@ -318,10 +321,7 @@ public class SwayNBobScript : MonoBehaviour
         x_InputManager_amount = Mathf.Clamp(x_InputManager_amount, -5f, 5f);
         y_InputManager_amount = Mathf.Clamp(y_InputManager_amount, -5f, 5f);
 
-        // Multiplicadores (ajuste conforme necessidade)
-        const int yRotationMultiplier = 4; // Ajuste para valores por SEGUNDO
-        const int zRotationMultiplier = 4;
-        const int xRotationMultiplier = 4;
+
 
         // Agora escalado por deltaTime
         float enhancedYRotation = x_InputManager_amount * yRotationMultiplier;

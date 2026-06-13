@@ -29,18 +29,22 @@ public class RocketPodsMissile : Missiles
         rb.AddForce(gravityForce, ForceMode.Acceleration);
     }
 
-    [ServerRpc]
     public override void Shoot(Vector3 direction)
     {
         if (didShoot) return;
-        CmdShoot(direction);
+
+        SoundManager.Play2dSoundLocal(shootSound, shootSoundProperties);
+
+        RequestShoot(direction);
     }
+
+    [ServerRpc]
+    private void RequestShoot(Vector3 direction) => CmdShoot(direction);
 
     [ObserversRpc]
     private void CmdShoot(Vector3 direction)
     {
 
-        CreateSound(shoot_sound);
         missile_collider.enabled = true;
 
         transform.SetParent(null);

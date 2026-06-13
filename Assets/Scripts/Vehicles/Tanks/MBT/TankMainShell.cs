@@ -4,16 +4,24 @@ using VoxelDestructionPro.Tools;
 
 public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 {
+    [Header("Sounds")]
+    [SerializeField] private AudioClip explosionSound;
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+
+    [Header("Properties")]
     [SerializeField] private Collider shell_collider;
     [SerializeField] private Rigidbody rb;
     [SerializeField] private VoxCollider voxCollider;
     [SerializeField] private GameObject explosion_efect;
-    [SerializeField] private AudioSource explosion_sound;
+    
+    [Header("Damage")]
+    [SerializeField] private float infantary_damage;
+    [SerializeField] private float vehicle_damage;
+
+    [Header("Properties")]
     public float reload_time;
-    public float infantary_damage;
-    public float vehicle_damage;
-    public float travel_speed;
-    public float fall_multiplier;
+    [SerializeField] private float travel_speed;
+    [SerializeField] private float fall_multiplier;
     public float recoil_force;
 
     private GameObject ignoreCollision;
@@ -78,8 +86,7 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 
         shell_collider.enabled = false;
 
-        explosion_sound.transform.SetParent(null);
-        explosion_sound.GetComponent<AudioDistanceController>().StartGrowth();
+        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, collision.contacts[0].point);
 
         SpawnExplosionEffect(contact_point);
 

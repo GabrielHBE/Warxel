@@ -6,7 +6,7 @@ public class BulletSoundEffect : NetworkBehaviour
 {
     [SerializeField] private AudioSource audioSource;
 
-    [Header("HitEffects")]
+    [Header("HitSounds")]
     [SerializeField] private AudioClip[] ricochet_sound;
     [SerializeField] private AudioClip wosh_sound;
     [SerializeField] private AudioClip blood_hit_sound;
@@ -17,6 +17,8 @@ public class BulletSoundEffect : NetworkBehaviour
     [SerializeField] private AudioClip sand_hit_sound;
     [SerializeField] private AudioClip dirt_hit_sound;
     [SerializeField] private AudioClip softbody_hit_sound;
+
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
 
     public enum HitSoundType
     {
@@ -32,17 +34,7 @@ public class BulletSoundEffect : NetworkBehaviour
     }
 
     #region Unified Network Sound Playing
-
-    // 1. The Client calls this to ask the Server to play a sound
-    [ServerRpc(RequireOwnership = false)]
-    public void CmdPlayHitSound(HitSoundType soundType, Vector3 pos)
-    {
-        RpcPlayHitSound(soundType, pos);
-    }
-
-    // 2. The Server broadcasts the instruction to all clients
-    [ObserversRpc]
-    private void RpcPlayHitSound(HitSoundType soundType, Vector3 pos)
+    public void PlayHitSound(HitSoundType soundType, Vector3 pos)
     {
         AudioClip clipToPlay = null;
 
@@ -79,12 +71,11 @@ public class BulletSoundEffect : NetworkBehaviour
 
         if (clipToPlay != null)
         {
-            AudioSource tempSource = Instantiate(audioSource, pos, Quaternion.identity);
-            tempSource.clip = clipToPlay;
-            tempSource.Play();
-            tempSource.gameObject.AddComponent<SoundDestroyAfterTime>().SetTime(clipToPlay.length);
+            SoundManager.Instance.RequestPlay3dSound(clipToPlay.name, soundProperties, pos, false);
+            SoundManager.Play3dSoundLocal(clipToPlay, soundProperties, pos);
         }
     }
+
 
     // For Voxel Materials, we map the VoxelMaterialType to our HitSoundType enum
     public void RequestVoxelHitSound(Vector3 pos, VoxelMaterials.VoxelMaterialType material)
@@ -102,26 +93,9 @@ public class BulletSoundEffect : NetworkBehaviour
             case VoxelMaterials.VoxelMaterialType.SoftBody: type = HitSoundType.SoftBody; break;
         }
 
-        CmdPlayHitSound(type, pos);
+        PlayHitSound(type, pos);
+
     }
 
     #endregion
-
-    [TargetRpc]
-    private void TargetPlayWhooshSound(NetworkConnection conn)
-    {
-        if (wosh_sound == null) return;
-        AudioSource tempSource = Instantiate(audioSource, transform.position, Quaternion.identity);
-        tempSource.clip = wosh_sound;
-        tempSource.Play();
-        tempSource.gameObject.AddComponent<SoundDestroyAfterTime>().SetTime(wosh_sound.length);
-    }
-
-    private class SoundDestroyAfterTime : MonoBehaviour
-    {
-        public void SetTime(float time)
-        {
-            Destroy(gameObject, time);
-        }
-    }
 }

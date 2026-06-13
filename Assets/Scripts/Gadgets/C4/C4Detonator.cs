@@ -9,9 +9,12 @@ public class C4Detonator : Gadget
     [SerializeField] private float throw_c4_force;
     [SerializeField] private float pick_up_c4_distance;
     [SerializeField] private GameObject right_hand_pos;
-    [SerializeField] private AudioSource beepSound;
     private List<C4Explosive> c4_list = new List<C4Explosive>();
     [SerializeField] private Transform detonator_position;
+
+    [Header("Sounds")]
+    [SerializeField] private AudioClip beepSound;
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
 
 
     [Header("Detonation timing (seconds)")]
@@ -22,9 +25,10 @@ public class C4Detonator : Gadget
     private float detonateTimer = 0f;
     private int detonateIndex = 0;
 
-    void OnEnable()
+    public override void Reestart()
     {
-        AdsBehaviour.Instance.Setup(null, 0, 0);
+        base.Reestart();
+        adsBehaviour.DisableUpdate();
     }
 
     void Update()
@@ -35,10 +39,7 @@ public class C4Detonator : Gadget
         }
 
         if (!is_active) return;
-        if (gadgetComponents.soldierHudManager.mag_counter_hud != null) gadgetComponents.soldierHudManager.mag_counter_hud.UpdateMagCount(c4_qtd);
-
-        gadgetComponents.left_hand.transform.position = detonator_position.position;
-        gadgetComponents.right_hand.transform.position = right_hand_pos.transform.position;
+        if (soldierHudManager != null) soldierHudManager.SetCurrentAmmo(c4_qtd.ToString());
 
         if (c4_qtd > 0 && InputManager.GetKeyDown(Settings.Instance._keybinds.GADGET_throwC4Key))
         {
@@ -51,7 +52,7 @@ public class C4Detonator : Gadget
 
             if (c4_list.Count > 0)
             {
-                beepSound?.Play();
+                SoundManager.Play2dSoundLocal(beepSound, soundProperties);
                 StartDetonationSequence();
             }
         }
@@ -124,7 +125,7 @@ public class C4Detonator : Gadget
     {
         RaycastHit hit;
 
-        if (Physics.Raycast(gadgetComponents.player_camera.transform.position, gadgetComponents.player_camera.transform.forward, out hit, pick_up_c4_distance))
+        if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit, pick_up_c4_distance))
         {
             C4Explosive c4 = hit.collider.GetComponent<C4Explosive>();
             if (c4 != null)
@@ -150,7 +151,7 @@ public class C4Detonator : Gadget
     {
         c4_qtd -= 1;
 
-        GameObject c4Instance = Instantiate(c4Explosive.gameObject, gadgetComponents.player_camera.transform.position, gadgetComponents.player_camera.transform.rotation);
+        GameObject c4Instance = Instantiate(c4Explosive.gameObject, Camera.main.transform.position, Camera.main.transform.rotation);
         C4Explosive newC4 = c4Instance.GetComponent<C4Explosive>();
         c4_list.Add(newC4);
 
@@ -158,19 +159,8 @@ public class C4Detonator : Gadget
 
         Rigidbody rb = c4Instance.GetComponent<Rigidbody>();
 
-        rb.AddForce(gadgetComponents.player_camera.transform.forward * throw_c4_force, ForceMode.Impulse);
+        rb.AddForce(Camera.main.transform.forward * throw_c4_force, ForceMode.Impulse);
 
     }
 
-    /*
-    private void OnDrawGizmos()
-    {
-        if (gadgetComponents.player_camera.transform != null)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawSphere(gadgetComponents.player_camera.transform.position, 0.1f);
-            Gizmos.DrawLine(gadgetComponents.player_camera.transform.position, gadgetComponents.player_camera.transform.position + gadgetComponents.player_camera.transform.forward * 2f);
-        }
-    }
-    */
 }

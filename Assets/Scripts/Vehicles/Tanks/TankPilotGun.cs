@@ -62,7 +62,6 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
 
             if (pilot_gun_next_time_to_fire <= 0f)
             {
-                if (tankContext != null) tankContext.PlayWeaponSound(tankPilotGunProperties.shoot_shound);
                 ApplyMachineGunRecoil();
 
                 Bullet.BulletData data = new Bullet.BulletData
@@ -78,7 +77,6 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
                     destructionForce = tankPilotGunProperties.destruction_force,
                     minimumDamage = tankPilotGunProperties.minimum_damage,
                     hsMultiplier = 2,
-                    size = 1,
                     canDamageVehicles = false,
                     vehicleDamage = tankPilotGunProperties.vehicle_damage,
                     delaytoEnableForNonOwner = 0,
@@ -110,14 +108,6 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         {
             bullet.CreateBullet(data);
         }
-
-        RpcShootMachineGunEffects();
-    }
-
-    [ObserversRpc(ExcludeOwner = true)]
-    private void RpcShootMachineGunEffects()
-    {
-        if (tankContext != null) tankContext.PlayWeaponSound(tankPilotGunProperties.shoot_shound);
     }
 
     private void ApplyMachineGunRecoil()

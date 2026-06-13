@@ -26,14 +26,15 @@ public class Bullet : NetworkBehaviour
     private float hs_multiplier;
     private bool can_damage_vehicles;
     private float vehicle_damage;
-    private Vector3 original_position;
     private bool did_ricochet;
     private float timer;
     private float delaytoEnableForNonOwner;
-    private bool isDespawning;
     private Vector3 lastPosition;
     private Transform ignoredTransform;
     private GameObject shoot_root;
+
+    // Flag de controle para evitar múltiplas execuções de desativação na mesma frame
+    private bool _isDespawning;
 
     public struct BulletData
     {
@@ -48,7 +49,6 @@ public class Bullet : NetworkBehaviour
         public float destructionForce;
         public float minimumDamage;
         public float hsMultiplier;
-        public float size;
         public bool canDamageVehicles;
         public float vehicleDamage;
         public float delaytoEnableForNonOwner;
@@ -58,35 +58,60 @@ public class Bullet : NetworkBehaviour
     [ObserversRpc]
     public void CreateBullet(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = false;
+        }
 
-        if (data.size != 0) transform.localScale *= data.size;
+        if (trail != null)
+        {
+            trail.enabled = true;
+            trail.Clear(); // Limpa o rastro antigo para não criar uma linha gigante cruzando o mapa
+        }
+
+        gameObject.SetActive(true);
+
+        // Reseta o estado da flag de despawn para o Object Pooling funcionar nesta nova vida
+        _isDespawning = false;
+        timer = 0f; // Reseta o cronômetro do dropoff de dano
+
         delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
         voxCollider.destructionRadius = data.destructionForce;
+        transform.position = data.position;
+        transform.rotation = data.rotation;
+        bullet_collider.enabled = true;
+
+        // 3. Aplica a nova velocidade após limpar o estado antigo
+        SetDirection(data.direction, data.speed);
 
         if (IsServerInitialized)
         {
+            // Para segurança do Pool, interrompe qualquer contagem antiga antes de iniciar a nova
+            StopAllCoroutines();
             StartCoroutine(DespawnTimer());
         }
 
         if (!IsOwner)
         {
-            StartCoroutine(EnableViewForNonOwners());
+            // Se não for o dono, pode ocultar temporariamente baseado no seu delay, se configurado
+            if (delaytoEnableForNonOwner > 0f)
+            {
+                if (meshRenderer != null) meshRenderer.enabled = false;
+                if (trail != null) trail.enabled = false;
+                StartCoroutine(EnableViewForNonOwners());
+            }
             return;
         }
 
         SetBulletProperties(data, ignoredObject, root);
-        
     }
 
     private void SetBulletProperties(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
-        SetDirection(data.direction, data.speed);
-        
-        original_position = transform.localPosition;
-        
         ignoredTransform = ignoredObject;
         shoot_root = root;
-        isDespawning = false;
         did_ricochet = false;
         infantary_damage = data.infantaryDamage;
         damage_dropoff = data.damageDropoff;
@@ -118,9 +143,12 @@ public class Bullet : NetworkBehaviour
 
     void FixedUpdate()
     {
-        if (!IsOwner) return;
+        // Impede física e detecção se o projétil já iniciou o processo de destruição
+        if (_isDespawning) return;
 
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
+
+        if (!IsOwner) return;
 
         if (bullet_collider.isTrigger)
         {
@@ -136,7 +164,6 @@ public class Bullet : NetworkBehaviour
 
                 if (hits > 0)
                 {
-
                     RaycastHit closestHit = default;
                     float minDistance = float.MaxValue;
                     bool foundValidHit = false;
@@ -171,9 +198,8 @@ public class Bullet : NetworkBehaviour
 
     void Update()
     {
-        if (!IsOwner) return;
+        if (_isDespawning || !IsOwner) return;
 
-        // Restante da sua lógica original de dano e dropoff
         if (infantary_damage > minimum_damage && damage_dropoff != 0)
         {
             timer += Time.deltaTime;
@@ -190,83 +216,57 @@ public class Bullet : NetworkBehaviour
     {
         if (did_ricochet)
         {
-            DespawnLocalSafe();
+            RequestDisableBullet();
             return;
         }
 
-        float calculated_distance = Vector3.Distance(original_position, hitPoint);
+        hitEffects.RequestCustomHitEffect(hitPoint);
 
-        if (calculated_distance > 3)
+        if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
         {
-            hitEffects.RequestCustomHitEffect(hitPoint);
-
-            if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
+            ProcessVoxelCollision(collider, hitPoint);
+            VoxelObjBase voxelObj = hitObject.GetComponent<VoxelObjBase>();
+            if (voxelObj != null)
             {
-                ProcessVoxelCollision(collider, hitPoint);
-                VoxelObjBase voxelObj = hitObject.GetComponent<VoxelObjBase>();
-                if (voxelObj != null)
-                {
-                    VoxelMaterials.VoxelMaterialType material = voxelObj.material;
-                    hitEffects.RequestVoxelHitEffect(hitPoint, material);
-
-                    // NEW: Use the local helper method that maps materials and sends the RPC
-                    soundEffects.RequestVoxelHitSound(hitPoint, material);
-                }
+                VoxelMaterials.VoxelMaterialType material = voxelObj.material;
+                hitEffects.RequestVoxelHitEffect(hitPoint, material);
+                soundEffects.RequestVoxelHitSound(hitPoint, material);
             }
-
-            if (hitObject.layer == LayerMask.NameToLayer("Ground"))
-            {
-                ProcessGroundCollision(hitPoint);
-            }
-
-            if (hitObject.layer == LayerMask.NameToLayer("Vehicle") && can_damage_vehicles)
-            {
-                ProcessVehicleCollision(collider);
-                hitEffects.RequestMetalHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
-
-                // NEW: Use CmdPlayHitSound instead of direct method
-                soundEffects.CmdPlayHitSound(BulletSoundEffect.HitSoundType.Metal, hitPoint);
-            }
-
-            if (hitObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
-            {
-                ProcessPlayerCollision(hitObject);
-                hitEffects.RequestBloodHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
-            }
-
-            DespawnLocalSafe();
         }
-        else
+
+        if (hitObject.layer == LayerMask.NameToLayer("Ground"))
         {
-            if (hitObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
-            {
-                ProcessPlayerCollision(hitObject);
-                hitEffects.RequestBloodHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
-            }
-            else
-            {
-                Ricochet(hitPoint);
-            }
-
+            ProcessGroundCollision(hitPoint);
         }
+
+        if (hitObject.layer == LayerMask.NameToLayer("Vehicle") && can_damage_vehicles)
+        {
+            ProcessVehicleCollision(collider);
+            hitEffects.RequestMetalHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
+            soundEffects.PlayHitSound(BulletSoundEffect.HitSoundType.Metal, hitPoint);
+        }
+
+        if (hitObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
+        {
+            ProcessPlayerCollision(hitObject);
+            hitEffects.RequestBloodHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
+        }
+
+        RequestDisableBullet();
     }
 
-
     #region TriggerEnter
-
     void OnTriggerEnter(Collider collider)
     {
         if (!bullet_collider.isTrigger) return;
-        if (!IsOwner) return;
+        if (!IsOwner || _isDespawning) return;
 
-        // Ignora colisões com balas ou física do player
         if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") ||
             collider.gameObject.layer == LayerMask.NameToLayer("Player"))
         {
             return;
         }
 
-        // Ignora o objeto passado no parâmetro (e as hitboxes filhas dele)
         if (ignoredTransform != null && collider.transform.IsChildOf(ignoredTransform))
         {
             return;
@@ -274,17 +274,14 @@ public class Bullet : NetworkBehaviour
 
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
     }
-
     #endregion
 
     #region CollisionEnter
-
     void OnCollisionEnter(Collision collision)
     {
         if (bullet_collider.isTrigger) return;
-        if (!IsOwner) return;
+        if (!IsOwner || _isDespawning) return;
 
-        // Ignora o objeto passado no parâmetro
         if (ignoredTransform != null && collision.gameObject.transform.IsChildOf(ignoredTransform))
         {
             return;
@@ -296,16 +293,13 @@ public class Bullet : NetworkBehaviour
             HandleBulletHit(contact.otherCollider.gameObject, contact.point, contact.normal, contact.otherCollider);
         }
     }
-
     #endregion
 
     #region Collision / Trigger Helper Methods
-
     private void ProcessVoxelCollision(Collider collision, Vector3 position)
     {
         if (voxCollider.destructionRadius > 2)
         {
-
             voxCollider.SphereExplosion(position, infantary_damage, vehicle_damage);
         }
         else
@@ -321,7 +315,6 @@ public class Bullet : NetworkBehaviour
 
     private void ProcessVehicleCollision(Collider collision)
     {
-
         Vehicle hit_vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
 
         if (hit_vehicle != null)
@@ -353,7 +346,6 @@ public class Bullet : NetworkBehaviour
         if (playerProperties.is_dead.Value) return;
 
         float start_hp = playerProperties.hp.Value;
-
         float base_damage;
 
         if (collision.gameObject.CompareTag("PlayerHead"))
@@ -376,14 +368,9 @@ public class Bullet : NetworkBehaviour
 
         player.RequestDamage(base_damage);
 
-        // 1. Simula o cálculo de dano localmente que o servidor vai fazer
         float target_resistance = player.GetResistance();
         float dano_real_esperado = base_damage * ((100f - target_resistance) / 100f);
-
-        // 2. Subtrai o dano da vida inicial que vimos no momento do impacto
         float post_hp = start_hp - dano_real_esperado;
-
-        // 3. Agora sim, se a vida restante simulada for menor ou igual a zero, é letal
         bool is_lethal_shot = post_hp <= 0;
 
         if (is_lethal_shot)
@@ -396,55 +383,40 @@ public class Bullet : NetworkBehaviour
     #endregion
 
     #region Extras
-    void Ricochet(Vector3 position)
-    {
-        did_ricochet = true;
-        rb.linearVelocity /= 1.5f;
-
-        // NEW: Use CmdPlayHitSound instead of direct method
-        soundEffects.CmdPlayHitSound(BulletSoundEffect.HitSoundType.Ricochet, position);
-    }
-
     private IEnumerator DespawnTimer()
     {
         yield return new WaitForSeconds(10f);
-        DespawnLocalSafe();
+        RequestDisableBullet();
     }
     #endregion
 
     #region Despawning
-
-    // Novo método para desativar a física antes de enviar o RPC pro servidor
-    private void DespawnLocalSafe()
+    private void RequestDisableBullet()
     {
-        if (isDespawning || !IsSpawned) return;
-        isDespawning = true;
+        if (_isDespawning) return;
+        _isDespawning = true;
 
-        GetComponent<BoxCollider>().enabled = false;
-        rb.isKinematic = true;
-
-        if (TryGetComponent<FishNet.Component.Transforming.NetworkTransform>(out var nt))
+        // Desativa imediatamente a física local para evitar registros fantasmas
+        if (bullet_collider != null) bullet_collider.enabled = false;
+        if (rb != null)
         {
-            nt.enabled = false;
+            rb.linearVelocity = Vector3.zero;
+            rb.isKinematic = true;
         }
 
-        CancelInvoke(nameof(DespawnLocalSafe));
-        RequestDespawn();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestDespawn()
-    {
-        if (IsSpawned)
+        if (IsServerInitialized)
         {
-            Despawn(gameObject);
+            ExecuteServerDespawn();
         }
         else
         {
-            Destroy(gameObject);
+            CmdRequestDespawn();
         }
     }
 
-    #endregion
+    [ServerRpc]
+    private void CmdRequestDespawn() => ExecuteServerDespawn();
 
+    private void ExecuteServerDespawn() => ServerManager.Despawn(GetComponent<NetworkObject>());
+    #endregion
 }

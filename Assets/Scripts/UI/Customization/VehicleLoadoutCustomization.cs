@@ -79,7 +79,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     [SerializeField] private float maxScrollYIncreaser = 100f;
 
     [Header("Sound Effects")]
-    [SerializeField] private AudioSource audio_source;
+
     [SerializeField] private AudioClip select_item_sfx;
 
     // Enums e Estados
@@ -254,12 +254,8 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     // NOVO: Chamado ao clicar no botão de um veículo
     public void OnVehicleSelected(GameObject vehiclePrefab, VehicleCategory category)
     {
-        if (audio_source != null && select_item_sfx != null)
-        {
-            audio_source.clip = select_item_sfx;
-            audio_source.Play();
-        }
-
+        if (select_item_sfx != null) SoundManager.Play2dSoundLocal(select_item_sfx, SoundManager.SoundProperties.Default);
+        
         _selectedVehiclePrefab = vehiclePrefab;
 
         // Instancia e prepara o veículo na tela (igual ao PlayerLoadout)
@@ -358,11 +354,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
 
     public void OnPartClicked(IsVehicleCustomizationPart selectedPart)
     {
-        if (audio_source != null && select_item_sfx != null)
-        {
-            audio_source.clip = select_item_sfx;
-            audio_source.Play();
-        }
+        if (select_item_sfx != null) SoundManager.Play2dSoundLocal(select_item_sfx, SoundManager.SoundProperties.Default);
 
         // Desativa todos do mesmo slot
         IsVehicleCustomizationPart[] allParts = _currentVehicleInstance.GetComponentsInChildren<IsVehicleCustomizationPart>(true);

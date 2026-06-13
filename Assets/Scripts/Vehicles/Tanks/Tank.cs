@@ -535,12 +535,6 @@ public class Tank : Vehicle
     {
         currentSeat.currentArmory.Shoot();
     }
-
-    // Método utilitário público para permitir que a arma acesse o sistema de áudio protegido da classe Vehicle
-    public void PlayWeaponSound(AudioSource audioSource)
-    {
-        HandleSound(audioSource);
-    }
     #endregion
 
     #region Entry / Exit

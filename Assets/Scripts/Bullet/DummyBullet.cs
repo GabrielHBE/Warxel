@@ -1,19 +1,29 @@
 using UnityEngine;
 
-public class DummyBullet : MonoBehaviour
+public class DummyBullet : LocalPooledObject
 {
     [SerializeField] private Rigidbody rb;
-
+    [SerializeField] private TrailRenderer trail;
     private Transform ignoredTransform;
     private Vector3 lastPosition;
     private float bulletDropMultiplier;
     public void CreateBullet(Bullet.BulletData data, Transform ignoredObject = null)
     {
+        Activate();
+        if (trail != null)
+        {
+            trail.enabled = true;
+            trail.Clear();
+        }
+
         bulletDropMultiplier = data.dropMultiplier;
         ignoredTransform = ignoredObject;
+
+        transform.rotation = data.rotation;
+        transform.position = data.position;
+
         lastPosition = transform.position;
 
-        if (data.size != 0) transform.localScale *= data.size;
 
         SetDirection(data.direction, data.speed);
     }
@@ -25,7 +35,7 @@ public class DummyBullet : MonoBehaviour
 
     void OnTriggerEnter(Collider collider)
     {
-        print(collider.gameObject.name);
+        
         // Ignora colisões com balas ou física do player
         if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") ||
             collider.gameObject.layer == LayerMask.NameToLayer("Player"))
@@ -38,8 +48,8 @@ public class DummyBullet : MonoBehaviour
         {
             return;
         }
-
-        Destroy(gameObject);
+        print(collider.gameObject.name);
+        Deactivate();
     }
 
     private RaycastHit[] hit_results = new RaycastHit[128];
@@ -47,7 +57,6 @@ public class DummyBullet : MonoBehaviour
     void FixedUpdate()
     {
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
-
 
         Vector3 currentPosition = transform.position;
         Vector3 direction = currentPosition - lastPosition;
@@ -81,7 +90,7 @@ public class DummyBullet : MonoBehaviour
 
                 if (foundValidHit)
                 {
-                    Destroy(gameObject);
+                    Deactivate();
                 }
             }
         }
@@ -89,4 +98,17 @@ public class DummyBullet : MonoBehaviour
         lastPosition = currentPosition;
 
     }
+
+    protected override void Deactivate()
+    {
+        base.Deactivate();
+        if (trail != null)
+        {
+            trail.enabled = false;
+            trail.Clear();
+        }
+        transform.localPosition = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
+    }
+
 }

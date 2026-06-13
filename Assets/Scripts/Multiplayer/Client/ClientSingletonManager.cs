@@ -1,10 +1,7 @@
 using FishNet.Object;
-using FishNet.Managing;
-using FishNet.Connection;
 using UnityEngine;
 using FishNet;
 using FishNet.Component.Spawning;
-using Unity.VisualScripting;
 using System.Collections;
 
 public class ClientSingletonManager : NetworkBehaviour
@@ -15,7 +12,7 @@ public class ClientSingletonManager : NetworkBehaviour
     [SerializeField] private GameObject settings;
     [SerializeField] private GameObject loadoutCustomization;
     [SerializeField] private GameObject vehicleLoadoutCustomization;
-
+    [SerializeField] private GameObject bulletObjectPooling;
 
 
     private GameObject instantiated_player_spawner;
@@ -24,6 +21,8 @@ public class ClientSingletonManager : NetworkBehaviour
     private GameObject instantiated_settings;
     private GameObject instantiated_infantary_loadout_customization;
     private GameObject instantiated_vehicle_loadout_customization;
+    private GameObject instantiades_bullet_object_pooling;
+
 
 
     public override void OnStartClient()
@@ -49,6 +48,11 @@ public class ClientSingletonManager : NetworkBehaviour
         if (playerSpawnController != null)
         {
             SpawnPlayerSpawner();
+        }
+
+        if (bulletObjectPooling != null)
+        {
+            instantiades_bullet_object_pooling = Instantiate(bulletObjectPooling);
         }
 
         // Para objetos sem NetworkBehaviour, instancia normalmente
@@ -86,6 +90,7 @@ public class ClientSingletonManager : NetworkBehaviour
         if (instantiated_settings != null) Destroy(instantiated_settings);
         if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
         if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
+        if (instantiades_bullet_object_pooling != null) Destroy(instantiades_bullet_object_pooling);
 
     }
 
@@ -100,4 +105,5 @@ public class ClientSingletonManager : NetworkBehaviour
         Spawn(instantiated_player_spawner, Owner);
 
     }
+
 }

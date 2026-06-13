@@ -42,6 +42,7 @@ public class MainMenuConnection : MonoBehaviour
 
     public void ConnectAsClient()
     {
+        System.GC.Collect();
         StartMapImage("Conectando ao servidor...");
 
         InstanceFinder.ClientManager.StartConnection();
@@ -54,6 +55,7 @@ public class MainMenuConnection : MonoBehaviour
 
     public void StartAsHost()
     {
+        System.GC.Collect();
         StartMapImage("Iniciando servidor...");
 
         // Apenas pede para iniciar. A cena será carregada pelo evento abaixo!

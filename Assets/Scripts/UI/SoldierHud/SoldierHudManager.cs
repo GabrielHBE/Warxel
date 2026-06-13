@@ -1,42 +1,28 @@
-using System.Collections.Generic;
-using FishNet.Object;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class SoldierHudManager : NetworkBehaviour
+public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHpUIValues
 {
-    //private Settings settings;
+
+    [Header("References")]
     [SerializeField] private PlayerProperties playerProperties;
     public GameObject hud;
     [SerializeField] private Image center_screen_dot;
-    [SerializeField] private List<GameObject> itens_to_hide_when_in_vehicle = new List<GameObject>();
     public FireMode fire_mode_hud;
-    public SoldierHudMagCounter mag_counter_hud;
     public ScreenBlood screenBlood;
-    public SoldierHudHpManager soldierHudHpManager;
     public DeadPlayerHud deadPlayerHud;
+    private string currentAmmo;
 
+    [Header("Canvas")]
+    [SerializeField] private Canvas ammoCanvas;
+    [SerializeField] private Canvas armoryCanvas;
+    [SerializeField] private Canvas miscelaniousCanvas;
+    [SerializeField] private Canvas deadPlayerCanvas;
+    [SerializeField] private Canvas hpCanvas;
+    [SerializeField] private Canvas reticleCanvas;
 
-    public override void OnStartClient()
-    {
-        base.OnStartClient();
-        if (IsOwner)
-        {
-
-            UpdateItemsVisibility(!playerProperties.is_in_vehicle);
-
-        }
-        else
-        {
-            Destroy(this);
-        }
-    }
-
-    
     void Update()
     {
-        if (!IsOwner) return;
-        
 
         if (playerProperties.sprinting && !playerProperties.is_in_vehicle)
         {
@@ -47,27 +33,45 @@ public class SoldierHudManager : NetworkBehaviour
             center_screen_dot.enabled = false;
         }
     }
-    
-
-    /// <summary>
-    /// Atualiza a visibilidade dos itens que devem ser escondidos no veículo
-    /// </summary>
-    /// <param name="isInVehicle">Indica se o jogador está dentro de um veículo</param>
-    public void UpdateItemsVisibility(bool isInVehicle)
-    {
-        foreach (GameObject item in itens_to_hide_when_in_vehicle)
-        {
-            if (item != null)
-            {
-                item.SetActive(isInVehicle);
-            }
-        }
-    }
 
     public void UpdateDeadPlayerHud(bool isDead)
     {
-
         if (deadPlayerHud.gameObject.activeSelf) deadPlayerHud.gameObject.SetActive(isDead);
-
     }
+
+    public void SetCurrentAmmo(string ammo) => currentAmmo = ammo;
+
+    public string GetCurrentAmmo() => currentAmmo;
+    public float GetCurrentHp() => playerProperties.hp.Value;
+    public float GetMaxHp() => playerProperties.max_hp;
+
+    public void ActivateInVehicleHUD()
+    {
+        ammoCanvas.gameObject.SetActive(false);
+        armoryCanvas.gameObject.SetActive(false);
+        miscelaniousCanvas.gameObject.SetActive(false);
+        deadPlayerCanvas.gameObject.SetActive(false);
+        hpCanvas.gameObject.SetActive(true);
+        reticleCanvas.gameObject.SetActive(false);
+    }
+    public void ActivateDeadHUD()
+    {
+        ammoCanvas.gameObject.SetActive(false);
+        armoryCanvas.gameObject.SetActive(false);
+        miscelaniousCanvas.gameObject.SetActive(false);
+        deadPlayerCanvas.gameObject.SetActive(true);
+        hpCanvas.gameObject.SetActive(false);
+        reticleCanvas.gameObject.SetActive(false);
+    }
+
+    public void ActivateStandardHUD()
+    {
+        ammoCanvas.gameObject.SetActive(true);
+        armoryCanvas.gameObject.SetActive(true);
+        miscelaniousCanvas.gameObject.SetActive(true);
+        deadPlayerCanvas.gameObject.SetActive(false);
+        hpCanvas.gameObject.SetActive(true);
+        reticleCanvas.gameObject.SetActive(true);
+    }
+
 }

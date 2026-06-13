@@ -3,15 +3,16 @@ using UnityEngine;
 public class Grip : Attatchment
 {
     [Header("Changes")]
-    public GameObject left_hand_holder;
+    [HideInInspector]public GameObject left_hand_holder;
     public GameObject grip_holder;
-    public float vertical_recoil_change;
-    public float horizontal_recoil_change;
-    public float first_shoot_change;
-    public float weapon_stability_change;
+    [Range(-10,10)] public float vertical_recoil_change;
+    [Range(-10,10)] public float horizontal_recoil_change;
+    [Range(0,10)]  public float first_shoot_change;
+    [Range(0,5)] public float weapon_stability_change;
     public float reload_speed_change;
     public float ads_speed_change;
     public float pick_up_weapon_speed_change;
+    public float store_weapon_speed_change;
 
 
     void Update()

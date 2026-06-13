@@ -11,6 +11,7 @@ public class Barrel : Attatchment
     public float muzzle_velocity_change;
     public AudioSource shoot_sound_change;
     public float shoot_pith_change;
+    public float shoot_volume_change;
     public float volume_changer;
     public float spread_change;
 

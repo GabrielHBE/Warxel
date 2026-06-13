@@ -31,22 +31,26 @@ public class MedBox : Gadget
     private SwitchWeapon switchWeapon;
 
 
-    protected override void  Awake()
+    protected override void Awake()
     {
         base.Awake();
+        
         rb.isKinematic = true;
         playerController = GetComponentInParent<PlayerController>();
         switchWeapon = gameObject.GetComponentInParent<SwitchWeapon>();
         owner = playerController.gameObject;
     }
 
+    public override void Reestart()
+    {
+        base.Reestart();
+        adsBehaviour.DisableUpdate();
+    }
+
     void Update()
     {
         if (is_active)
         {
-            gadgetComponents.left_hand.transform.position = transform.position;
-            gadgetComponents.right_hand.transform.position = transform.position;
-
             if (!med_box_thrown)
             {
 

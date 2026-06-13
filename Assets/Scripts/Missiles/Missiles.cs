@@ -4,22 +4,32 @@ using UnityEngine;
 using VoxelDestructionPro.Tools;
 public abstract class Missiles : NetworkBehaviour
 {
-    public MeshRenderer mesh;
+
+    [Header("Damage")]
     [SerializeField] protected float infantary_damage;
     [SerializeField] protected float vehicle_damage;
+
+    [Header("Properties")]
     [SerializeField] protected float time_to_explode;
+    [SerializeField] protected float travel_speed;
+
+    [Header("Sounds")]
+    [SerializeField] protected AudioClip explosionSound;
+    [SerializeField] protected SoundManager.SoundProperties explosionSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] protected AudioClip shootSound;
+    [SerializeField] protected SoundManager.SoundProperties shootSoundProperties = SoundManager.SoundProperties.Default;
+
+    [Header("Instances")]
     [SerializeField] protected Collider missile_collider;
     [SerializeField] protected VoxCollider voxCollider;
-    [SerializeField] protected float travel_speed;
-    [SerializeField] protected AudioSource explosion_sound;
+    public MeshRenderer mesh;
     [SerializeField] protected GameObject explosion_effect;
     [SerializeField] protected Rigidbody rb;
     [SerializeField] protected ParticleSystem trail;
-    [SerializeField] protected AudioSource shoot_sound;
-    protected float speed;
-
     public GameObject parent_gameobject;
 
+
+    protected float speed;
     protected bool didShoot;
     protected bool hasExploded; // Nova variável para evitar execuções duplicadas
 
@@ -64,7 +74,7 @@ public abstract class Missiles : NetworkBehaviour
     protected virtual void OnCollisionEnter(Collision collision)
     {
         if (!IsSpawned || hasExploded || collision.gameObject == parent_gameobject) return;
-        
+
         GameObject ignoreGoInExplosion = null;
 
         trail.Stop(true, ParticleSystemStopBehavior.StopEmitting);
@@ -119,6 +129,8 @@ public abstract class Missiles : NetworkBehaviour
 
         missile_collider.enabled = false;
 
+        SoundManager.Play3dSoundLocal(explosionSound, explosionSoundProperties, collision.contacts[0].point);
+
         voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage, ignoreGoInExplosion);
         Explode(collision.contacts[0].point);
 
@@ -126,51 +138,18 @@ public abstract class Missiles : NetworkBehaviour
     #endregion
 
     #region Collision / Explosion
-    [ServerRpc]
     protected void Explode(Vector3 contact_point)
     {
-        // No servidor, verificar novamente se já não foi processado
-        if (!IsSpawned) return;
-
-        CmdPlayExplosionSound();
         if (explosion_effect != null)
         {
             GameObject explosion = Instantiate(explosion_effect, contact_point, Quaternion.identity);
-            Spawn(explosion);
+            //Spawn(explosion);
             explosion.transform.localScale *= 2;
         }
+
         RequestDespawn();
     }
 
-    [ObserversRpc]
-    private void CmdPlayExplosionSound()
-    {
-        AudioDistanceController audioDistanceController = explosion_sound.GetComponent<AudioDistanceController>();
-        audioDistanceController.StartGrowth();
-    }
-
-    protected virtual void CreateSound(AudioSource sound)
-    {
-        AudioDistanceController AudioDistanceController = sound.GetComponent<AudioDistanceController>();
-
-        if (AudioDistanceController != null)
-        {
-            AudioDistanceController.StartGrowth();
-            return;
-        }
-
-        sound.gameObject.AddComponent<CreateSoundDesroyManager>().Initialize(sound, sound.clip.length);
-    }
-
-    private class CreateSoundDesroyManager : MonoBehaviour
-    {
-        public void Initialize(AudioSource audio, float DestroyTimer)
-        {
-            transform.SetParent(null);
-            audio.Play();
-            Destroy(gameObject, DestroyTimer);
-        }
-    }
 
     #endregion
 
@@ -190,7 +169,7 @@ public abstract class Missiles : NetworkBehaviour
             voxCollider.parent_vehicle = vehicle;
         }
     }
-
+    [ServerRpc]
     private void RequestDespawn()
     {
 

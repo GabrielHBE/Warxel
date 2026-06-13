@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -19,7 +20,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     [SerializeField] private MeshRenderer[] hideToOwnerItems;
     public GameObject[] body_parts;
     [SerializeField] private GameObject fist_person;
-    [SerializeField] private GameObject firt_person_canvas;
 
     [Header("Body")]
     public GameObject playerHead;
@@ -154,7 +154,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         else
         {
             Destroy(fist_person);
-            Destroy(firt_person_canvas);
+            Destroy(soldierHudManager.gameObject);
         }
     }
 
@@ -189,7 +189,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             return;
         }
 
-        if (soldierHudManager.deadPlayerHud.gameObject.activeSelf) soldierHudManager.deadPlayerHud.gameObject.SetActive(false);
         death_timer = 0;
 
         HandleInteractionInputManager();
@@ -222,7 +221,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     #region Initialization
     public void ConfigureOwner()
     {
-
+        soldierHudManager.ActivateStandardHUD();
+        
         Instance = this;
         HideOwnerItems(true);
 
@@ -890,7 +890,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         {
             weapon.can_shoot = true;
             weapon.weaponProperties.weapon.transform.localPosition = weapon.weaponProperties.initial_potiion;
-            weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.inicial_rotation;
+            weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.initial_rotation;
             weapon.weaponAnimation.FinishReloadAnimation();
 
         }
@@ -1012,8 +1012,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void HandleDeathState()
     {
-        if (!soldierHudManager.deadPlayerHud.gameObject.activeSelf) soldierHudManager.deadPlayerHud.gameObject.SetActive(true);
-
         HandleMecidProximity();
         death_timer += Time.deltaTime;
 
@@ -1069,7 +1067,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         }
 
         jogadoresDetectados.Sort((a, b) => a.distance.CompareTo(b.distance));
-        soldierHudManager.deadPlayerHud.UpdateCloseMedics(jogadoresDetectados);
     }
 
     public class PlayerInfo
@@ -1145,13 +1142,13 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
         cameraShake.RequestShake(damage_dealt / 2, 0.1f);
         if (damage_dealt > 40) soldierHudManager.screenBlood.TriggerBlood();
-        soldierHudManager.soldierHudHpManager.UpdateHp();
-
         if (playerProperties.hp.Value <= 0)
         {
             if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
             playerProperties.hp.Value = 0;
             playerProperties.is_dead.Value = true;
+
+            soldierHudManager.ActivateDeadHUD();
 
             CmdUpdateServerHP(0);
             CmdUpdateServerIsDead(true);
@@ -1197,7 +1194,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         playerProperties.is_dead.Value = false;
         playerProperties.hp.Value = 100;
 
-        soldierHudManager.soldierHudHpManager.UpdateHp();
         transform.rotation = new Quaternion(transform.rotation.z, transform.rotation.y, 0, transform.rotation.w);
         DisableDeathCollier();
     }
@@ -1209,7 +1205,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         {
             playerProperties.hp.Value = playerProperties.max_hp;
         }
-        soldierHudManager.soldierHudHpManager.UpdateHp();
     }
     #endregion
 

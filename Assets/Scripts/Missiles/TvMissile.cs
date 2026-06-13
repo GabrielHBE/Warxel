@@ -16,8 +16,7 @@ public class TvMissile : Missiles
 
     protected override void Update()
     {
-
-
+        
         if (!didShoot) return;
 
         DestroyTimer();
@@ -79,8 +78,6 @@ public class TvMissile : Missiles
 
         didShoot = true;
 
-
-        CreateSound(shoot_sound);
         missile_collider.enabled = true;
 
         if (rb != null)

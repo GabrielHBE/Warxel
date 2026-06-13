@@ -5,9 +5,14 @@ using VoxelDestructionPro.Tools;
 
 public class AirStrikeMissile : NetworkBehaviour
 {
+    [Header("Sounds")]
+    [SerializeField] private AudioClip explosionSound;    
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+
+    [Header("Settings")]
     [SerializeField] private GameObject trail;
     [SerializeField] private VoxCollider voxCollider;
-    [SerializeField] private GameObject explosion_sound;
+
     [SerializeField] private GameObject explosion_effect;
 
     // Aumentei a velocidade base um pouco para o MoveTowards funcionar bem
@@ -25,12 +30,8 @@ public class AirStrikeMissile : NetworkBehaviour
 
     private IEnumerator GoToLogation(Vector3 pos)
     {
-        // 1. Aponta para o alvo UMA ÚNICA VEZ antes de começar a voar
         transform.LookAt(pos);
 
-        // 2. Mantém o loop ativo até a distância ser minúscula OU quase zero
-        // (Aumentei a tolerância para 1 metro para evitar que ele atravesse e o loop falhe 
-        // devido à alta velocidade de 200f. O OnCollision também garante a explosão.)
         while (Vector3.Distance(transform.position, pos) > 1f)
         {
             // Move o míssil
@@ -42,14 +43,15 @@ public class AirStrikeMissile : NetworkBehaviour
         // antes de detonar.
         transform.position = pos;
 
-
+        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, transform.position);
         Detonate();
         ShephereExplosion();
 
     }
     void OnCollisionEnter(Collision collision)
     {
-
+        //SoundManager.Instance.RequestPlay3dSound(explosionSound.name, soundProperties, collision.contacts[0].point, true);
+        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, collision.contacts[0].point);
         Detonate();
         ShephereExplosion();
     }
@@ -68,16 +70,10 @@ public class AirStrikeMissile : NetworkBehaviour
         Spawn(explosion);
         explosion.transform.localScale *= 2;
 
-        CreateSound();
         RequestDespawn();
     }
 
-    [ObserversRpc]
-    void CreateSound()
-    {
-        explosion_sound.transform.SetParent(null);
-        explosion_sound.GetComponent<AudioDistanceController>().StartGrowth();
-    }
+
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestDespawn()

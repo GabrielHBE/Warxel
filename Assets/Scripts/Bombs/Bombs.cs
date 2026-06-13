@@ -15,11 +15,16 @@ public abstract class Bombs : NetworkBehaviour
     [SerializeField] protected float travel_speed;
     [SerializeField] protected Rigidbody rb;
 
+    [Header("Audio")]
+    [SerializeField] protected AudioClip explosionSound;
+    [SerializeField] protected SoundManager.SoundProperties explosionSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] protected AudioSource shootSound;
+    [SerializeField] protected SoundManager.SoundProperties shootSoundProperties = SoundManager.SoundProperties.Default;
+
     [Header("Effects")]
-    [SerializeField] protected AudioSource explosion_sound;
     [SerializeField] protected GameObject explosion_effect;
     [SerializeField] protected TrailRenderer trail;
-    [SerializeField] protected AudioSource shoot_sound;
+    
 
     [Header("Visual")]
     public MeshRenderer mesh;
@@ -139,6 +144,9 @@ public abstract class Bombs : NetworkBehaviour
 
         bomb_collider.enabled = false;
 
+        SoundManager.Instance.RequestPlay3dSound(explosionSound.name, explosionSoundProperties, collision.transform.position, false);
+        SoundManager.Play3dSoundLocal(explosionSound, explosionSoundProperties,collision.transform.position);
+
         Explode(collision.contacts[0].point);
     }
     #endregion
@@ -148,8 +156,6 @@ public abstract class Bombs : NetworkBehaviour
     protected void Explode(Vector3 contact_point)
     {
         if (!IsSpawned) return;
-
-        CmdPlayExplosionSound();
 
         if (explosion_effect != null)
         {
@@ -161,39 +167,8 @@ public abstract class Bombs : NetworkBehaviour
         RequestDespawn();
     }
 
-    [ObserversRpc]
-    private void CmdPlayExplosionSound()
-    {
-        if (explosion_sound != null)
-        {
-            AudioDistanceController adc = explosion_sound.GetComponent<AudioDistanceController>();
-            if (adc != null) adc.StartGrowth();
-        }
-    }
 
-    protected virtual void CreateSound(AudioSource sound)
-    {
-        if (sound == null) return;
 
-        AudioDistanceController audioDistanceController = sound.GetComponent<AudioDistanceController>();
-        if (audioDistanceController != null)
-        {
-            audioDistanceController.StartGrowth();
-            return;
-        }
-
-        sound.gameObject.AddComponent<CreateSoundDestroyManager>().Initialize(sound, sound.clip.length);
-    }
-
-    private class CreateSoundDestroyManager : MonoBehaviour
-    {
-        public void Initialize(AudioSource audio, float destroyTimer)
-        {
-            transform.SetParent(null);
-            audio.Play();
-            Destroy(gameObject, destroyTimer);
-        }
-    }
     #endregion
 
     #region Utility

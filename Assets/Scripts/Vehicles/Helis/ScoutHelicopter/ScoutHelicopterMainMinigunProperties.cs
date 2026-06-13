@@ -1,20 +1,25 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class ScoutHelicopterMainMinigunProperties : MonoBehaviour, IsVehicleCustomizationPart
 {
     public Sprite hudIcon;
-    
+
+    [Header("Sounds")]
+    public AudioClip shoot_sound;
+    public SoundManager.SoundProperties shootSoundProperties = SoundManager.SoundProperties.Default;
+
     [Header("Bullet")]
+    public DummyBullet dummyBullet;
+    public NetworkObject bulletPref;
     public float muzzle_velocity;
     public float bullet_drop;
     public float minimum_damage;
-    public AudioSource shoot_sound;
     public GameObject bullet_hit_effect;
 
     [Header("Cannon")]
     public float infantary_damage;
     public float vehicle_damage;
-    public Transform bulletPref;
     public float spread;
     public float max_spread;
     public float fire_rate;

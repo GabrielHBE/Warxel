@@ -5,15 +5,18 @@ using UnityEngine;
 public class Helicopter : Vehicle, ICurrentRotationUIValues
 {
     #region Inspector Variables
+    [Header("Sounds")]
+    [SerializeField] protected AudioClip insidePropellerSound;
+    [SerializeField] protected SoundManager.SoundProperties insidePropellerSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] protected AudioClip outsidePropellerSound;
+    [SerializeField] protected SoundManager.SoundProperties outsidePropellerSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] protected AudioClip fallAlarmSound;
+    [SerializeField] protected SoundManager.SoundProperties fallAlarmSoundProperties = SoundManager.SoundProperties.Default;
 
     [Header("Helicopter variables")]
     [SerializeField] protected HeliProperties heliProperties;
     [SerializeField] protected GameObject main_propeller;
     [SerializeField] protected GameObject back_propeller;
-    [SerializeField] protected AudioSource inside_propeller_sound;
-    [SerializeField] protected AudioSource outside_propeller_sound;
-    [SerializeField] protected AudioSource fall_alarm;
-
     #endregion
 
     #region Private Variables
@@ -61,7 +64,7 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
 
         if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
         {
-            
+
             HandleThrottleInput(deltaTime);
         }
         else
@@ -77,7 +80,7 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
     protected void HandleThrottleInput(float deltaTime)
     {
         print("to no HandleThrottleInput");
-        
+
         float pitchAngle = transform.eulerAngles.x;
         float rollAngle = transform.eulerAngles.z;
 
@@ -236,6 +239,8 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
             // Usando os valores obtidos da colisão
             HandleCollision(collision, 50);
             Explode(contactPoint, contactNormal, collision.gameObject.layer, 12);
+
+            SoundManager.Play2dSoundLocal(fallAlarmSound, fallAlarmSoundProperties);
         }
     }
 
@@ -264,11 +269,6 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
         {
             if (hit.distance >= 5)
             {
-                if (!fall_alarm.isPlaying)
-                {
-                    fall_alarm.Play(); // Consider making this an ObserversRpc if you want everyone to hear it
-                }
-
                 rb.AddTorque(transform.up * rotate_value * rb.mass);
             }
             else
@@ -296,31 +296,6 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
         fire_effects_parent.SetActive(true);
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    protected void CmdRequestPlayEngineSound()
-    {
-        RpcPlayEngineSound();
-    }
-
-    [ObserversRpc]
-    private void RpcPlayEngineSound()
-    {
-        inside_propeller_sound.Play();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    protected void CmdRequestStopEngineSound()
-    {
-        RpcStopEngineSound();
-    }
-
-    [ObserversRpc]
-    private void RpcStopEngineSound()
-    {
-        inside_propeller_sound.Stop();
-    }
-
-
     protected override void StartStopEngine()
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
@@ -328,11 +303,11 @@ public class Helicopter : Vehicle, ICurrentRotationUIValues
             start_engine = !start_engine;
             if (start_engine == true)
             {
-                CmdRequestPlayEngineSound();
+                SoundManager.Instance.RequestPlay3dLoopSound(insidePropellerSound.name, insidePropellerSoundProperties, transform, true);
             }
             else
             {
-                CmdRequestStopEngineSound();
+                SoundManager.Instance.RequestPause3dLoopSound(insidePropellerSound.name, transform);
             }
         }
     }

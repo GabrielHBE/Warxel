@@ -7,7 +7,11 @@ public class Shell : Mag
     [SerializeField] private Transform put_shell_pos;
 
     [Header("Sound")]
-    [SerializeField] private AudioSource put_shell;
+    [SerializeField] private AudioClip put_shell;
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+
+    [Header("Instances")]
+    
     [SerializeField] private WeaponHolder weaponHolder;
     [SerializeField] private MeshRenderer mesh;
 
@@ -64,7 +68,7 @@ public class Shell : Mag
                 {
                     mesh.enabled = false;
 
-                    put_shell.Play();
+                    SoundManager.Play2dSoundLocal(put_shell, soundProperties);
                     hasPlayedSound = true;
                 }
 

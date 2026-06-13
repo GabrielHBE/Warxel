@@ -1,3 +1,4 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class AttackHelicopterGunnerProperties : MonoBehaviour, IsVehicleCustomizationPart
@@ -5,17 +6,21 @@ public class AttackHelicopterGunnerProperties : MonoBehaviour, IsVehicleCustomiz
     [Header("UI")]
     public Sprite image_hud;
 
+    [Header("Sounds")]
+    public AudioClip shoot_sound;
+    public SoundManager.SoundProperties shootSoundProperties = SoundManager.SoundProperties.Default;
+
     [Header("Bullet")]
+    public DummyBullet dummyBullet;
+    public NetworkObject networkBullet;
     public float muzzle_velocity;
     public float bullet_drop;
     public float minimum_damage;
-    public AudioSource shoot_sound;
-    public GameObject bullet_hit_effect;
+
 
     [Header("Cannon")]
     public float infantary_damage;
     public float vehicle_damage;
-    public Transform bullefPref;
     public float spread;
     public float max_spread;
     public float fire_rate;

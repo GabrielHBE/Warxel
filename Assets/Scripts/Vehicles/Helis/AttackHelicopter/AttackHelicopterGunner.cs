@@ -4,7 +4,6 @@ using System.Collections;
 
 public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 {
-    [SerializeField] private DummyBullet dummyBullet;
     [SerializeField] private AttackHelicopter helicopter;
     [SerializeField] private Camera gunnerGunCamera;
     public AttackHelicopterGunnerProperties properties;
@@ -113,13 +112,9 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     private void Fire()
     {
-        properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
         Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPos, current_spread);
 
-        if (current_spread < properties.max_spread)
-        {
-            current_spread = Spread.AddSpread(current_spread, properties.spread);
-        }
+        current_spread = Spread.AddSpread(current_spread, properties.spread, properties.max_spread);
 
         Bullet.BulletData data = new Bullet.BulletData
         {
@@ -134,14 +129,13 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
             destructionForce = properties.destruction_force,
             minimumDamage = properties.minimum_damage,
             hsMultiplier = 2,
-            size = 1,
             canDamageVehicles = true,
             vehicleDamage = properties.vehicle_damage,
             delaytoEnableForNonOwner = 0,
         };
 
-        DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
-        instantiatedDummyBullet.CreateBullet(data);
+        DummyBullet instantiatedDummyBullet = ObjectPooling.Instance.GetLocalPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
+        if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
 
         // Chama a lógica de rede
         CmdFireGunner(data);
@@ -150,12 +144,9 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     [ServerRpc(RequireOwnership = true)]
     private void CmdFireGunner(Bullet.BulletData data)
     {
-        GameObject bulletObj = Instantiate(properties.bullefPref.gameObject, shootPos);
-        Spawn(bulletObj, Owner);
-
-        bulletObj.GetComponent<Bullet>().CreateBullet(data, transform.root);
-        RpcPlayShootEffects();
-        Destroy(bulletObj, 10f);
+        Bullet bullet = NetworkManager.GetPooledInstantiated(properties.networkBullet, IsServerInitialized).GetComponent<Bullet>();
+        Spawn(bullet, Owner);
+        bullet.CreateBullet(data, transform.root, null);
     }
 
     private IEnumerator ShakeRoutine()
@@ -198,15 +189,11 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     {
         current_spread = Spread.ResetSpread(current_spread);
 
-
         float coolSpeed = is_overheated ? (Time.deltaTime / 2f) : Time.deltaTime;
         current_overheat = Mathf.MoveTowards(current_overheat, 0f, coolSpeed);
 
         if (current_overheat <= 0) is_overheated = false;
     }
-
-    [ObserversRpc(ExcludeOwner = true)]
-    private void RpcPlayShootEffects() => properties.shoot_sound.PlayOneShot(properties.shoot_sound.clip);
 
     // Implementações da Interface
     public void Shoot()
@@ -219,9 +206,11 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
             if (next_time_to_fire <= 0f)
             {
+                SoundManager.Instance.RequestPlay3dSound(properties.shoot_sound.name, properties.shootSoundProperties, transform.position, false);
+                SoundManager.Play2dSoundLocal(properties.shoot_sound, properties.shootSoundProperties);
                 Fire();
                 next_time_to_fire = properties.interval;
-                current_overheat += dt + 0.05f; // Ajuste fino do ganho de calor por tiro
+                current_overheat += dt;
             }
 
             if (current_overheat >= properties.overheat_time) is_overheated = true;

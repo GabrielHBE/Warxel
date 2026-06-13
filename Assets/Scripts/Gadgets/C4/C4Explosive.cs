@@ -1,30 +1,29 @@
-using System;
-using Unity.VisualScripting;
 using UnityEngine;
-using VoxelDestructionPro.Data;
 using VoxelDestructionPro.Tools;
-using VoxelDestructionPro.VoxelObjects;
+
 
 public class C4Explosive : MonoBehaviour
 {
+    [Header("Sounds")]
+    [SerializeField] private AudioClip explosionSound;
+    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+
+    [Header("Damage")]
     [SerializeField] private float infantary_damage;
     [SerializeField] private float vehicle_damage;
+
+    [Header("References")]
     [SerializeField] VoxCollider voxCollider;
     [SerializeField] private GameObject smokeEffect;
     [SerializeField] private C4Detonator c4;
     [SerializeField] private GameObject throw_hand;
     [SerializeField] private GameObject throw_hand_original_pos;
-    [SerializeField] private AudioSource explosion_sound;
-    [SerializeField] private AudioSource beepSound;
+    
+
 
     public float explosionRadius = 10f;
     public float explosionForce = 20f;
 
-    void CreateSound()
-    {
-        explosion_sound.transform.SetParent(null);
-        explosion_sound.GetComponent<AudioDistanceController>().StartGrowth();
-    }
 
     public void Detonate()
     {
@@ -32,7 +31,9 @@ public class C4Explosive : MonoBehaviour
 
         Instantiate(smokeEffect, transform.position, Quaternion.identity);
 
-        CreateSound();
+        SoundManager.Instance.RequestPlay3dSound(explosionSound.name, soundProperties, transform.position, false);
+        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, transform.position);
+
         Destroy(gameObject);
     }
 

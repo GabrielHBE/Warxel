@@ -13,11 +13,6 @@ public class Jet : Vehicle
     [SerializeField] private Transform _shootPosition;
     [SerializeField] private GameObject _turbineSmoke;
     [SerializeField] private JetProperties _properties;
-
-    [Header("Sound")]
-    [SerializeField] private AudioSource _stopShooting;
-    [SerializeField] private AudioSource _tinnitusAudio;
-    [SerializeField] private AudioSource _bulletHitAudio;
     #endregion
 
     #region Public Fields
@@ -32,7 +27,6 @@ public class Jet : Vehicle
     #endregion
 
     #region Private Fields
-    private JetMainCannon mainCannon;
     private bool _isPassingOut;
     private float _diveSpeedModifier;
     private float _afterburnerSpeedModifier;
@@ -43,8 +37,10 @@ public class Jet : Vehicle
     private float _gForce;
     public static float maxSpeed = 700;
 
+    
     // Flags de controle
     private bool _wasEnginePlaying = false;
+    private float _currentPitch = 0f;
     private bool _destroyAnimationDoOnce = true;
     private float _destructionDeltaTime = 0;
     #endregion
@@ -55,7 +51,6 @@ public class Jet : Vehicle
         base.OnStartClient();
         SetHpProperties(_properties.hp, _properties.resistance);
         _turbineSmoke.SetActive(false);
-        mainCannon = vehicleSeats[0].vehicleArmory[0].GetComponent<JetMainCannon>();
     }
 
     protected override void FixedUpdate()
@@ -167,7 +162,7 @@ public class Jet : Vehicle
     private void HandleInVehicleLogic()
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
-        
+
         HandleDebugInput();
         PilotBehaviour();
     }
@@ -513,12 +508,17 @@ public class Jet : Vehicle
         }
     }
 
+    private Coroutine disableEngineSound;
+
     protected override void StartStopEngine()
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
             start_engine = !start_engine;
-            if (start_engine) _properties.interior_turbine.Play();
+            if (start_engine)
+            {
+                SoundManager.Instance.RequestPlay3dLoopSound(_properties.interiorTurbineSound.name, _properties.interiorTurbineSoundProperties, transform, true);
+            }
         }
     }
 
@@ -526,17 +526,35 @@ public class Jet : Vehicle
     {
         if (vehicle_destroyed.Value) return;
 
+        // Calcula a porcentagem do acelerador
         float t = throttle / _properties.max_throttle;
-        float targetPitch = start_engine ? Mathf.Lerp(0.4f, 2f, t) : Mathf.Lerp(0.01f, 2f, t);
 
-        _properties.interior_turbine.pitch = Mathf.Lerp(_properties.interior_turbine.pitch, targetPitch, Time.deltaTime * 2);
+        // Se o motor está ligado, sobe até 2f baseado no acelerador. Se desligado, cai para 0f.
+        float targetPitch = start_engine ? Mathf.Lerp(0.4f, 2f, t) : 0f;
 
-        bool shouldBePlaying = _properties.interior_turbine.pitch > 0.01f;
+        // Faz a interpolação suave na nossa variável local
+        _currentPitch = Mathf.Lerp(_currentPitch, targetPitch, Time.deltaTime * 2);
+        
+        bool shouldBePlaying = _currentPitch > 0.01f;
 
-        if (_wasEnginePlaying && !shouldBePlaying) _properties.interior_turbine.Stop();
-        else if (!_wasEnginePlaying && shouldBePlaying) _properties.interior_turbine.Play();
+        // Aplica o pitch LOCALMENTE usando a referência do AudioClip
+        if (shouldBePlaying)
+        {
+            SoundManager.SetLoopSoundPitchLocal(_properties.interiorTurbineSound, transform, _currentPitch);
+        }
 
-        _wasEnginePlaying = shouldBePlaying;
+        // Gerencia o momento de parar totalmente o som via rede
+        if (_wasEnginePlaying && !shouldBePlaying)
+        {
+            SoundManager.Instance.RequestStop3dLoopSound(_properties.interiorTurbineSound.name, transform);
+            _wasEnginePlaying = false;
+        }
+        // Se precisar reiniciar o som via Update (ex: motor religado antes do pitch zerar)
+        else if (!_wasEnginePlaying && shouldBePlaying)
+        {
+            SoundManager.Instance.RequestPlay3dLoopSound(_properties.interiorTurbineSound.name, _properties.interiorTurbineSoundProperties, transform, true);
+            _wasEnginePlaying = true;
+        }
     }
     #endregion
 
