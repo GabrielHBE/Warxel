@@ -248,10 +248,10 @@ public class PlayerSpawnController : NetworkBehaviour
     private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab)
     {
         // 1. Instancia e Spawna o Player na rede
-        player_instantiated =  Instantiate(player_prefab, spawnPosition, spawnRotation);
+        player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
         NetworkObject playerNetObj = player_instantiated.GetComponent<NetworkObject>();
         Spawn(playerNetObj, Owner);
-  
+
         // 2. Instancia e Spawna o Veículo na rede
         GameObject spawnedVehicle = Instantiate(vehiclePrefab.gameObject, spawnPosition, spawnRotation);
         Vehicle vScript = spawnedVehicle.GetComponent<Vehicle>();
@@ -268,7 +268,7 @@ public class PlayerSpawnController : NetworkBehaviour
     [ServerRpc]
     private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        player_instantiated= Instantiate(player_prefab, spawnPosition, spawnRotation);
+        player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
         NetworkObject spawnedNetworkObject = player_instantiated.GetComponent<NetworkObject>();
 
         // Spawna o objeto para o owner específico
@@ -306,6 +306,12 @@ public class PlayerSpawnController : NetworkBehaviour
             foreach (WeaponProperties wp in weaponProperties)
             {
                 wp.Initialize();
+                wp.GetComponent<WeaponHolder>().Initialize();
+
+                foreach (Attatchment a in wp.GetComponentsInChildren<Attatchment>())
+                {
+                    a.Initialize();
+                }
             }
 
         }

@@ -11,6 +11,7 @@ public class WeaponAttachmentSaveData
     public string activeMag;
     public string activeGrip;
     public string activeSideGrip;
+    public string activeErgonomics;
     
     public WeaponAttachmentSaveData(string weaponName)
     {
@@ -20,6 +21,7 @@ public class WeaponAttachmentSaveData
         activeMag = "";
         activeGrip = "";
         activeSideGrip = "";
+        activeErgonomics = "";
     }
 }
 

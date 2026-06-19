@@ -8,7 +8,7 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
     [SerializeField] private PlayerProperties playerProperties;
     public GameObject hud;
     [SerializeField] private Image center_screen_dot;
-    public FireMode fire_mode_hud;
+    public FireModeUI fire_mode_hud;
     public ScreenBlood screenBlood;
     public DeadPlayerHud deadPlayerHud;
     private string currentAmmo;

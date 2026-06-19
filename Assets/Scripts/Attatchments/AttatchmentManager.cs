@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections.Generic;
 
 public class AttatchmentManager : MonoBehaviour
 {
@@ -18,7 +19,6 @@ public class AttatchmentManager : MonoBehaviour
         public float vertical_recoil_change;
         public float horizontal_recoil_change;
         public float first_shoot_change;
-        public float weapon_stability_change;
         public float reload_speed_change;
         public float ads_speed_change;
         public float pick_up_weapon_speed_change;
@@ -37,9 +37,15 @@ public class AttatchmentManager : MonoBehaviour
 
         // Mag
         public int bullet_counter_change;
-        public float stability_change;
         public float reload_speed_changer;
         public bool is_tape_mag;
+
+        // Ergonomics (NOVO)
+        public Vector3 visual_recoil_change;
+        public List<WeaponProperties.FireMode> fire_modes_change = new List<WeaponProperties.FireMode>();
+        public float rate_of_fire_change;
+        public int burst_bullets_per_tap_change;
+        public float burst_time_between_bursts_change;
     }
 
     // Trackers dos attachments atuais (apenas para saber quais estão ativos)
@@ -48,6 +54,7 @@ public class AttatchmentManager : MonoBehaviour
     private AttachmentData currentSight;
     private AttachmentData currentMag;
     private AttachmentData currentSideGrip;
+    private AttachmentData currentErgonomics;
 
     // Referência para o WeaponProperties
     private WeaponProperties weaponProperties;
@@ -55,13 +62,11 @@ public class AttatchmentManager : MonoBehaviour
     // Nome da arma para salvar/carregar
     private string weaponName;
 
-
     public void InitializeAttachments()
     {
         weaponProperties = GetComponent<WeaponProperties>();
         if (weaponProperties != null)
             weaponName = weaponProperties.weapon_name;
-
 
         // Desativa todos os attachments no início
         Grip[] grips = GetComponentsInChildren<Grip>(true);
@@ -94,20 +99,15 @@ public class AttatchmentManager : MonoBehaviour
             sideGrip.gameObject.SetActive(false);
         }
 
+        // NOVO
+        Ergonomics[] ergonomics = GetComponentsInChildren<Ergonomics>(true);
+        foreach (Ergonomics ergo in ergonomics)
+        {
+            ergo.gameObject.SetActive(false);
+        }
+
         // Carrega attachments salvos
         LoadAttachmentsFromPlayerPrefs();
-
-        /*
-        // Se ainda não tem Mag equipado, equipa o primeiro disponível
-        if (currentMag == null && weaponProperties != null)
-        {
-            Mag firstMag = GetFirstAvailableMag();
-            if (firstMag != null)
-            {
-                UpdateMag(firstMag, weaponProperties, true);
-            }
-        }
-        */
     }
 
     #region Data Creation Methods
@@ -121,7 +121,6 @@ public class AttatchmentManager : MonoBehaviour
             vertical_recoil_change = g.vertical_recoil_change,
             horizontal_recoil_change = g.horizontal_recoil_change,
             first_shoot_change = g.first_shoot_change,
-            weapon_stability_change = g.weapon_stability_change,
             reload_speed_change = g.reload_speed_change,
             ads_speed_change = g.ads_speed_change,
             pick_up_weapon_speed_change = g.pick_up_weapon_speed_change,
@@ -164,7 +163,6 @@ public class AttatchmentManager : MonoBehaviour
             attachmentName = m.gameObject.name,
             points = m.attatchment_points,
             bullet_counter_change = m.bullet_counter_change,
-            stability_change = m.stability_change,
             ads_speed_change = m.ads_speed_change,
             reload_speed_changer = m.reload_speed_changer,
         };
@@ -176,6 +174,25 @@ public class AttatchmentManager : MonoBehaviour
         {
             attachmentName = sg.gameObject.name,
             points = sg.attatchment_points
+        };
+    }
+
+    // NOVO
+    private AttachmentData CreateErgonomicsData(Ergonomics e)
+    {
+        return new AttachmentData
+        {
+            attachmentName = e.gameObject.name,
+            points = e.attatchment_points,
+            visual_recoil_change = e.visualRecoilChange,
+            reload_speed_change = e.reloadSpeedChange,
+            ads_speed_change = e.adsSpeedChange,
+            pick_up_weapon_speed_change = e.pickupWeaponSpeedChange,
+            store_weapon_speed_change = e.storeWeaponSpeedChange,
+            fire_modes_change = new List<WeaponProperties.FireMode>(e.fireModesChange),
+            rate_of_fire_change = e.rafeOfFireChange, // Mantido do seu script original
+            burst_bullets_per_tap_change = e.burstBulletsPerTapChange,
+            burst_time_between_bursts_change = e.burstTimeBetweenBurstsChange
         };
     }
 
@@ -199,14 +216,12 @@ public class AttatchmentManager : MonoBehaviour
         wp.first_shoot_increaser += grip.first_shoot_change;
         wp.pick_up_weapon_speed += grip.pick_up_weapon_speed_change;
         wp.store_weapon_speed += grip.store_weapon_speed_change;
-        wp.weapon_stability += grip.weapon_stability_change;
         wp.reload_time += grip.reload_speed_change;
         wp.ads_speed += grip.ads_speed_change;
     }
 
     private void AddBarrelStats(WeaponProperties wp, AttachmentData barrel)
     {
-        // Boa prática: Adicionado o Null Check que faltava aqui também
         if (wp == null || barrel == null) return;
 
         for (int i = 0; i < wp.vertical_recoil.Length; i++)
@@ -216,7 +231,6 @@ public class AttatchmentManager : MonoBehaviour
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
         {
-            // Se o recuo for para a esquerda (negativo), subtraímos o valor para trazê-lo para perto de zero
             if (wp.horizontal_recoil[i] < 0)
                 wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
             else
@@ -230,6 +244,7 @@ public class AttatchmentManager : MonoBehaviour
         wp.weapon_sound.shootSoundProperties.volume += barrel.shoot_volume_change;
         wp.spread_increaser += barrel.spread_change;
     }
+
     private void AddSightStats(WeaponProperties wp, AttachmentData sight)
     {
         wp.current_attachment_points += sight.points;
@@ -241,7 +256,6 @@ public class AttatchmentManager : MonoBehaviour
     {
         wp.current_attachment_points += mag.points;
         wp.bullets_per_mag = mag.bullet_counter_change;
-        wp.weapon_stability += mag.stability_change;
         wp.ads_speed += mag.ads_speed_change;
         wp.reload_time += mag.reload_speed_changer;
     }
@@ -249,6 +263,47 @@ public class AttatchmentManager : MonoBehaviour
     private void AddSideGripStats(WeaponProperties wp, AttachmentData sideGrip)
     {
         wp.current_attachment_points += sideGrip.points;
+    }
+
+    // NOVO
+    private void AddErgonomicsStats(WeaponProperties wp, AttachmentData ergo)
+    {
+        if (wp == null || ergo == null) return;
+
+        for (int i = 0; i < wp.vertical_recoil.Length; i++)
+        {
+            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] + ergo.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
+        }
+
+        for (int i = 0; i < wp.horizontal_recoil.Length; i++)
+        {
+            if (wp.horizontal_recoil[i] < 0)
+                wp.horizontal_recoil[i] -= ergo.horizontal_recoil_change;
+            else
+                wp.horizontal_recoil[i] += ergo.horizontal_recoil_change;
+        }
+
+        wp.current_attachment_points += ergo.points;
+        wp.first_shoot_increaser += ergo.first_shoot_change;
+        wp.reload_time += ergo.reload_speed_change;
+        wp.ads_speed += ergo.ads_speed_change;
+        wp.pick_up_weapon_speed += ergo.pick_up_weapon_speed_change;
+        wp.store_weapon_speed += ergo.store_weapon_speed_change;
+
+        // Assumindo que essas variáveis existam em WeaponProperties. Ajuste se o nome for diferente!
+        wp.visual_recoil += ergo.visual_recoil_change;
+        wp.rate_of_fire += ergo.rate_of_fire_change;
+        wp.bullets_per_tap += ergo.burst_bullets_per_tap_change;
+        wp.time_between_bursts += ergo.burst_time_between_bursts_change;
+
+        if (ergo.fire_modes_change != null && ergo.fire_modes_change.Count > 0)
+        {
+            foreach (var fm in ergo.fire_modes_change)
+            {
+                if (!wp.fire_modes.Contains(fm)) // Assumindo que a lista se chama 'fire_modes'
+                    wp.fire_modes.Add(fm);
+            }
+        }
     }
 
     #endregion
@@ -264,10 +319,10 @@ public class AttatchmentManager : MonoBehaviour
         attachment.vertical_recoil_change = 0;
         attachment.horizontal_recoil_change = 0;
         attachment.first_shoot_change = 0;
-        attachment.weapon_stability_change = 0;
         attachment.reload_speed_change = 0;
         attachment.ads_speed_change = 0;
         attachment.pick_up_weapon_speed_change = 0;
+        attachment.store_weapon_speed_change = 0;
         attachment.muzzle_lightning_change = 0;
         attachment.muzzle_velocity_change = 0;
         attachment.shoot_pith_change = 0;
@@ -275,9 +330,13 @@ public class AttatchmentManager : MonoBehaviour
         attachment.zoom_change = 0;
         attachment.sway_change = 0;
         attachment.bullet_counter_change = 0;
-        attachment.stability_change = 0;
         attachment.reload_speed_changer = 0;
         attachment.is_tape_mag = false;
+        attachment.visual_recoil_change = Vector3.zero;
+        if (attachment.fire_modes_change != null) attachment.fire_modes_change.Clear();
+        attachment.rate_of_fire_change = 0;
+        attachment.burst_bullets_per_tap_change = 0;
+        attachment.burst_time_between_bursts_change = 0;
     }
 
     private void RemoveGripStats(WeaponProperties wp, AttachmentData grip)
@@ -298,7 +357,6 @@ public class AttatchmentManager : MonoBehaviour
         wp.first_shoot_increaser -= grip.first_shoot_change;
         wp.pick_up_weapon_speed -= grip.pick_up_weapon_speed_change;
         wp.store_weapon_speed -= grip.store_weapon_speed_change;
-        wp.weapon_stability -= grip.weapon_stability_change;
         wp.reload_time -= grip.reload_speed_change;
         wp.ads_speed -= grip.ads_speed_change;
 
@@ -316,7 +374,6 @@ public class AttatchmentManager : MonoBehaviour
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
         {
-            // Inverte exatamente a lógica aplicada no Add
             if (wp.horizontal_recoil[i] < 0)
                 wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
             else
@@ -350,7 +407,6 @@ public class AttatchmentManager : MonoBehaviour
 
         wp.current_attachment_points -= mag.points;
         wp.bullets_per_mag -= mag.bullet_counter_change;
-        wp.weapon_stability -= mag.stability_change;
         wp.ads_speed -= mag.ads_speed_change;
         wp.reload_time -= mag.reload_speed_changer;
 
@@ -365,6 +421,33 @@ public class AttatchmentManager : MonoBehaviour
         ResetAttachmentDataToZero(sideGrip);
     }
 
+    // NOVO
+    private void RemoveErgonomicsStats(WeaponProperties wp, AttachmentData ergo)
+    {
+        if (wp == null || ergo == null) return;
+
+        wp.current_attachment_points -= ergo.points;
+        wp.reload_time -= ergo.reload_speed_change;
+        wp.ads_speed -= ergo.ads_speed_change;
+        wp.pick_up_weapon_speed -= ergo.pick_up_weapon_speed_change;
+        wp.store_weapon_speed -= ergo.store_weapon_speed_change;
+
+        wp.visual_recoil -= ergo.visual_recoil_change;
+        wp.rate_of_fire -= ergo.rate_of_fire_change;
+        wp.bullets_per_tap -= ergo.burst_bullets_per_tap_change;
+        wp.time_between_bursts -= ergo.burst_time_between_bursts_change;
+
+        if (ergo.fire_modes_change != null && ergo.fire_modes_change.Count > 0)
+        {
+            foreach (var fm in ergo.fire_modes_change)
+            {
+                wp.fire_modes.Remove(fm);
+            }
+        }
+
+        ResetAttachmentDataToZero(ergo);
+    }
+
     #endregion
 
     #region Update Methods - APENAS SETACTIVE
@@ -373,132 +456,115 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (g == null || weaponProperties == null) return;
 
-        // Primeiro, desativa o grip atual
         DisableAllOfType<Grip>();
 
-        // Remove stats do grip atual se existir
         if (currentGrip != null)
         {
             RemoveGripStats(weaponProperties, currentGrip);
         }
 
-        // Ativa o novo grip e adiciona stats
         currentGrip = CreateGripData(g);
         AddGripStats(weaponProperties, currentGrip);
         g.gameObject.SetActive(true);
 
         if (shouldSave)
             SaveAttachmentsToPlayerPrefs();
-
-        //Debug.Log($"Grip atualizado para: {currentGrip.attachmentName}");
     }
 
     public void UpdateBarrel(Barrel b, WeaponProperties weaponProperties, bool shouldSave = true)
     {
         if (b == null || weaponProperties == null) return;
 
-        // Primeiro, desativa o barrel atual
         DisableAllOfType<Barrel>();
 
-        // Remove stats do barrel atual se existir
         if (currentBarrel != null)
         {
             RemoveBarrelStats(weaponProperties, currentBarrel);
         }
 
-        // Ativa o novo barrel e adiciona stats
         currentBarrel = CreateBarrelData(b);
         AddBarrelStats(weaponProperties, currentBarrel);
         b.gameObject.SetActive(true);
 
         if (shouldSave)
             SaveAttachmentsToPlayerPrefs();
-
-        //Debug.Log($"Barrel atualizado para: {currentBarrel.attachmentName}");
     }
 
     public void UpdateSight(Sight s, WeaponProperties weaponProperties, bool shouldSave = true)
     {
         if (s == null || weaponProperties == null) return;
 
-        // Primeiro, desativa a sight atual
         DisableAllOfType<Sight>();
 
-        // Remove stats da sight atual se existir
         if (currentSight != null)
         {
             RemoveSightStats(weaponProperties, currentSight);
         }
 
-        // Ativa a nova sight e adiciona stats
         currentSight = CreateSightData(s);
         AddSightStats(weaponProperties, currentSight);
         s.gameObject.SetActive(true);
 
         if (shouldSave)
             SaveAttachmentsToPlayerPrefs();
-
-        //Debug.Log($"Sight atualizada para: {currentSight.attachmentName}");
     }
 
     public void UpdateMag(Mag m, WeaponProperties weaponProperties, bool shouldSave = true)
     {
         if (weaponProperties == null) return;
 
-        // Se o Mag for nulo, tenta pegar o primeiro disponível
-        /*
-        if (m == null)
-        {
-            m = GetFirstAvailableMag();
-            if (m == null)
-            {
-                Debug.LogWarning("Nenhum Mag disponível encontrado!");
-                return;
-            }
-        }
-        */
-
-        // Primeiro, desativa o mag atual
         DisableAllOfType<Mag>();
 
-        // Remove stats do mag atual se existir
         if (currentMag != null)
         {
             RemoveMagStats(weaponProperties, currentMag);
         }
 
-        // Ativa o novo mag e adiciona stats
         currentMag = CreateMagData(m);
         AddMagStats(weaponProperties, currentMag);
         m.gameObject.SetActive(true);
 
         if (shouldSave)
             SaveAttachmentsToPlayerPrefs();
-
     }
 
     public void UpdateSideGrip(SideGrip sg, WeaponProperties weaponProperties, bool shouldSave = true)
     {
         if (sg == null || weaponProperties == null) return;
 
-        // Primeiro, desativa o side grip atual
         DisableAllOfType<SideGrip>();
 
-        // Remove stats do side grip atual se existir
         if (currentSideGrip != null)
         {
             RemoveSideGripStats(weaponProperties, currentSideGrip);
         }
 
-        // Ativa o novo side grip e adiciona stats
         currentSideGrip = CreateSideGripData(sg);
         AddSideGripStats(weaponProperties, currentSideGrip);
         sg.gameObject.SetActive(true);
 
         if (shouldSave)
             SaveAttachmentsToPlayerPrefs();
+    }
 
-        //Debug.Log($"SideGrip atualizado para: {currentSideGrip.attachmentName}");
+    // NOVO
+    public void UpdateErgonomics(Ergonomics e, WeaponProperties weaponProperties, bool shouldSave = true)
+    {
+        if (e == null || weaponProperties == null) return;
+
+        DisableAllOfType<Ergonomics>();
+
+        if (currentErgonomics != null)
+        {
+            RemoveErgonomicsStats(weaponProperties, currentErgonomics);
+        }
+
+        currentErgonomics = CreateErgonomicsData(e);
+        AddErgonomicsStats(weaponProperties, currentErgonomics);
+        e.gameObject.SetActive(true);
+
+        if (shouldSave)
+            SaveAttachmentsToPlayerPrefs();
     }
 
     // Método auxiliar para desativar todos os attachments de um tipo específico
@@ -522,25 +588,19 @@ public class AttatchmentManager : MonoBehaviour
         RemoveMag_(true);
         RemoveSight(true);
         RemoveSideGrip(true);
+        RemoveErgonomics(true); // NOVO
     }
 
     public void RemoveGrip(bool shouldSave = true)
     {
         if (currentGrip != null && weaponProperties != null)
         {
-            Debug.Log($"Removendo grip: {currentGrip.attachmentName}");
             RemoveGripStats(weaponProperties, currentGrip);
             DisableAllOfType<Grip>();
             currentGrip = null;
 
             if (shouldSave)
                 SaveAttachmentsToPlayerPrefs();
-
-            //Debug.Log("Grip removido com sucesso");
-        }
-        else
-        {
-            Debug.LogWarning("Tentou remover grip mas nenhum grip está equipado");
         }
     }
 
@@ -548,19 +608,12 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (currentBarrel != null && weaponProperties != null)
         {
-            Debug.Log($"Removendo barrel: {currentBarrel.attachmentName}");
             RemoveBarrelStats(weaponProperties, currentBarrel);
             DisableAllOfType<Barrel>();
             currentBarrel = null;
 
             if (shouldSave)
                 SaveAttachmentsToPlayerPrefs();
-
-            //Debug.Log("Barrel removido com sucesso");
-        }
-        else
-        {
-            Debug.LogWarning("Tentou remover barrel mas nenhum barrel está equipado");
         }
     }
 
@@ -568,19 +621,12 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (currentSight != null && weaponProperties != null)
         {
-            Debug.Log($"Removendo sight: {currentSight.attachmentName}");
             RemoveSightStats(weaponProperties, currentSight);
             DisableAllOfType<Sight>();
             currentSight = null;
 
             if (shouldSave)
                 SaveAttachmentsToPlayerPrefs();
-
-            //Debug.Log("Sight removida com sucesso");
-        }
-        else
-        {
-            Debug.LogWarning("Tentou remover sight mas nenhuma sight está equipada");
         }
     }
 
@@ -588,19 +634,12 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (currentMag != null && weaponProperties != null)
         {
-            Debug.Log($"Removendo mag: {currentMag.attachmentName}");
             RemoveMagStats(weaponProperties, currentMag);
             DisableAllOfType<Mag>();
             currentMag = null;
 
             if (shouldSave)
                 SaveAttachmentsToPlayerPrefs();
-
-            //Debug.Log("Mag removido com sucesso");
-        }
-        else
-        {
-            Debug.LogWarning("Tentou remover mag mas nenhum mag está equipado");
         }
     }
 
@@ -608,19 +647,26 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (currentSideGrip != null && weaponProperties != null)
         {
-            Debug.Log($"Removendo side grip: {currentSideGrip.attachmentName}");
             RemoveSideGripStats(weaponProperties, currentSideGrip);
             DisableAllOfType<SideGrip>();
             currentSideGrip = null;
 
             if (shouldSave)
                 SaveAttachmentsToPlayerPrefs();
-
-            //Debug.Log("SideGrip removido com sucesso");
         }
-        else
+    }
+
+    // NOVO
+    public void RemoveErgonomics(bool shouldSave = true)
+    {
+        if (currentErgonomics != null && weaponProperties != null)
         {
-            Debug.LogWarning("Tentou remover side grip mas nenhum side grip está equipado");
+            RemoveErgonomicsStats(weaponProperties, currentErgonomics);
+            DisableAllOfType<Ergonomics>();
+            currentErgonomics = null;
+
+            if (shouldSave)
+                SaveAttachmentsToPlayerPrefs();
         }
     }
 
@@ -641,7 +687,6 @@ public class AttatchmentManager : MonoBehaviour
         return null;
     }
 
-    // Adicione este método na região Helper Methods
     private Mag GetFirstAvailableMag()
     {
         Mag[] mags = GetComponentsInChildren<Mag>(true);
@@ -668,9 +713,9 @@ public class AttatchmentManager : MonoBehaviour
         if (currentMag != null) saveData.activeMag = currentMag.attachmentName;
         if (currentGrip != null) saveData.activeGrip = currentGrip.attachmentName;
         if (currentSideGrip != null) saveData.activeSideGrip = currentSideGrip.attachmentName;
+        if (currentErgonomics != null) saveData.activeErgonomics = currentErgonomics.attachmentName; // NOVO
 
         string json = JsonUtility.ToJson(saveData);
-        //Debug.Log($"[{weaponName}] Salvando attachments: {json}");
 
         PlayerPrefs.SetString(saveKey, json);
         PlayerPrefs.Save();
@@ -681,38 +726,26 @@ public class AttatchmentManager : MonoBehaviour
         if (string.IsNullOrEmpty(weaponName) || weaponProperties == null) return;
 
         string saveKey = $"WeaponAttachments_{weaponName}";
-        //Debug.Log($"[{weaponName}] Tentando carregar attachments de: {saveKey}");
 
         if (!PlayerPrefs.HasKey(saveKey))
         {
-            Debug.Log($"[{weaponName}] Nenhum save encontrado - Criando save padrão com magazine inicial");
-
-            // Cria um save com todos os campos nulos exceto o activeMag
             var defaultSaveData = new WeaponAttachmentSaveData(weaponName);
 
-            // Encontra o primeiro magazine disponível
             Mag firstMag = GetFirstAvailableMag();
             if (firstMag != null)
             {
                 defaultSaveData.activeMag = firstMag.gameObject.name;
-                Debug.Log($"[{weaponName}] Magazine padrão definido: {defaultSaveData.activeMag}");
             }
 
-            // Salva o JSON padrão
             string defaultJson = JsonUtility.ToJson(defaultSaveData);
             PlayerPrefs.SetString(saveKey, defaultJson);
             PlayerPrefs.Save();
 
-            Debug.Log($"[{weaponName}] Save padrão criado: {defaultJson}");
-
-            // Carrega o save que acabamos de criar (isso vai equipar o magazine)
             LoadAttachmentsFromPlayerPrefs();
             return;
         }
 
         string json = PlayerPrefs.GetString(saveKey);
-        //Debug.Log($"[{weaponName}] JSON carregado: {json}");
-
         var saveData = JsonUtility.FromJson<WeaponAttachmentSaveData>(json);
 
         if (saveData == null)
@@ -721,65 +754,44 @@ public class AttatchmentManager : MonoBehaviour
             return;
         }
 
-        //Debug.Log($"[{weaponName}] Dados carregados: Sight={saveData.activeSight}, Barrel={saveData.activeBarrel}, Mag={saveData.activeMag}");
-
-        // Carrega Sight
         if (!string.IsNullOrEmpty(saveData.activeSight))
         {
             Sight sight = FindAttachmentByName<Sight>(saveData.activeSight);
-            if (sight != null)
-            {
-                //Debug.Log($"[{weaponName}] Carregando sight: {saveData.activeSight}");
-                UpdateSight(sight, weaponProperties, false);
-            }
+            if (sight != null) UpdateSight(sight, weaponProperties, false);
         }
 
-        // Carrega Barrel
         if (!string.IsNullOrEmpty(saveData.activeBarrel))
         {
             Barrel barrel = FindAttachmentByName<Barrel>(saveData.activeBarrel);
-            if (barrel != null)
-            {
-                //Debug.Log($"[{weaponName}] Carregando barrel: {saveData.activeBarrel}");
-                UpdateBarrel(barrel, weaponProperties, false);
-            }
+            if (barrel != null) UpdateBarrel(barrel, weaponProperties, false);
         }
 
-        // Carrega Mag
         if (!string.IsNullOrEmpty(saveData.activeMag))
         {
             Mag mag = FindAttachmentByName<Mag>(saveData.activeMag);
-            if (mag != null)
-            {
-                //Debug.Log($"[{weaponName}] Carregando mag: {saveData.activeMag}");
-                UpdateMag(mag, weaponProperties, false);
-            }
+            if (mag != null) UpdateMag(mag, weaponProperties, false);
         }
 
-        // Carrega Grip
         if (!string.IsNullOrEmpty(saveData.activeGrip))
         {
             Grip grip = FindAttachmentByName<Grip>(saveData.activeGrip);
-            if (grip != null)
-            {
-                //Debug.Log($"[{weaponName}] Carregando grip: {saveData.activeGrip}");
-                UpdateGrip(grip, weaponProperties, false);
-            }
+            if (grip != null) UpdateGrip(grip, weaponProperties, false);
         }
 
-        // Carrega SideGrip
         if (!string.IsNullOrEmpty(saveData.activeSideGrip))
         {
             SideGrip sideGrip = FindAttachmentByName<SideGrip>(saveData.activeSideGrip);
-            if (sideGrip != null)
-            {
-                //Debug.Log($"[{weaponName}] Carregando side grip: {saveData.activeSideGrip}");
-                UpdateSideGrip(sideGrip, weaponProperties, false);
-            }
+            if (sideGrip != null) UpdateSideGrip(sideGrip, weaponProperties, false);
+        }
+
+        // NOVO
+        if (!string.IsNullOrEmpty(saveData.activeErgonomics))
+        {
+            Ergonomics ergonomics = FindAttachmentByName<Ergonomics>(saveData.activeErgonomics);
+            if (ergonomics != null) UpdateErgonomics(ergonomics, weaponProperties, false);
         }
     }
 
-    // Método para compatibilidade com o sistema antigo
     public void LoadSavedAttachments(PlayerAttachmentsSaveData saveData)
     {
         if (saveData == null || weaponProperties == null) return;
@@ -787,39 +799,41 @@ public class AttatchmentManager : MonoBehaviour
         var weaponData = saveData.GetWeaponData(weaponName);
         if (weaponData == null) return;
 
-        // Carrega Sight
         if (!string.IsNullOrEmpty(weaponData.activeSight))
         {
             Sight sight = FindAttachmentByName<Sight>(weaponData.activeSight);
             if (sight != null) UpdateSight(sight, weaponProperties, false);
         }
 
-        // Carrega Barrel
         if (!string.IsNullOrEmpty(weaponData.activeBarrel))
         {
             Barrel barrel = FindAttachmentByName<Barrel>(weaponData.activeBarrel);
             if (barrel != null) UpdateBarrel(barrel, weaponProperties, false);
         }
 
-        // Carrega Mag
         if (!string.IsNullOrEmpty(weaponData.activeMag))
         {
             Mag mag = FindAttachmentByName<Mag>(weaponData.activeMag);
             if (mag != null) UpdateMag(mag, weaponProperties, false);
         }
 
-        // Carrega Grip
         if (!string.IsNullOrEmpty(weaponData.activeGrip))
         {
             Grip grip = FindAttachmentByName<Grip>(weaponData.activeGrip);
             if (grip != null) UpdateGrip(grip, weaponProperties, false);
         }
 
-        // Carrega SideGrip
         if (!string.IsNullOrEmpty(weaponData.activeSideGrip))
         {
             SideGrip sideGrip = FindAttachmentByName<SideGrip>(weaponData.activeSideGrip);
             if (sideGrip != null) UpdateSideGrip(sideGrip, weaponProperties, false);
+        }
+
+        // NOVO
+        if (!string.IsNullOrEmpty(weaponData.activeErgonomics))
+        {
+            Ergonomics ergonomics = FindAttachmentByName<Ergonomics>(weaponData.activeErgonomics);
+            if (ergonomics != null) UpdateErgonomics(ergonomics, weaponProperties, false);
         }
     }
 
@@ -832,12 +846,14 @@ public class AttatchmentManager : MonoBehaviour
     public AttachmentData GetCurrentSight() => currentSight;
     public AttachmentData GetCurrentMag() => currentMag;
     public AttachmentData GetCurrentSideGrip() => currentSideGrip;
+    public AttachmentData GetCurrentErgonomics() => currentErgonomics; // NOVO
 
     public bool HasGrip() => currentGrip != null;
     public bool HasBarrel() => currentBarrel != null;
     public bool HasSight() => currentSight != null;
     public bool HasMag() => currentMag != null;
     public bool HasSideGrip() => currentSideGrip != null;
+    public bool HasErgonomics() => currentErgonomics != null; // NOVO
 
     #endregion
 }

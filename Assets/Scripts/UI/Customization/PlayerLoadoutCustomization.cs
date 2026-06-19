@@ -38,7 +38,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     [Header("UI Elements")]
     [SerializeField] private TextMeshProUGUI class_description_text;
     [SerializeField] private TextMeshProUGUI current_battle_coins_indicator;
-    [SerializeField] private UnityEngine.UI.Button buy_weapon_button;
+    [SerializeField] private Button buy_weapon_button;
     [SerializeField] private Image class_selection_image;
     [SerializeField] private Sprite lockedItemImage;
     [SerializeField] private GameObject backButton;
@@ -57,6 +57,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     [SerializeField] private GameObject customizeWeaponButtonMag;
     [SerializeField] private GameObject customizeWeaponButtonGrip;
     [SerializeField] private GameObject customizeWeaponButtonSideGrip;
+    [SerializeField] private GameObject customizeWeaponButtonErgonomics;
 
     [Header("Weapon Stats Display")]
     [SerializeField] private TextMeshProUGUI rateOfFireText;
@@ -122,7 +123,8 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     {
         ClassSelection,
         LoadoutOptionSelection,
-        ItemSelection
+        ItemSelection,
+        WeaponCustomization
     }
 
     private enum LoadoutOption
@@ -141,7 +143,8 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         Barrel,
         Mag,
         Grip,
-        SideGrip
+        SideGrip,
+        Ergonomics
     }
 
     // State variables
@@ -273,6 +276,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         SetupCustomizeButtonListener(customizeWeaponButtonMag, OnCustomizeMagButtonClicked);
         SetupCustomizeButtonListener(customizeWeaponButtonGrip, OnCustomizeGripButtonClicked);
         SetupCustomizeButtonListener(customizeWeaponButtonSideGrip, OnCustomizeSideGripButtonClicked);
+        SetupCustomizeButtonListener(customizeWeaponButtonErgonomics, OnCustomizeErgonomicsButtonClicked);
     }
 
     private void SetupCustomizeButtonListener(GameObject button, UnityEngine.Events.UnityAction action)
@@ -293,9 +297,10 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (IsWeaponSelected)
         {
             weaponStatusParent.SetActive(true);
-            bool showCustomizeButtons = !IsCustomizingWeapon && IsPrimaryOrSecondaryWeapon;
-            customizeWeaponButton.SetActive(showCustomizeButtons);
 
+            // O botão de "Customizar Arma" só aparece se estivermos na tela de escolher armas (ItemSelection)
+            bool showCustomizeButton = _currentStage == SelectionStage.ItemSelection && IsPrimaryOrSecondaryWeapon;
+            customizeWeaponButton.SetActive(showCustomizeButton);
         }
         else
         {
@@ -340,7 +345,8 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void OnSliderValueChanged(float value)
     {
-        if (_currentStage != SelectionStage.ItemSelection) return;
+        // CORREÇÃO: Permite a rolagem tanto na seleção de itens quanto na customização de armas
+        if (_currentStage != SelectionStage.ItemSelection && _currentStage != SelectionStage.WeaponCustomization) return;
 
         float scrollY = Mathf.Lerp(minScrollY, _maxSliderY, value);
         Vector3 newPosition = _originalWeaponsGadgetsPosition;
@@ -797,6 +803,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     {
         if (_currentItemSelected == null) return;
 
+        // MUDA PARA O NOVO ESTADO
+        _currentStage = SelectionStage.WeaponCustomization;
+
         _weaponBeingCustomized = _currentItemSelected;
         _currentCustomizationPart = CustomizationPart.None;
 
@@ -805,8 +814,11 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (weaponsGadgetsSlider != null)
             weaponsGadgetsSlider.gameObject.SetActive(false);
 
+        // Esconde a lista de armas para focar apenas nos botões de customização
+        weaponsGadgetsParent.gameObject.SetActive(false);
+
         customizeWeaponButton.SetActive(false);
-        SetCustomizeButtonsActive(true);
+        SetCustomizeButtonsActive(true); // Ativa os botões de categorias (Mira, Cano, etc)
 
         WeaponProperties wp = _weaponBeingCustomized.GetComponent<WeaponProperties>();
 
@@ -820,7 +832,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         CreateCustomizationButtons<Sight>(
             "Mira",
             sight => sight.icon_hud,
-            sight => sight.gameObject.name
+            sight => sight.attachmentName
         );
         UpdateSelectionText("Selecione uma mira");
     }
@@ -831,7 +843,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         CreateCustomizationButtons<Barrel>(
             "Cano",
             barrel => barrel.icon_hud,
-            barrel => barrel.gameObject.name
+            barrel => barrel.attachmentName
         );
         UpdateSelectionText("Selecione um cano");
     }
@@ -842,7 +854,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         CreateCustomizationButtons<Mag>(
             "Carregador",
             mag => mag.icon_hud,
-            mag => mag.gameObject.name
+            mag => mag.attachmentName
         );
         UpdateSelectionText("Selecione um carregador");
     }
@@ -853,7 +865,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         CreateCustomizationButtons<Grip>(
             "Empunhadura",
             grip => grip.icon_hud,
-            grip => grip.gameObject.name
+            grip => grip.attachmentName
         );
         UpdateSelectionText("Selecione uma empunhadura");
     }
@@ -864,9 +876,20 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         CreateCustomizationButtons<SideGrip>(
             "Empunhadura Lateral",
             sidegrip => sidegrip.icon_hud,
-            sidegrip => sidegrip.gameObject.name
+            sidegrip => sidegrip.attachmentName
         );
         UpdateSelectionText("Selecione uma empunhadura lateral");
+    }
+
+    public void OnCustomizeErgonomicsButtonClicked()
+    {
+        _currentCustomizationPart = CustomizationPart.Ergonomics;
+        CreateCustomizationButtons<Ergonomics>(
+            "Ergonomia",
+            ergonomics => ergonomics.icon_hud,
+            ergonomics => ergonomics.attachmentName
+        );
+        UpdateSelectionText("Selecione uma Ergonomia");
     }
 
     private void CreateCustomizationButtons<T>(string partName,
@@ -936,6 +959,8 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         //    attachmentManager.RemoveMag_(weaponProps);
         else if (targetType == typeof(SideGrip))
             attachmentManager.RemoveSideGrip(weaponProps);
+        else if (targetType == typeof(Ergonomics))
+            attachmentManager.RemoveErgonomics();
 
         // Desativa na instância
         DisableAttachmentInInstance(targetType, weaponBeingCustomized);
@@ -959,6 +984,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             "Carregador" => typeof(Mag),
             "Empunhadura" => typeof(Grip),
             "Empunhadura Lateral" => typeof(SideGrip),
+            "Ergonomia" => typeof(Ergonomics),
             _ => null
         };
     }
@@ -1043,6 +1069,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             CustomizationPart.Mag => typeof(Mag),
             CustomizationPart.Grip => typeof(Grip),
             CustomizationPart.SideGrip => typeof(SideGrip),
+            CustomizationPart.Ergonomics => typeof(Ergonomics), // <--- ADICIONE ESTA LINHA
             _ => null
         };
     }
@@ -1052,17 +1079,15 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (part is Sight sight)
             weaponProps.GetComponent<AttatchmentManager>().UpdateSight(sight, weaponProps);
         else if (part is Barrel barrel)
-            //_attachmentManager.UpdateBarrel(barrel, weaponProps);
             weaponProps.GetComponent<AttatchmentManager>().UpdateBarrel(barrel, weaponProps);
         else if (part is Mag mag)
-            //_attachmentManager.UpdateMag(mag, weaponProps);
             weaponProps.GetComponent<AttatchmentManager>().UpdateMag(mag, weaponProps);
         else if (part is Grip grip)
-            //_attachmentManager.UpdateGrip(grip, weaponProps);
             weaponProps.GetComponent<AttatchmentManager>().UpdateGrip(grip, weaponProps);
         else if (part is SideGrip sidegrip)
-            //_attachmentManager.UpdateGrip(grip, weaponProps);
             weaponProps.GetComponent<AttatchmentManager>().UpdateSideGrip(sidegrip, weaponProps);
+        else if (part is Ergonomics ergonomics)
+            weaponProps.GetComponent<AttatchmentManager>().UpdateErgonomics(ergonomics, weaponProps);
     }
 
     private void UpdateWeaponPartInInstance(GameObject partObject, Type targetType)
@@ -1088,16 +1113,17 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     #endregion
 
     #region Navigation
-
     public void OnBackButtonClicked()
     {
-        if (IsCustomizingWeapon)
+        // 1. Se estiver dentro de uma categoria de customização (ex: tela com a lista de miras)
+        if (_currentStage == SelectionStage.WeaponCustomization && _currentCustomizationPart != CustomizationPart.None)
         {
-            OnBackFromCustomization();
+            OnCustomizeWeaponButtonClicked(); // Volta para os botões de categorias (Mira, Cano, etc)
             return;
         }
 
-        if (_currentStage != SelectionStage.ItemSelection && _currentItemSelected != null)
+        // Garante que o item seja destruído caso não estejamos em ItemSelection nem em Customization
+        if (_currentStage != SelectionStage.ItemSelection && _currentStage != SelectionStage.WeaponCustomization && _currentItemSelected != null)
         {
             Destroy(_currentItemSelected);
         }
@@ -1105,18 +1131,12 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         if (weaponsGadgetsSlider != null)
             weaponsGadgetsSlider.gameObject.SetActive(false);
 
-        print(_currentStage);
+        // 2. Navegação principal baseada no Estágio (State Machine)
         switch (_currentStage)
         {
-
-            case SelectionStage.LoadoutOptionSelection:
-                if (PlayerSpawnController.Instance != null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(true);
-                _maxSliderY = minScrollY;
-                _currentStage = SelectionStage.ClassSelection;
-                loadoutOptionsParent.gameObject.SetActive(false);
-                backButton.SetActive(false);
-                ShowClassSelection();
-                UpdateClassButtonColors(); // Garante que a classe selecionada mantenha a cor
+            case SelectionStage.WeaponCustomization:
+                // Sai da customização de arma e volta para a escolha de armas
+                OnBackFromCustomization();
                 break;
 
             case SelectionStage.ItemSelection:
@@ -1125,6 +1145,16 @@ public class PlayerLoadoutCustomization : MonoBehaviour
                 weaponsGadgetsParent.gameObject.SetActive(false);
                 ClearItemButtons();
                 ShowLoadoutOptions();
+                break;
+
+            case SelectionStage.LoadoutOptionSelection:
+                if (PlayerSpawnController.Instance != null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(true);
+                _maxSliderY = minScrollY;
+                _currentStage = SelectionStage.ClassSelection;
+                loadoutOptionsParent.gameObject.SetActive(false);
+                backButton.SetActive(false);
+                ShowClassSelection();
+                UpdateClassButtonColors();
                 break;
         }
     }
@@ -1135,25 +1165,29 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         _weaponBeingCustomized = null;
 
         ClearWeaponsGadgetsChildren();
-        weaponsGadgetsParent.gameObject.SetActive(false);
+
+        // Desativa botões de customização e reativa a lista de armas
         SetCustomizeButtonsActive(false);
+        weaponsGadgetsParent.gameObject.SetActive(true);
 
+        // CORREÇÃO: Alterado de false para true para o slider reaparecer
         if (weaponsGadgetsSlider != null)
-            weaponsGadgetsSlider.gameObject.SetActive(false);
+            weaponsGadgetsSlider.gameObject.SetActive(true);
 
+        // VOLTA PARA O ESTADO DE SELEÇÃO DE ITEM
         _currentStage = SelectionStage.ItemSelection;
+
+        // Recarrega os botões de armas da categoria atual
+        ShowAvailableItems(_currentLoadoutOption);
 
         if (currentSelectionText != null && _currentItemSelected != null)
         {
-            WeaponProperties wp = _currentItemSelected.GetComponent<WeaponProperties>();
-            string weaponName = wp != null ? wp.weapon_name : _currentItemSelected.name;
             UpdateSelectionText($"Selecionando: {GetLoadoutOptionDisplayName(_currentLoadoutOption)} - {_selectedClass}");
         }
 
         // Reativa os outlines dos itens principais
         UpdateAllButtonOutlines();
     }
-
     #endregion
 
     #region Utility Methods
@@ -1587,7 +1621,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             _partName = partName;
             _parent = GetComponentInParent<PlayerLoadoutCustomization>();
             _isRemoveButton = isRemoveButton;
-            is_attatchment_unlocked = component.GetComponent<Attatchment>().is_attatchment_unlocked;
+            is_attatchment_unlocked = component.GetComponent<Attatchment>().IsAttatchmentUnlocked();
 
             SetupImage();
             SetupText();

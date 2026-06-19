@@ -15,7 +15,6 @@ public class AirStrikeMissile : NetworkBehaviour
 
     [SerializeField] private GameObject explosion_effect;
 
-    // Aumentei a velocidade base um pouco para o MoveTowards funcionar bem
     private float missileSpeed = 200f;
     private float infantary_damage = 200;
     private float vehicle_damage = 100;

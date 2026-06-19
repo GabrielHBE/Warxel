@@ -2,30 +2,24 @@ using UnityEngine;
 
 public static class Spread
 {
+    public const float MAX_SPREAD_VALUE = 3;
+    public const float MIN_SPREAD_VALUE = 0;
+
     private static float minModifier = 0.9f;
     private static float maxModifier = 1.1f;
 
     public static Quaternion CalculateSpreadRotation(Transform shootPosition, float currentSpread)
     {
-        Vector3 randomSpread = new Vector3(
-            Random.Range(-currentSpread, currentSpread),
-            Random.Range(-currentSpread, currentSpread),
-            Random.Range(-currentSpread, currentSpread)
-        );
-
-        return shootPosition.rotation * Quaternion.Euler(randomSpread);
+        return shootPosition.rotation * Quaternion.Euler(new Vector3(
+                                                            Random.Range(-currentSpread, currentSpread),
+                                                            Random.Range(-currentSpread, currentSpread),
+                                                            Random.Range(-currentSpread, currentSpread)
+                                                        ));
     }
 
     public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread)
     {
-        float randomizedIncreaser = spreadIncreaser * Random.Range(minModifier, maxModifier);
-
-        if(currentSpread + randomizedIncreaser > maxSpread)
-        {
-            return maxSpread;
-        }
-
-        return currentSpread + randomizedIncreaser;
+        return Mathf.Clamp(currentSpread + (spreadIncreaser * Random.Range(minModifier, maxModifier)), MIN_SPREAD_VALUE, maxSpread);
     }
 
     public static float ResetSpread(float currentSpread, float baseSpread = 0, float spreadRecoveryTime = 1f)

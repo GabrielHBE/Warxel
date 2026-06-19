@@ -3,18 +3,13 @@ using UnityEngine;
 public class DummyBullet : LocalPooledObject
 {
     [SerializeField] private Rigidbody rb;
-    [SerializeField] private TrailRenderer trail;
+    [SerializeField] private TrailRenderer trailRenderer;
     private Transform ignoredTransform;
     private Vector3 lastPosition;
     private float bulletDropMultiplier;
     public void CreateBullet(Bullet.BulletData data, Transform ignoredObject = null)
     {
         Activate();
-        if (trail != null)
-        {
-            trail.enabled = true;
-            trail.Clear();
-        }
 
         bulletDropMultiplier = data.dropMultiplier;
         ignoredTransform = ignoredObject;
@@ -24,6 +19,11 @@ public class DummyBullet : LocalPooledObject
 
         lastPosition = transform.position;
 
+        if (trailRenderer != null)
+        {
+            trailRenderer.Clear();
+            trailRenderer.enabled = true;
+        }
 
         SetDirection(data.direction, data.speed);
     }
@@ -99,14 +99,9 @@ public class DummyBullet : LocalPooledObject
 
     }
 
-    protected override void Deactivate()
+    public override void Deactivate()
     {
         base.Deactivate();
-        if (trail != null)
-        {
-            trail.enabled = false;
-            trail.Clear();
-        }
         transform.localPosition = Vector3.zero;
         rb.linearVelocity = Vector3.zero;
     }

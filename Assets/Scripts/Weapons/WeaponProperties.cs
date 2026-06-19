@@ -26,7 +26,7 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public float rate_of_fire;
     public float ads_speed;
     public float speed_change;
-    public float zoom;
+    public float zoom = 1;
     public float switch_weapon_timer;
     [HideInInspector] public float interval => 60f / rate_of_fire;
     #endregion
@@ -37,21 +37,19 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
     #region Shooting and Reload mechanics
     [Header("Shooting & Reloading")]
-    public bool can_hold_trigger;
     public bool single_reload;
     public float delay_to_shoot_animation;
     public float time_to_transfer_bullets;
     public float reload_time;
     public int mag_count;
-    public int bullets_per_mag;
-    public List<int> mags = new List<int>();
+    [HideInInspector] public int bullets_per_mag;
+    [HideInInspector] public List<int> mags = new List<int>();
     #endregion
     
     #region Damage and Ballistics
     [Header("Damage & Ballistics")]
     public bool can_damage_vehicles;
     public int bullets_per_shot;
-    public int shells; // Shotgun specific
     public float muzzle_velocity;
     public float bullet_drop;
     public float infantry_damage;
@@ -66,17 +64,16 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #region Burst Mode Settings
     [Header("Burst Mode")]
     public int bullets_per_tap;
-    public float time_between_shots_in_burst;
     public float time_between_bursts;
     #endregion
 
     #region Accuracy and Spread
     [Header("Spread")]
-    [Range(0, 5)]
+    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)]
     public float base_spread;
-    [Range(0, 5)]
+    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)]
     public float spread_increaser;
-    [Range(0, 5)]
+    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)]
     public float max_spread;
     public float spread_recovery = 1;
     #endregion
@@ -84,18 +81,16 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #region Recoil Mechanics
     [Header("Recoil Settings")]
     public bool manual_calculate_recoil;
-    [Range(0, 10)]
+    [Range(Recoil.MIN_FIRTSHOTINCREASER_VALUE, Recoil.MAX_FIRTSHOTINCREASER_VALUE)]
     public float first_shoot_increaser;
-    [Range(0, 5)]
-    public float weapon_stability;
     public float weapon_reset_recoil_speed;
     public float weapon_apply_recoil_speed;
     public Vector3 visual_recoil;
     
     [Space(5)]
-    [Range(0,10)]
+    [Range(Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE)]
     public float[] vertical_recoil = new float[10];
-    [Range(-10,10)]
+    [Range(Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE)]
     public float[] horizontal_recoil = new float[10];
     [HideInInspector] public float horizontal_recoil_media;
     [HideInInspector] public float vertical_recoil_media;
@@ -156,16 +151,13 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #endregion
 
     #region Unity Callbacks
-
     void Awake()
     {
         weapon = gameObject;
     }
-
     #endregion
 
     #region Initialization & Setup
-
     public void Initialize()
     {
         weapon_kills = PlayerPrefs.GetInt($"WeaponProperties_weapon_kills_{weapon_name}");
@@ -212,11 +204,9 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
             mags.Add(bullets_per_mag);
         }
     }
-
     #endregion
 
     #region Logic & Calculations
-
     public void CalculateRecoilSpeed(bool is_burst)
     {
         // Espaço reservado para lógica futura de recuo por modo de tiro
@@ -250,11 +240,9 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
             bulletExtractor.CreateBullet();
         }
     }
-
     #endregion
 
     #region Progression Systems
-
     public void AddKill()
     {
         weapon_kills += 1;
@@ -266,6 +254,5 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", 0);
         PlayerPrefs.Save();
     }
-
     #endregion
 }

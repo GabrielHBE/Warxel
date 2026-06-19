@@ -1,7 +1,7 @@
 using TMPro;
 using UnityEngine;
 
-public class FireMode : MonoBehaviour
+public class FireModeUI : MonoBehaviour
 {
     [SerializeField] private GameObject auto;
     [SerializeField] private GameObject burst;

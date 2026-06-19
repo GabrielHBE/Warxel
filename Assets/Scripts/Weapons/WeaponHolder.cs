@@ -1,43 +1,27 @@
 
+using System.Collections;
 using UnityEngine;
 
 public class WeaponHolder : MonoBehaviour
 {
-    public GameObject rightHand_destiny;
-    public GameObject leftHand_destiny;
-    public Transform weapon_mag;
-    public GameObject weapon_extractor;
+    [SerializeField] private GameObject rightHand_destiny;
+    [SerializeField] private GameObject leftHand_destiny;
+    [SerializeField] private GameObject weapon_extractor;
+    private Transform weapon_mag;
 
     private CameraShake cameraShake;
 
     private FirstPersonArms firstPersonArms;
 
-    void Awake()
+    public void Initialize()
     {
         cameraShake = GetComponentInParent<CameraShake>();
-        weapon_mag = GetChildMag(transform, "MagHandPosition");
-
 
     }
 
-    Transform GetChildMag(Transform parent, string name)
+    public void SetWeaponMag(Transform weapon_mag)
     {
-        foreach (Transform child in parent)
-        {
-            if (child.name == name)
-            {
-                return child;
-            }
-
-            Transform found = GetChildMag(child, name);
-            if (found != null)
-            {
-                return found;
-            }
-
-        }
-
-        return null;
+        this.weapon_mag = weapon_mag;
     }
 
     public void ResetWeaponState()

@@ -62,10 +62,8 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         adsBehaviour = GetComponent<AdsBehaviour>();
     }
 
-
     void Update()
     {
-
         if (weaponProperties != null)
             Reload();
 
@@ -121,8 +119,6 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             HandleFireModeSwitch();
         }
     }
-
-
     #endregion
 
     #region Initialization
@@ -161,11 +157,9 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
 
         SwitchFireMode();
     }
-
     #endregion
 
     #region Fire Mode
-
     private void HandleFireModeSwitch()
     {
         if (weaponProperties.fire_modes.Count == 1) return;
@@ -191,27 +185,22 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         if (currentMode == WeaponProperties.FireMode.Auto)
         {
             soldierHudManager.fire_mode_hud.SetFireMode(WeaponProperties.FireMode.Auto);
-            weaponProperties.can_hold_trigger = true;
             weaponProperties.CalculateRecoilSpeed(false);
         }
         else if (currentMode == WeaponProperties.FireMode.Burst)
         {
             soldierHudManager.fire_mode_hud.SetFireMode(WeaponProperties.FireMode.Burst);
-            weaponProperties.can_hold_trigger = false;
             weaponProperties.CalculateRecoilSpeed(true);
         }
         else
         {
             soldierHudManager.fire_mode_hud.SetFireMode(WeaponProperties.FireMode.Single);
-            weaponProperties.can_hold_trigger = false;
             weaponProperties.CalculateRecoilSpeed(false);
         }
     }
-
     #endregion
 
     #region Reload
-
     void HandleReload()
     {
         if (playerProperties.is_firing || playerProperties.is_reloading || playerProperties.roll || reserve_ammo == 0)
@@ -223,18 +212,24 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
 
         weaponAnimation.StartReloadAnimation();
 
+        float totalReloadTime = weaponProperties.reload_time;
+        if (weaponProperties.mags[^1] == 0)
+        {
+            totalReloadTime += WeaponAnimation.LAST_MAG_RELOAD_TIMER_INCREASER;
+        }
+
         if (weaponAnimation.fireClip != null)
         {
             if (!weaponAnimation.is_in_fire_animation)
             {
-                reload_cooldown = weaponAnimation.reload_animation_timer / weaponProperties.reload_time;
+                reload_cooldown = totalReloadTime;
                 playerProperties.is_reloading = true;
                 can_reload = true;
             }
         }
         else
         {
-            reload_cooldown = weaponAnimation.reload_animation_timer / weaponProperties.reload_time;
+            reload_cooldown = totalReloadTime;
             playerProperties.is_reloading = true;
             can_reload = true;
         }
@@ -331,27 +326,22 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         if (playerProperties.is_reloading &&
             can_reload &&
             weaponProperties.mags[^1] != weaponProperties.bullets_per_mag &&
-            !playerProperties.is_firing &&
-            weaponProperties.shells > 0)
+            !playerProperties.is_firing)
         {
             shell.Reload();
         }
         else
         {
-
             playerProperties.is_reloading = false;
         }
     }
-
     #endregion
 
     #region Shooting
-
     void Shoot()
     {
         bool hold_shoot = InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
         bool press_shoot = InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
-
 
         if (ShouldBlockShooting())
         {
@@ -469,8 +459,13 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             weaponProperties.CreateBulletExtractor();
         }
 
-        CreateBullet();
+        // 1. Aplica o recuo usando o índice atual antes de ser incrementado e antes de gastar bala
         StartCoroutine(ApplyVisualRecoilOffset());
+
+        // 2. Cria o projétil (isso vai incrementar o índice para o PRÓXIMO tiro)
+        CreateBullet();
+
+        // 3. Remove a munição por último
         weaponProperties.mags[^1] -= 1;
     }
 
@@ -513,17 +508,22 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     private void ExecuteBurstShot()
     {
         did_shoot = true;
-        weaponProperties.mags[^1] -= 1;
-        bullets_shot_in_current_burst++;
-        burst_timer = weaponProperties.time_between_shots_in_burst;
 
         if (weaponAnimation.fireClip == null)
         {
             weaponProperties.CreateBulletExtractor();
         }
 
-        CreateBullet();
+        // 1. Aplica o recuo usando o estado atual (consistente com o modo Automático)
         StartCoroutine(ApplyVisualRecoilOffset());
+
+        // 2. Cria o projétil e atualiza o índice do recuo
+        CreateBullet();
+
+        // 3. Modifica a munição e os timers do burst no fim
+        weaponProperties.mags[^1] -= 1;
+        bullets_shot_in_current_burst++;
+        burst_timer = weaponProperties.interval;
     }
 
     private void EndBurst()
@@ -578,126 +578,47 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             vehicleDamage = weaponProperties.vehicle_damage,
             delaytoEnableForNonOwner = 0.2f,
         };
-        // 1. Pega o objeto do Pool (ele vem desativado)
-        GameObject pooledObj = ObjectPooling.Instance.GetLocalPooledItem(dummyBullet.gameObject);
 
-        if (pooledObj != null)
-        {
-            // 2. IMPORTANTÍSSIMO: Atualiza a posição e rotação ANTES de ativar e mover
-            pooledObj.transform.position = weaponProperties.barrel.transform.position;
-            pooledObj.transform.rotation = finalRotation;
-            pooledObj.transform.SetParent(null); // Tira de dentro do container do Pool
-
-            // 3. Ativa o Game Object para ele aparecer na cena
-            pooledObj.SetActive(true);
-
-            // 4. Inicializa os dados da bala
-            DummyBullet instantiatedDummyBullet = pooledObj.GetComponent<DummyBullet>();
-            if (instantiatedDummyBullet != null)
-            {
-                instantiatedDummyBullet.CreateBullet(data, playerController.transform);
-            }
-        }
+        ObjectPooling.Instance.GetLocalPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>().CreateBullet(data, playerController.transform);
 
         playerNetworkObjectSpawner.ServerSpawnBullet(serverBullet, data, weaponProperties.gameObject.name);
     }
 
     IEnumerator ApplyVisualRecoilOffset()
     {
-        float vr = weaponProperties.vertical_recoil[recoil_position_in_array];
-        float hr = weaponProperties.horizontal_recoil[recoil_position_in_array];
-
-        ApplyRecoilToCamera(vr, hr);
+        ApplyRecoilToCamera(weaponProperties.vertical_recoil[recoil_position_in_array], weaponProperties.horizontal_recoil[recoil_position_in_array]);
 
         Vector3 recoilOffset = GetRecoilOffset();
         Vector3 start = weaponProperties.initial_potiion;
         Vector3 target = start + recoilOffset;
-
-        //Quaternion weaponRotation = CalculateWeaponRotation();
-        //applyRotationRecoilCoroutine = StartCoroutine(ApplyRotationRecoilAnimation(weaponRotation));
 
         yield return StartCoroutine(ApplyPositionRecoilAnimation(start, target));
     }
 
     private void ApplyRecoilToCamera(float vr, float hr)
     {
+        var recoil = Recoil.CalculateCameraRecoil(
+            vr,
+            hr,
+            weaponProperties.first_shoot_increaser,
+            is_first_shot,
+            weaponProperties.mags[^1]
+        );
+
+        playerController.ApplyCameraRecoil(recoil.vertical, recoil.horizontal);
+
         if (!is_first_shot || weaponProperties.mags[^1] == 1)
         {
-            playerController.ApplyCameraRecoil(
-                vr * weaponProperties.first_shoot_increaser,
-                hr * weaponProperties.first_shoot_increaser
-            );
-
             is_first_shot = true;
-        }
-        else
-        {
-            playerController.ApplyCameraRecoil(vr, hr);
         }
     }
 
     private Vector3 GetRecoilOffset()
     {
-        return playerProperties.is_aiming == false
-            ? weaponProperties.visual_recoil
-            : new Vector3(
-                weaponProperties.visual_recoil.x / 2,
-                weaponProperties.visual_recoil.y / 2,
-                weaponProperties.visual_recoil.z / 2
-            );
-    }
-
-    private Quaternion CalculateWeaponRotation()
-    {
-        if (playerProperties.is_aiming)
-        {
-            return new Quaternion(
-                transform.localRotation.x + -weaponProperties.weapon_stability / 500,
-                transform.localRotation.y + weaponProperties.weapon_stability / 500,
-                transform.localRotation.z + -weaponProperties.weapon_stability / 500,
-                transform.localRotation.w
-            );
-        }
-
-        return new Quaternion(
-            transform.localRotation.x + Random.Range(-0.02f, 0.02f),
-            transform.localRotation.y + Random.Range(-0.02f, 0.02f),
-            transform.localRotation.z + Random.Range(-0.02f, 0.02f),
-            transform.localRotation.w
+        return Recoil.CalculateVisualRecoilOffset(
+            weaponProperties.visual_recoil,
+            playerProperties.is_aiming
         );
-    }
-
-    private IEnumerator ApplyRotationRecoilAnimation(Quaternion weaponRotation)
-    {
-        // 1. Salva a rotação inicial (ponto de partida fixo)
-        Quaternion initialRotation = transform.localRotation;
-
-        // 2. Define qual será o alvo real do recuo
-        Quaternion targetRotation = weaponRotation;
-
-        // Se o mouse estiver indo para baixo, o alvo será apenas 50% do recuo total
-        if (InputManager.GetAxis("Mouse Y") < 0)
-        {
-            targetRotation = Quaternion.Slerp(initialRotation, weaponRotation, 0.5f);
-        }
-
-        float elapsed = 0f;
-        float totalDuration = weaponProperties.weapon_apply_recoil_speed + weaponProperties.weapon_reset_recoil_speed;
-
-        // 3. Loop da animação
-        while (elapsed < totalDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / totalDuration;
-
-            // Suaviza a curva (Ease-Out: começa rápido e desacelera no topo)
-            float smoothT = Mathf.Sin(t * Mathf.PI * 0.5f);
-
-            // 4. Interpola do ponto inicial fixo até o alvo que definimos acima
-            transform.localRotation = Quaternion.Slerp(initialRotation, targetRotation, smoothT);
-
-            yield return null;
-        }
     }
 
     private IEnumerator ApplyPositionRecoilAnimation(Vector3 start, Vector3 target)
@@ -725,11 +646,9 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             yield return null;
         }
     }
-
     #endregion
 
     #region Bullet Concatenation
-
     private void ConcatenateBullets()
     {
         if (weaponProperties.mags == null || weaponProperties.mags.Count == 0)
@@ -851,10 +770,8 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
 
     private void ExecuteBulletTransfer(int fromPosition, int toPosition, int amount)
     {
-
         weaponProperties.mags[fromPosition] -= amount;
         weaponProperties.mags[toPosition] += amount;
-
     }
 
     private void ResetConcatenation()
@@ -864,7 +781,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     }
     #endregion
 
-    #region  Interface Implementations
+    #region Interface Implementations
     public float GetCurrentSpread() => current_spread;
     public float GetMaxSpread() => weaponProperties.max_spread;
     #endregion

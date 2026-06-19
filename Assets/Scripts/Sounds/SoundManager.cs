@@ -11,7 +11,11 @@ using UnityEditor;
 public class SoundManager : NetworkBehaviour
 {
     public static SoundManager Instance { get; private set; }
+
+    [Header("Pool de Áudio")]
     [SerializeField] private AudioDistanceController audioDistanceControllerPrefab;
+    [SerializeField, Tooltip("Prefab genérico vazio com o script LocalPooledObject e um AudioSource para sons 2D e Loops")]
+    private GameObject audio2DPrefab;
 
     [Header("Configurações de Áudio (Atualizado Automatically)")]
     [SerializeField] private List<AudioClip> internalAudioList = new List<AudioClip>();
@@ -19,11 +23,15 @@ public class SoundManager : NetworkBehaviour
 
     private readonly Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
     private static readonly List<LoopAudio> loopAudioList = new List<LoopAudio>();
+
+    // Variáveis estáticas para permitir acesso nos métodos estáticos
     private static AudioDistanceController staticAudioDistanceController;
+    private static GameObject staticAudio2DPrefab;
 
     void Start()
     {
         staticAudioDistanceController = audioDistanceControllerPrefab;
+        staticAudio2DPrefab = audio2DPrefab;
         Instance = this;
         InitializeAudioCache();
     }
@@ -43,7 +51,14 @@ public class SoundManager : NetworkBehaviour
             else
             {
                 if (audio.audioSource != null) audio.audioSource.Stop();
-                if (audio.gameObject != null) Destroy(audio.gameObject);
+
+                // Em vez de Destroy, usa Deactivate se for um item do Pool
+                if (audio.gameObject != null)
+                {
+                    if (audio.gameObject.TryGetComponent(out LocalPooledObject pooled)) pooled.Deactivate();
+                    else Destroy(audio.gameObject);
+                }
+
                 loopAudioList.RemoveAt(i);
             }
         }
@@ -55,9 +70,7 @@ public class SoundManager : NetworkBehaviour
         foreach (var clip in internalAudioList)
         {
             if (clip == null) continue;
-
             if (audioCache.TryAdd(clip.name, clip)) continue;
-
             Debug.LogWarning($"[SoundManager] Áudio duplicado detectado e ignorado: '{clip.name}'");
         }
     }
@@ -102,7 +115,12 @@ public class SoundManager : NetworkBehaviour
     #region Helpers de Criação de Áudio
     private static AudioSource CreateConfiguredAudioSource(GameObject go, AudioClip clip, SoundProperties props, bool is3D, bool loop)
     {
-        AudioSource audioSource = go.AddComponent<AudioSource>();
+        // Se vier do Pool, usa o componente existente para não adicionar múltiplos AudioSources
+        if (!go.TryGetComponent(out AudioSource audioSource))
+        {
+            audioSource = go.AddComponent<AudioSource>();
+        }
+
         audioSource.playOnAwake = false;
         audioSource.clip = clip;
         audioSource.loop = loop;
@@ -127,23 +145,22 @@ public class SoundManager : NetworkBehaviour
 
     private static void SetupLoopAudio(string namePrefix, AudioClip clip, SoundProperties props, Transform target, bool is3D)
     {
-        // 1. Verificação de Prevenção de Duplicatas
         foreach (var existingLoop in loopAudioList)
         {
-            // Se já existe um som com o mesmo clip anexado ao mesmo target
             if (existingLoop.target == target && existingLoop.audioSource != null && existingLoop.audioSource.clip == clip)
             {
-                // Apenas garanta que ele está tocando e aborte a criação de um novo
-                if (!existingLoop.audioSource.isPlaying)
-                {
-                    existingLoop.audioSource.Play();
-                }
+                if (!existingLoop.audioSource.isPlaying) existingLoop.audioSource.Play();
                 return;
             }
         }
 
-        // 2. Criação Padrão (caso não exista)
-        GameObject loopObject = new GameObject($"{namePrefix}_{clip.name}");
+        // Pega do Pool em vez de fazer "new GameObject()"
+        GameObject loopObject = ObjectPooling.Instance.GetLocalPooledItem(staticAudio2DPrefab);
+        if (loopObject == null) return;
+
+        loopObject.GetComponent<LocalPooledObject>().Activate();
+        loopObject.name = $"{namePrefix}_{clip.name}";
+
         if (target != null) loopObject.transform.position = target.position;
 
         AudioSource audioSource = CreateConfiguredAudioSource(loopObject, clip, props, is3D, true);
@@ -180,7 +197,7 @@ public class SoundManager : NetworkBehaviour
             if (loopAudio.target == target && loopAudio.audioSource != null && loopAudio.audioSource.clip == clip)
             {
                 loopAudio.audioSource.Stop();
-                if (loopAudio.gameObject != null) Destroy(loopAudio.gameObject);
+                if (loopAudio.gameObject.TryGetComponent(out LocalPooledObject pooled)) pooled.Deactivate();
                 return true;
             }
             return false;
@@ -217,9 +234,16 @@ public class SoundManager : NetworkBehaviour
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip))
         {
-            AudioDistanceController controller = Instantiate(audioDistanceControllerPrefab, position, Quaternion.identity);
-            controller.Setup(clip, soundProperties);
-            controller.StartGrowth();
+            GameObject pooledObj = ObjectPooling.Instance.GetLocalPooledItem(audioDistanceControllerPrefab.gameObject);
+            if (pooledObj != null)
+            {
+                pooledObj.transform.position = position;
+                pooledObj.GetComponent<LocalPooledObject>().Activate();
+
+                AudioDistanceController controller = pooledObj.GetComponent<AudioDistanceController>();
+                controller.Setup(clip, soundProperties);
+                controller.StartGrowth();
+            }
         }
         else Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
     }
@@ -287,7 +311,7 @@ public class SoundManager : NetworkBehaviour
         if (audioCache.TryGetValue(soundName, out AudioClip clip)) ModifyLoopAudio(clip, target, src => src.UnPause());
     }
 
-    // ================= PITCH (NOVO) =================
+    // ================= PITCH =================
     public void RequestSet3dLoopSoundPitch(string soundName, Transform target, float newPitch)
     {
         if (IsServerStarted) RpcSet3dLoopSoundPitchObservers(soundName, target, newPitch);
@@ -335,10 +359,8 @@ public class SoundManager : NetworkBehaviour
 
     private void Play2dSound(string soundName, SoundProperties soundProperties)
     {
-        if (audioCache.TryGetValue(soundName, out AudioClip clip))
-            Play2dSoundLocal(clip, soundProperties);
-        else
-            Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
+        if (audioCache.TryGetValue(soundName, out AudioClip clip)) Play2dSoundLocal(clip, soundProperties);
+        else Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
     }
 
     // ================= PLAY 2D LOOP =================
@@ -405,7 +427,7 @@ public class SoundManager : NetworkBehaviour
         if (audioCache.TryGetValue(soundName, out AudioClip clip)) ModifyLoopAudio(clip, target, src => src.UnPause());
     }
 
-    // ================= PITCH 2D LOOP (NOVO) =================
+    // ================= PITCH 2D LOOP =================
     public void RequestSet2dLoopSoundPitch(string soundName, Transform target, float newPitch)
     {
         if (IsServerStarted) RpcSet2dLoopSoundPitchObservers(soundName, target, newPitch);
@@ -441,24 +463,44 @@ public class SoundManager : NetworkBehaviour
     #region Static Methods
     public static void Play2dSoundLocal(AudioClip clip, SoundProperties soundProperties)
     {
-        GameObject tempGO = new GameObject($"TempAudio2D_{clip.name}");
+        GameObject tempGO = ObjectPooling.Instance.GetLocalPooledItem(staticAudio2DPrefab);
+        if (tempGO == null) return;
+
+        tempGO.GetComponent<LocalPooledObject>().Activate();
+        tempGO.name = $"TempAudio2D_{clip.name}";
+
         AudioSource tempSource = CreateConfiguredAudioSource(tempGO, clip, soundProperties, is3D: false, loop: false);
         tempSource.PlayOneShot(clip);
-        Destroy(tempGO, clip.length);
+
+        // Rotina para devolver ao Pool após o fim do som
+        Instance.StartCoroutine(Instance.DeactivatePooledObjectDelay(tempGO, clip.length));
+    }
+
+    private System.Collections.IEnumerator DeactivatePooledObjectDelay(GameObject go, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (go != null && go.TryGetComponent(out LocalPooledObject pooled))
+        {
+            pooled.Deactivate();
+        }
     }
 
     public static void Play3dSoundLocal(AudioClip clip, SoundProperties soundProperties, Vector3 position)
     {
-        AudioDistanceController controller = Instantiate(staticAudioDistanceController, position, Quaternion.identity);
-        controller.Setup(clip, soundProperties);
-        controller.StartGrowth();
+        GameObject pooledObj = ObjectPooling.Instance.GetLocalPooledItem(staticAudioDistanceController.gameObject);
+        if (pooledObj != null)
+        {
+            pooledObj.transform.position = position;
+            pooledObj.GetComponent<LocalPooledObject>().Activate();
+
+            AudioDistanceController controller = pooledObj.GetComponent<AudioDistanceController>();
+            controller.Setup(clip, soundProperties);
+            controller.StartGrowth();
+        }
     }
 
-    public static void Play3dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target)
-        => SetupLoopAudio("LoopAudio", clip, soundProperties, target, is3D: true);
-
-    public static void Play2dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target)
-        => SetupLoopAudio("LoopAudio2D", clip, soundProperties, target, is3D: false);
+    public static void Play3dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target) => SetupLoopAudio("LoopAudio", clip, soundProperties, target, is3D: true);
+    public static void Play2dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target) => SetupLoopAudio("LoopAudio2D", clip, soundProperties, target, is3D: false);
 
     public static void ServerPause3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.Pause());
     public static void ServerContinue3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.UnPause());
@@ -471,54 +513,38 @@ public class SoundManager : NetworkBehaviour
     public static void ServerStop3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.Stop());
     public static void ServerStop2dLoopSoundLocal(AudioClip clip, Transform target) => ServerStop3dLoopSoundLocal(clip, target);
 
-    // Método Estático Local para Alterar o Pitch (NOVO)
     public static void SetLoopSoundPitchLocal(AudioClip clip, Transform target, float newPitch) => ModifyLoopAudio(clip, target, src => src.pitch = newPitch);
+
+    #endregion
+
+    #region Helper
+    public AudioClip GetClip(string soundName)
+    {
+        if (audioCache.TryGetValue(soundName, out AudioClip clip))
+        {
+            return clip;
+        }
+        return null;
+    }
     #endregion
 
     #region structs & classes
     [System.Serializable]
     public struct SoundProperties
     {
-        [Tooltip("Sound priority: lower number = higher priority. Higher priority sounds are favored when voice limits are reached (same as AudioSource.priority - range: 0-256)")]
         public int priority;
-
-        [Tooltip("Sound volume: 0 = silence, 1 = maximum volume (same as AudioSource.volume)")]
         [Range(0, 1)] public float volume;
-
-        [Tooltip("Sound pitch: negative values = lower tone, positive = higher tone. 1 = original pitch (same as AudioSource.pitch)")]
         [Range(-3, 3)] public float pitch;
-
-        [Tooltip("Stereo pan: -1 = full left, 0 = center, 1 = full right (same as AudioSource.panStereo)")]
         [Range(-1, 1)] public float stereoPan;
-
-        [Tooltip("Blend between 2D and 3D sound: 0 = completely 2D (no spatial effects), 1 = completely 3D (affected by distance and position) (same as AudioSource.spatialBlend)")]
         [Range(0, 1)] public float spatialBlend;
-
-        [Tooltip("Influence of reverb zones: 0 = no reverb, 1 = full reverb (same as AudioSource.reverbZoneMix)")]
         [Range(0, 1.1f)] public float reverbZoneMix;
-
-        [Tooltip("Doppler effect level: 0 = no Doppler, 5 = maximum (same as AudioSource.dopplerLevel)")]
         [Range(0, 5)] public float dopplerLevel;
-
-        [Tooltip("Sound spread angle in degrees: 0 = point sound, 360 = omnidirectional sound (same as AudioSource.spread)")]
         [Range(0, 360)] public float spread;
-
-        [Tooltip("Sound attenuation mode with distance: Logarithmic (most realistic), Linear, or Custom (same as AudioSource.rolloffMode)")]
         public AudioRolloffMode rolloffMode;
-
-        [Tooltip("Minimum distance where sound begins to fade. Before this, volume is at maximum (same as AudioSource.minDistance)")]
         public float minDistance;
-
-        [Tooltip("Maximum distance where sound can be heard. Beyond this, volume is zero (same as AudioSource.maxDistance)")]
         public float maxDistance;
-
-        [Tooltip("If enabled, the camera will shake when this sound is played (extension of AudioSource)")]
         public bool enableCameraShake;
-
-        [Tooltip("Intensity of the camera shake. Higher values = stronger shake (extension of AudioSource)")]
         public float cameraShakeIntensity;
-
-        [Tooltip("Duration of the camera shake in seconds (extension of AudioSource)")]
         public float cameraShakeDuration;
 
         public static SoundProperties Default => new SoundProperties

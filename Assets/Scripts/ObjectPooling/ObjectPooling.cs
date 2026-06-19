@@ -5,9 +5,8 @@ using UnityEngine;
 
 public class ObjectPooling : MonoBehaviour
 {
-    public static ObjectPooling Instance {get; private set;}
+    public static ObjectPooling Instance { get; private set; }
 
-    // Estruturas criadas para exibir o Prefab + Quantidade perfeitamente no Inspector
     [System.Serializable]
     public struct LocalPoolSettings
     {
@@ -28,8 +27,10 @@ public class ObjectPooling : MonoBehaviour
     [Header("Server Pooling")]
     [SerializeField] private List<ServerPoolSettings> serverPooledItens = new List<ServerPoolSettings>();
 
-    // Dicionário para organizar os objetos instanciados locais pelo seu Prefab de origem
     private Dictionary<GameObject, List<GameObject>> localPoolDictionary = new Dictionary<GameObject, List<GameObject>>();
+
+    // NOVO: Dicionário para guardar as "pastas" (GameObjects vazios) organizadoras na Hierarchy
+    private Dictionary<GameObject, Transform> poolFolders = new Dictionary<GameObject, Transform>();
 
     void Start()
     {
@@ -42,20 +43,31 @@ public class ObjectPooling : MonoBehaviour
     {
         foreach (LocalPoolSettings item in localPooledItens)
         {
-            // Proteção básica para não tentar instanciar itens nulos ou vazios
             if (item.prefab == null || item.quantity <= 0) continue;
 
-            // Se o Prefab ainda não tem uma lista no dicionário, cria uma nova
             if (!localPoolDictionary.ContainsKey(item.prefab))
             {
                 localPoolDictionary[item.prefab] = new List<GameObject>();
             }
 
-            // Instancia a quantidade exata definida no Inspector
+            // --- CRIAÇÃO DA PASTA ORGANIZADORA ---
+            GameObject folder = new GameObject($"[Pool] {item.prefab.name}");
+            folder.transform.SetParent(transform);
+            poolFolders[item.prefab] = folder.transform;
+            // -------------------------------------
+
             for (int i = 0; i < item.quantity; i++)
             {
-                GameObject obj = Instantiate(item.prefab, transform);
-                obj.SetActive(false); // Mantém desativado no pool
+                // Instancia o objeto já dentro da sua respectiva pasta
+                GameObject obj = Instantiate(item.prefab, folder.transform);
+                obj.SetActive(false);
+
+                // Avisa ao objeto qual é a pasta dele para quando ele for desativado
+                if (obj.TryGetComponent(out LocalPooledObject pooledObj))
+                {
+                    pooledObj.SetupPoolParent(folder.transform);
+                }
+
                 localPoolDictionary[item.prefab].Add(obj);
             }
         }
@@ -68,8 +80,6 @@ public class ObjectPooling : MonoBehaviour
             foreach (ServerPoolSettings item in serverPooledItens)
             {
                 if (item.prefab == null || item.quantity <= 0) continue;
-
-                // Passamos a quantidade dinâmica vinda do Inspector para o FishNet
                 InstanceFinder.NetworkManager.CacheObjects(item.prefab, item.quantity, false);
             }
         }
@@ -79,31 +89,45 @@ public class ObjectPooling : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Função pública para você pegar um objeto do Pool Local quando precisar.
-    /// </summary>
     public GameObject GetLocalPooledItem(GameObject prefab)
     {
-        if (localPoolDictionary.TryGetValue(prefab, out List<GameObject> poolList))
-        {
-            // Procura um objeto que não esteja ativo na cena
-            foreach (GameObject obj in poolList)
-            {
-                if (!obj.activeInHierarchy)
-                {
-                    return obj;
-                }
-            }
+        if (prefab == null) return null;
 
-            // Opcional (Transbordo): Se todos os objetos estiverem ativos e você precisar de mais um,
-            // ele cria um extra dinamicamente para o jogo não quebrar.
-            GameObject newObj = Instantiate(prefab, transform);
-            newObj.SetActive(false);
-            poolList.Add(newObj);
-            return newObj;
+        // Se o prefab não existir no dicionário, nós o criamos dinamicamente!
+        if (!localPoolDictionary.TryGetValue(prefab, out List<GameObject> poolList))
+        {
+            Debug.Log($"[ObjectPooling] O prefab '{prefab.name}' não estava na lista do Inspector. Criando Pool dinamicamente...");
+
+            poolList = new List<GameObject>();
+            localPoolDictionary[prefab] = poolList;
+
+            // Cria a pasta organizadora
+            GameObject folder = new GameObject($"[Pool] {prefab.name}");
+            folder.transform.SetParent(transform);
+            poolFolders[prefab] = folder.transform;
         }
 
-        Debug.LogWarning($"[ObjectPooling] O prefab {prefab.name} não foi pré-aquecido no Local Pooling!");
-        return null;
+        // Procura um item desativado para usar
+        foreach (GameObject obj in poolList)
+        {
+            if (!obj.activeInHierarchy)
+            {
+                return obj;
+            }
+        }
+
+        // Transbordo: Se todos estiverem em uso, cria um novo
+        Transform folderTransform = poolFolders[prefab];
+
+        GameObject newObj = Instantiate(prefab, folderTransform);
+        newObj.SetActive(false);
+
+        if (newObj.TryGetComponent(out LocalPooledObject pooledObj))
+        {
+            pooledObj.SetupPoolParent(folderTransform);
+        }
+
+        poolList.Add(newObj);
+        return newObj;
     }
 }

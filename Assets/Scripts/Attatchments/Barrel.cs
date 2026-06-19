@@ -15,5 +15,4 @@ public class Barrel : Attatchment
     public float volume_changer;
     public float spread_change;
 
-
 }

@@ -60,15 +60,9 @@ public class Bullet : NetworkBehaviour
     {
         if (rb != null)
         {
+            rb.isKinematic = false;
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            rb.isKinematic = false;
-        }
-
-        if (trail != null)
-        {
-            trail.enabled = true;
-            trail.Clear(); // Limpa o rastro antigo para não criar uma linha gigante cruzando o mapa
         }
 
         gameObject.SetActive(true);
@@ -241,14 +235,16 @@ public class Bullet : NetworkBehaviour
 
         if (hitObject.layer == LayerMask.NameToLayer("Vehicle") && can_damage_vehicles)
         {
-            ProcessVehicleCollision(collider);
+            ProcessHit.VehicleHit(hitObject, infantary_damage, shoot_root);
+            //ProcessVehicleCollision(collider);
             hitEffects.RequestMetalHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
             soundEffects.PlayHitSound(BulletSoundEffect.HitSoundType.Metal, hitPoint);
         }
 
         if (hitObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
         {
-            ProcessPlayerCollision(hitObject);
+            ProcessHit.PlayerHit(hitObject, infantary_damage, hs_multiplier, shoot_root);
+            //ProcessPlayerCollision(hitObject);
             hitEffects.RequestBloodHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
         }
 
@@ -258,8 +254,7 @@ public class Bullet : NetworkBehaviour
     #region TriggerEnter
     void OnTriggerEnter(Collider collider)
     {
-        if (!bullet_collider.isTrigger) return;
-        if (!IsOwner || _isDespawning) return;
+        if (!IsOwner || _isDespawning || !bullet_collider.isTrigger) return;
 
         if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") ||
             collider.gameObject.layer == LayerMask.NameToLayer("Player"))
@@ -273,25 +268,6 @@ public class Bullet : NetworkBehaviour
         }
 
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
-    }
-    #endregion
-
-    #region CollisionEnter
-    void OnCollisionEnter(Collision collision)
-    {
-        if (bullet_collider.isTrigger) return;
-        if (!IsOwner || _isDespawning) return;
-
-        if (ignoredTransform != null && collision.gameObject.transform.IsChildOf(ignoredTransform))
-        {
-            return;
-        }
-
-        if (collision.contacts.Length > 0)
-        {
-            ContactPoint contact = collision.contacts[0];
-            HandleBulletHit(contact.otherCollider.gameObject, contact.point, contact.normal, contact.otherCollider);
-        }
     }
     #endregion
 
@@ -311,74 +287,6 @@ public class Bullet : NetworkBehaviour
     private void ProcessGroundCollision(Vector3 pos)
     {
         voxCollider.SphereExplosion(pos, infantary_damage, vehicle_damage);
-    }
-
-    private void ProcessVehicleCollision(Collider collision)
-    {
-        Vehicle hit_vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
-
-        if (hit_vehicle != null)
-        {
-            string[] occupantNames = hit_vehicle.GetOccupantNames();
-
-            if (!hit_vehicle.vehicle_destroyed.Value)
-            {
-                hit_vehicle.RequestDamage(vehicle_damage);
-
-                float target_resistance = hit_vehicle.GetResistance();
-                float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
-
-                DamageMarker.Instance.UpdateDamage(final_actual_damage);
-            }
-            else
-            {
-                ProcessKill.ProcessVehicleKill(shoot_root, occupantNames);
-            }
-        }
-    }
-
-    private void ProcessPlayerCollision(GameObject collision)
-    {
-        bool hs_hit = false;
-        PlayerController player = collision.GetComponentInParent<PlayerController>();
-        PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
-
-        if (playerProperties.is_dead.Value) return;
-
-        float start_hp = playerProperties.hp.Value;
-        float base_damage;
-
-        if (collision.gameObject.CompareTag("PlayerHead"))
-        {
-            base_damage = infantary_damage * hs_multiplier;
-            hs_hit = true;
-        }
-        else if (collision.gameObject.CompareTag("Arms and Legs"))
-        {
-            base_damage = infantary_damage * 0.8f;
-        }
-        else if (collision.gameObject.CompareTag("Feet and Hands"))
-        {
-            base_damage = infantary_damage * 0.6f;
-        }
-        else
-        {
-            base_damage = infantary_damage;
-        }
-
-        player.RequestDamage(base_damage);
-
-        float target_resistance = player.GetResistance();
-        float dano_real_esperado = base_damage * ((100f - target_resistance) / 100f);
-        float post_hp = start_hp - dano_real_esperado;
-        bool is_lethal_shot = post_hp <= 0;
-
-        if (is_lethal_shot)
-        {
-            ProcessKill.ProcessInfantryKill(shoot_root, hs_hit, playerProperties.player_name.Value);
-        }
-
-        DamageMarker.Instance.UpdateDamage(dano_real_esperado);
     }
     #endregion
 

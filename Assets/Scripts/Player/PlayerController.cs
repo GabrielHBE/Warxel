@@ -222,7 +222,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public void ConfigureOwner()
     {
         soldierHudManager.ActivateStandardHUD();
-        
+
         Instance = this;
         HideOwnerItems(true);
 
@@ -833,15 +833,15 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         recoilVerticalTarget += verticalRecoil;
         horizontalRecoilTarget += horizontalRecoil;
 
-        // Otimização: Acesso direto à propriedade em cache ao invés de buscar via GetComponent todo frame
         if (weapon != null && weapon.weaponProperties != null)
         {
-            float range = (weapon.weaponProperties.horizontal_recoil_media + weapon.weaponProperties.vertical_recoil_media) * 2;
-            currentRecoilZ = UnityEngine.Random.Range(-range, range);
+            currentRecoilZ = Recoil.CalculateCameraZRoll(
+                weapon.weaponProperties.horizontal_recoil_media,
+                weapon.weaponProperties.vertical_recoil_media
+            );
             recoilResetVelocity = 0f;
         }
     }
-
     #endregion
 
     #region Interaction

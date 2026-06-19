@@ -1,17 +1,29 @@
+using System.Runtime.Remoting.Messaging;
 using UnityEngine;
 
-public class Attatchment : MonoBehaviour
+public abstract class Attatchment : MonoBehaviour
 {
     [Header("Attatchment Settings")]
+    public string attachmentName;
     public float attatchment_points;
     public float weapon_level_to_unlock;
     public Sprite icon_hud;
-    public string attachment_name;
-    [SerializeField] protected WeaponProperties weaponProperties;
-    public bool is_attatchment_unlocked;
+    protected WeaponProperties weaponProperties;
 
-    public void Initialize()
+    public bool IsAttatchmentUnlocked()
     {
-        if (weaponProperties != null) is_attatchment_unlocked = weapon_level_to_unlock >= weaponProperties.weapon_kills ? true : false;
+        InitializeWeaponProperties();
+        return weaponProperties != null && weaponProperties.weapon_kills >= weapon_level_to_unlock;
     }
+
+    public virtual void Initialize()
+    {
+        InitializeWeaponProperties();
+    }
+
+    protected void InitializeWeaponProperties()
+    {
+        weaponProperties = GetComponentInParent<WeaponProperties>();
+    }
+
 }

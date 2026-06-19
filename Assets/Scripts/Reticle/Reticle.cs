@@ -49,7 +49,7 @@ public class Reticle : MonoBehaviour
         if (adsBehaviour.dot_position && !playerProperties.is_reloading && !switchWeapon._switch && active_sight != null && reticleImage.sprite != null)
         {
             transform.position = playerCamera.WorldToScreenPoint(active_sight.adsPosition.position);
-            reticleImage.transform.localScale = new Vector3(Settings.Instance._gameplay.sight_reticle_size, Settings.Instance._gameplay.sight_reticle_size, 1f);
+            transform.localScale = new Vector3((Settings.Instance._gameplay.sight_reticle_size * 0.6f) * 0.1f, Settings.Instance._gameplay.sight_reticle_size * 0.1f, 1f);
             reticleImage.enabled = true;
         }
         else

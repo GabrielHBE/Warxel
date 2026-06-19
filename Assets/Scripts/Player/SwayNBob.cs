@@ -157,7 +157,6 @@ public class SwayNBobScript : MonoBehaviour
     Vector3 shakeOffset = Vector3.zero;
     void Update()
     {
-
         if (!restarted)
         {
             return;
@@ -230,8 +229,9 @@ public class SwayNBobScript : MonoBehaviour
         }
 
         //if ((!playerProperties.is_aiming && !playerProperties.is_firing && !playerProperties.is_reloading && !playerProperties.is_proned) || playerProperties.roll) Sprinting();
-        if ((playerProperties.sprinting || playerProperties.roll) && !playerProperties.is_reloading) Sprinting();
+        if (playerProperties.sprinting) Sprinting();
 
+        StoreWeapon();
         SwayRotation();
         Sway();
         BobOffset();
@@ -249,10 +249,24 @@ public class SwayNBobScript : MonoBehaviour
     Vector2 walkInputManager;
     Vector2 lookInputManager;
 
+
+    private void StoreWeapon()
+    {
+        if (((playerProperties.sprinting || playerProperties.roll) && !playerProperties.is_reloading) || SettingsHUD.Instance.is_menu_settings_active)
+        {
+            sprintTargetWeaponPosition = initial_position + new Vector3(vector3Values[0], vector3Values[1], vector3Values[2]);
+            sprintTargetWeaponRotation = initial_rotation * Quaternion.Euler(quaternionValues[0], quaternionValues[1], quaternionValues[2]);
+        }
+        else
+        {
+            // Garante o reset da arma para a posição original quando a condição falhar
+            sprintTargetWeaponPosition = initial_position;
+            sprintTargetWeaponRotation = initial_rotation;
+        }
+    }
+
     void Sprinting()
     {
-        sprintTargetWeaponPosition = initial_position + new Vector3(vector3Values[0], vector3Values[1], vector3Values[2]);
-        sprintTargetWeaponRotation = initial_rotation * Quaternion.Euler(quaternionValues[0], quaternionValues[1], quaternionValues[2]);
 
         current_position_sprinting += sprintDirection * Time.deltaTime * 8;
 

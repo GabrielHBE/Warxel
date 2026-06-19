@@ -29,8 +29,9 @@ public class Shell : Mag
     private Weapon weapon;
     private PlayerProperties playerProperties;
 
-    void Awake()
+    public override void Initialize()
     {
+        InitializeWeaponProperties();
         weapon = GetComponentInParent<Weapon>();
         playerProperties = GetComponentInParent<PlayerProperties>();
         hand_to_shell = true;

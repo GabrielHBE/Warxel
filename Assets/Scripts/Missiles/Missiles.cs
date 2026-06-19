@@ -87,6 +87,8 @@ public abstract class Missiles : NetworkBehaviour
 
         if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
         {
+            ProcessHit.VehicleHit(collision.gameObject, infantary_damage, gameObject);
+            /*
             Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
 
             if (vehicle != null && !vehicle.vehicle_destroyed.Value)
@@ -104,10 +106,14 @@ public abstract class Missiles : NetworkBehaviour
                 else
                     DamageMarker.Instance?.UpdateDamage(final_actual_damage);
             }
+            */
 
         }
-        else if (collision.gameObject.layer == LayerMask.NameToLayer("Player"))
+        else if (collision.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
         {
+            ProcessHit.PlayerHit(collision.gameObject, infantary_damage, 2, gameObject);
+
+            /*
             PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
             PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
             player.RequestDamage(infantary_damage);
@@ -124,6 +130,7 @@ public abstract class Missiles : NetworkBehaviour
             {
                 DamageMarker.Instance.UpdateDamage(final_actual_damage);
             }
+            */
 
         }
 
