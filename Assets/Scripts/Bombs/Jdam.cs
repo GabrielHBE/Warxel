@@ -4,9 +4,6 @@ using UnityEngine;
 public class Jdam : Bombs
 {
     [SerializeField] private TrailRenderer trailRenderer;
-    [Header("Sounds")]
-    [SerializeField] private AudioSource drop_bomb_sound;
-
     private Vector3 gravityForce;
 
     protected override void Update()

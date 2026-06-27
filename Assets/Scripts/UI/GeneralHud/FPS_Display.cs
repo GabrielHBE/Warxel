@@ -1,7 +1,8 @@
 using UnityEngine;
 
-public class FPS_Display : MonoBehaviour
+public class FpsDisplay : PersistentLocalSingleton<FpsDisplay>
 {
+    //public static FpsDisplay Instance {get; private set;}
     private float fps;
     float timer = 0.2f;
     public TMPro.TextMeshProUGUI fps_counter_text;

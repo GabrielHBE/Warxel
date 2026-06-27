@@ -112,7 +112,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
                         delaytoEnableForNonOwner = 0,
                     };
 
-                    DummyBullet instantiatedDummyBullet = ObjectPooling.Instance.GetLocalPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
+                    DummyBullet instantiatedDummyBullet = LocalObjectPooling.Instance.GetPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
                     if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
 
                     //DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
@@ -159,25 +159,20 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
         _shootDelayTimer = 0;
     }
 
-    [ServerRpc(RequireOwnership = true)]
+    [ServerRpc]
     private void CmdShootBullet(Bullet.BulletData data)
     {
         if (properties.bulletPref == null)
             return;
 
-        Bullet bullet = NetworkManager.GetPooledInstantiated(properties.bulletPref, IsServerInitialized).GetComponent<Bullet>();
-        Spawn(bullet, Owner);
-        bullet.CreateBullet(data, transform.root, null);
 
-        /*
+        NetworkObject pooledNetworkObj = NetworkManager.GetPooledInstantiated(properties.bulletPref, IsServerInitialized);
 
-        Transform bulletObj = Instantiate(properties.bulletPref, data.position, data.rotation);
-        bulletObj.localScale *= 2;
+        Bullet bullet = pooledNetworkObj.GetComponent<Bullet>();
 
+        Spawn(pooledNetworkObj, Owner);
 
-        Spawn(bulletObj.gameObject, Owner);
-        bulletObj.GetComponent<Bullet>()?.CreateBullet(data, transform.root);
-        */
+        bullet.CreateBullet(data, transform.root, gameObject);
     }
     public float GetMaxHeat()
     {

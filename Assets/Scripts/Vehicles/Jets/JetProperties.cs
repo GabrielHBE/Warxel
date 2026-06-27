@@ -17,7 +17,6 @@ public class JetProperties : MonoBehaviour
     public float max_pitch_value;
     public float lean_value;
     public float max_lean_speed;
-    public bool invertY;
     public float dive_speed_boost = 50f;
 
     [Header("Sounds")]

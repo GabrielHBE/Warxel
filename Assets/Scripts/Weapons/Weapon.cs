@@ -545,7 +545,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
 
     private void UpdateRecoilPosition()
     {
-        if (recoil_position_in_array >= weaponProperties.horizontal_recoil.Length - 1)
+        if (recoil_position_in_array >= weaponProperties.recoilPattern.Length - 1)
         {
             recoil_position_in_array = 0;
         }
@@ -576,17 +576,17 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             hsMultiplier = weaponProperties.headshot_multiplier,
             canDamageVehicles = weaponProperties.can_damage_vehicles,
             vehicleDamage = weaponProperties.vehicle_damage,
-            delaytoEnableForNonOwner = 0.2f,
+            delaytoEnableForNonOwner = 0.1f,
         };
 
-        ObjectPooling.Instance.GetLocalPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>().CreateBullet(data, playerController.transform);
+        LocalObjectPooling.Instance.GetPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>().CreateBullet(data, playerController.transform);
 
         playerNetworkObjectSpawner.ServerSpawnBullet(serverBullet, data, weaponProperties.gameObject.name);
     }
 
     IEnumerator ApplyVisualRecoilOffset()
     {
-        ApplyRecoilToCamera(weaponProperties.vertical_recoil[recoil_position_in_array], weaponProperties.horizontal_recoil[recoil_position_in_array]);
+        ApplyRecoilToCamera(weaponProperties.recoilPattern[recoil_position_in_array].verticalRecoil, weaponProperties.recoilPattern[recoil_position_in_array].horizontalRecoil);
 
         Vector3 recoilOffset = GetRecoilOffset();
         Vector3 start = weaponProperties.initial_potiion;

@@ -19,7 +19,7 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
     #region Core Weapon Settings
     [Header("Core Settings")]
-    public GameObject weapon;
+    [HideInInspector] public GameObject weapon;
     public GameObject third_person_prefab;
     public Sprite icon_hud;
     public List<FireMode> fire_modes = new List<FireMode>();
@@ -45,7 +45,7 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     [HideInInspector] public int bullets_per_mag;
     [HideInInspector] public List<int> mags = new List<int>();
     #endregion
-    
+
     #region Damage and Ballistics
     [Header("Damage & Ballistics")]
     public bool can_damage_vehicles;
@@ -81,17 +81,12 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #region Recoil Mechanics
     [Header("Recoil Settings")]
     public bool manual_calculate_recoil;
-    [Range(Recoil.MIN_FIRTSHOTINCREASER_VALUE, Recoil.MAX_FIRTSHOTINCREASER_VALUE)]
-    public float first_shoot_increaser;
     public float weapon_reset_recoil_speed;
     public float weapon_apply_recoil_speed;
     public Vector3 visual_recoil;
-    
-    [Space(5)]
-    [Range(Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE)]
-    public float[] vertical_recoil = new float[10];
-    [Range(Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE)]
-    public float[] horizontal_recoil = new float[10];
+    [Range(Recoil.MIN_FIRTSHOTINCREASER_VALUE, Recoil.MAX_FIRTSHOTINCREASER_VALUE)]
+    public float first_shoot_increaser;
+    public Recoil.RecoilPattern[] recoilPattern = new Recoil.RecoilPattern[0];
     [HideInInspector] public float horizontal_recoil_media;
     [HideInInspector] public float vertical_recoil_media;
     #endregion
@@ -127,7 +122,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #endregion
 
     #region Enums
-
     public enum WeaponCategory
     {
         AssaultRifle,
@@ -147,7 +141,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         Burst,
         Single
     }
-
     #endregion
 
     #region Unity Callbacks
@@ -174,22 +167,19 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
             reload_time *= 1.2f;
             first_shoot_increaser *= 0.9f;
 
-            for (int i = 0; i < vertical_recoil.Length; i++)
+            for (int i = 0; i < recoilPattern.Length; i++)
             {
-                vertical_recoil[i] *= 0.9f;
+                recoilPattern[i].horizontalRecoil *= 0.9f;
+                recoilPattern[i].verticalRecoil *= 0.9f;
             }
 
-            for (int i = 0; i < horizontal_recoil.Length; i++)
-            {
-                horizontal_recoil[i] *= 0.9f;
-            }
         }
     }
 
     public void Restart()
     {
         CalculateMedia();
-        
+
         if (!manual_calculate_recoil)
         {
             weapon_reset_recoil_speed = interval / 2;
@@ -214,6 +204,17 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
     public void CalculateMedia()
     {
+        float horizonalMedia = 0;
+        float verticalMedia = 0;
+
+        for (int i = 0; i < recoilPattern.Length; i++)
+        {
+            horizonalMedia = recoilPattern[i].horizontalRecoil;
+            verticalMedia = recoilPattern[i].verticalRecoil;
+        }
+        vertical_recoil_media = verticalMedia / recoilPattern.Length;
+        horizontal_recoil_media = horizonalMedia / recoilPattern.Length;
+        /*
         float media = 0;
 
         for (int i = 0; i < vertical_recoil.Length; i++)
@@ -231,6 +232,7 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         }
         media /= horizontal_recoil.Length;
         horizontal_recoil_media = media;
+        */
     }
 
     public void CreateBulletExtractor()

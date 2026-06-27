@@ -28,7 +28,7 @@ public class ScopeAimShake : MonoBehaviour
 
     void Update()
     {
-        if (playerProperties == null || cameraShake == null || !gameObject.activeSelf) return;
+        if (playerProperties == null || cameraShake == null || !gameObject.activeSelf || AccountManager.Instance.selected_class == ClassManager.Class.Recoon) return;
 
         // O jogador quer segurar a respiração se estiver mirando E apertando o botão
         bool wantsToHoldBreath = playerProperties.is_aiming && InputManager.GetKey(Settings.Instance._keybinds.PLAYER_holdBreathKey);

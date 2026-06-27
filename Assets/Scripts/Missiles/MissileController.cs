@@ -5,7 +5,8 @@ using TMPro;
 using UnityEngine;
 
 public abstract class MissileController : NetworkBehaviour, IsVehicleCustomizationPart, IVehicleArmory
-{    public Sprite image_hud;
+{    
+    public Sprite image_hud;
     public GameObject parent_gameobject;
     [SerializeField] protected bool can_reload_missiles;
     [SerializeField] protected bool only_show_missiles_when_shoot;
@@ -20,8 +21,6 @@ public abstract class MissileController : NetworkBehaviour, IsVehicleCustomizati
     protected Missiles current_missile;
     protected float original_shoot_delay;
     protected float original_spawn_interval;
-
-    public Transform shootDirection;
 
     public override void OnStartNetwork()
     {

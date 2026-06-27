@@ -3,9 +3,9 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
-public class EliminationMarker : MonoBehaviour
+public class EliminationMarker : PersistentLocalSingleton<EliminationMarker>
 {
-    public static EliminationMarker Instance { get; private set; }
+    //public static EliminationMarker Instance { get; private set; }
     [Header("Images")]
     [SerializeField] private Sprite infantary_kill_image;
     [SerializeField] private Sprite vehicle_kill_image;
@@ -25,9 +25,10 @@ public class EliminationMarker : MonoBehaviour
 
     private float nextImagePositionX = 0f;
 
-    private void Awake()
+    protected override void Awake()
     {
-        Instance = this;
+        base.Awake();
+        
         if (images_container == null)
         {
             images_container = transform;

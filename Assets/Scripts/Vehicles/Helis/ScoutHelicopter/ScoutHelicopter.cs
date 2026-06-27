@@ -2,9 +2,6 @@ using UnityEngine;
 
 public class ScoutHelicopter : Helicopter
 {
-
-    #region INITIALIZATION
-
     public override void OnStartClient()
     {
         base.OnStartClient();
@@ -17,222 +14,16 @@ public class ScoutHelicopter : Helicopter
 
         throttle = 0;
         SetHpProperties(heliProperties.hp, heliProperties.resistance);
-
     }
 
-    #endregion
-
-    #region UNITY LIFECYCLE
-
-    protected override void Update()
+    protected override void OnVehicleEntered(int seatIndex, GameObject _player)
     {
-        if (!IsPlayerValid())
-            return;
+        base.OnVehicleEntered(seatIndex, _player);
 
-        if (IsPlayerDead())
-            return;
-
-        PropellerRotation();
-
-        if (is_in_vehicle)
-        {
-            SwitchWeapon();
-
-            if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
-            {
-                currentSeat.currentArmory.Shoot();
-            }
-
-            SyncPlayerPosition();
-            HandleDebugInput();
-
-            if (!SettingsHUD.Instance.is_menu_settings_active)
-                HandleVehicleInput();
-        }
-    }
-
-    protected override void FixedUpdate()
-    {
-        if (CanMove())
-        {
-            Move();
-            Rotate();
-            rb.AddForce(liftDirection * throttle, ForceMode.Acceleration);
-        }
-        else
-        {
-            HandleIdleState();
-        }
-    }
-
-    #endregion
-
-    #region VALIDATION METHODS
-
-    private bool IsPlayerValid()
-    {
-        if (currentSeat != null && currentSeat.playerGameObject != null)
-            return true;
-
-        if (is_in_vehicle)
-        {
-            Debug.LogWarning("Player reference lost, exiting vehicle");
-            ExitVehicle();
-        }
-
-        return false;
-    }
-
-    private bool IsPlayerDead()
-    {
-        if (currentSeat?.playerProperties != null && currentSeat.playerProperties.is_dead.Value)
-        {
-            ExitVehicle();
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool CanMove()
-    {
-        return start_engine &&
-               is_in_vehicle &&
-               !SettingsHUD.Instance.is_menu_settings_active &&
-               !vehicle_destroyed.Value &&
-               currentSeat != null &&
-               currentSeat.seatType == VehicleSeats.SeatType.Pilot;
-    }
-
-    private void HandleIdleState()
-    {
-        if (vehicle_destroyed.Value)
-        {
-            DestroyAnimation();
-        }
-
-        throttle = 0;
-        rb.AddForce(Vector3.down * 50, ForceMode.Acceleration);
-    }
-
-    #endregion
-
-    #region INPUT HANDLING
-
-    private void HandleVehicleInput()
-    {
-        if (currentSeat.seatType == VehicleSeats.SeatType.Pilot && !vehicle_destroyed.Value) StartStopEngine();
-
-        FreeLook();
-
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchSeatKey)) SwitchSeats();
-
-        if (start_engine && !vehicle_destroyed.Value)
-            HandleThrottleControls();
-
-        HandleExitVehicle();
-    }
-
-    #endregion
-
-    // ==================== FREELOOK SYSTEM ====================
-
-    #region FREELOOK SYSTEM
-
-    private void FreeLook()
-    {
-        if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
-            HandlePilotFreeLook();
-        else
-            ApplyFreeLookRotation();
-    }
-
-    private void HandlePilotFreeLook()
-    {
-        if (InputManager.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
-            ApplyFreeLookRotation();
-        else
-            ReturnToCenter();
-    }
-
-    private void ApplyFreeLookRotation()
-    {
-        float mouseY = InputManager.GetAxis("Mouse Y") * -Settings.Instance._controls.helicopter_sensibility;
-        float mouseX = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
-
-        Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
-        float currentX = NormalizeAngle(currentEuler.x);
-        float currentY = NormalizeAngle(currentEuler.y);
-
-        currentX += mouseY;
-        currentY += mouseX;
-
-        currentX = Mathf.Clamp(currentX, -80, 40);
-        currentY = Mathf.Clamp(currentY, -90, 90);
-
-        currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
-    }
-
-    private void ReturnToCenter()
-    {
-        currentSeat.activeCamera.transform.localRotation = Quaternion.Lerp(
-            currentSeat.activeCamera.transform.localRotation,
-            Quaternion.identity,
-            Time.deltaTime * 3
-        );
-    }
-
-    private float NormalizeAngle(float angle)
-    {
-        return (angle > 180) ? angle - 360 : angle;
-    }
-
-    #endregion
-
-    #region PLAYER INTERACTION  
-
-    private void HandleExitVehicle()
-    {
-        exit_cooldown += Time.deltaTime;
-
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
-        {
-            currentSeat.playerController.playerCamera.enabled = true;
-            ExitVehicle();
-        }
-    }
-
-    protected override void OnVehicleEntered(int seatIndex, GameObject player)
-    {
-        base.OnVehicleEntered(seatIndex, player);
-
-        if (!ValidatePlayerReferences())
-            return;
-
-        exit_cooldown = 0f;
-    }
-
-    private bool ValidatePlayerReferences()
-    {
         if (currentSeat == null || currentSeat.playerController == null)
         {
-            Debug.LogError("Error: Player references were not filled by the base class.");
-            return false;
+            Debug.LogError("Erro: Referências do Player não foram preenchidas pela classe base.");
+            return;
         }
-
-        return true;
     }
-    #endregion
-
-    #region HELPER METHODS
-    private void HandleDebugInput()
-    {
-        if (InputManager.GetKeyDown(KeyCode.P))
-        {
-            RequestDamage(100);
-        }
-
-    }
-    #endregion
-
 }

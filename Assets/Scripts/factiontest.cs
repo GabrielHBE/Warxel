@@ -17,6 +17,11 @@ public class ServerState : NetworkBehaviour
         {
             a.text = "Client";
         }
+
+        if (AccountManager.Instance != null)
+        {
+            a.text += " / " + AccountManager.Instance.faction;
+        }
     }
     
 }

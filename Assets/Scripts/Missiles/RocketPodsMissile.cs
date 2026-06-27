@@ -26,7 +26,7 @@ public class RocketPodsMissile : Missiles
         if (!didShoot) return;
 
         gravityForce = Vector3.down * bulletDropMultiplier * rb.mass;
-        rb.AddForce(gravityForce, ForceMode.Acceleration);
+        rb.AddForce(gravityForce);
     }
 
     public override void Shoot(Vector3 direction)

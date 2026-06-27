@@ -60,18 +60,12 @@ public class AirStrikeMissile : NetworkBehaviour
         voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
     }
 
-
-    [ServerRpc(RequireOwnership = false)]
     public void Detonate()
     {
-
         GameObject explosion = Instantiate(explosion_effect, transform.position, Quaternion.identity);
-        Spawn(explosion);
         explosion.transform.localScale *= 2;
-
         RequestDespawn();
     }
-
 
 
     [ServerRpc(RequireOwnership = false)]

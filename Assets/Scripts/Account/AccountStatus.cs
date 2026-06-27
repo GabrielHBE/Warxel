@@ -1,7 +1,8 @@
 using UnityEngine;
 
-public class AccountStatus : MonoBehaviour
+public class AccountStatus : PersistentLocalSingleton<AccountStatus>
 {
+    //public static AccountStatus Instance {get; private set;}
     public ClassManager.Class most_used_class;
     public float kd_ratio;
     public int total_head_shot_kills;
@@ -14,13 +15,15 @@ public class AccountStatus : MonoBehaviour
     public int total_matches_lost;
     public float win_rate;
 
-    private void Awake()
+    protected override void Awake()
     {
+        base.Awake();
         LoadAccountStatus();
 
         CalculateKdRatio();
         CalculateWinRate();
     }
+
 
     public void LoadAccountStatus()
     {

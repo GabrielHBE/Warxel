@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 1. Herda de LocalPooledObject em vez de MonoBehaviour
 public class AudioDistanceController : LocalPooledObject
 {
     [Header("Growth Settings")]
@@ -14,6 +13,7 @@ public class AudioDistanceController : LocalPooledObject
     public bool stopOnExit = false;
     public bool preventRepeating = true;
     [SerializeField] private DistanceSounds[] distanceSounds;
+    private DistanceSounds[] defaultDistanceSounds; // NOVO: Armazena o padrão do Prefab
 
     [Header("Detection Settings")]
     [SerializeField] private LayerMask cameraLayer;
@@ -33,6 +33,16 @@ public class AudioDistanceController : LocalPooledObject
 
     private float initialGrowth = 0;
 
+    protected override void Awake()
+    {
+        base.Awake();
+        // Salva os sons padrão configurados no Inspector do Prefab
+        if (distanceSounds != null)
+        {
+            defaultDistanceSounds = (DistanceSounds[])distanceSounds.Clone();
+        }
+    }
+
     // 2. Limpa o estado quando sair do Pool
     void OnEnable()
     {
@@ -40,6 +50,12 @@ public class AudioDistanceController : LocalPooledObject
         isGrowing = false;
         currentSize = initialGrowth;
         if (sphereCollider != null) sphereCollider.radius = currentSize;
+
+        // Resetar os sons de distância para o padrão do prefab ao sair do pool
+        if (defaultDistanceSounds != null)
+            distanceSounds = (DistanceSounds[])defaultDistanceSounds.Clone();
+        else
+            distanceSounds = null;
     }
 
     void Update()
@@ -68,9 +84,34 @@ public class AudioDistanceController : LocalPooledObject
 
     public void Setup(AudioClip clip, SoundManager.SoundProperties soundProperties)
     {
-        ApplySoundProperties(clip, soundProperties);
+        audioSource = SoundManager.CreateConfiguredAudioSource(gameObject, clip, soundProperties, true, false);
 
         finalGrowth = audioSource.maxDistance;
+        
+        // NOVO: Lê os sons de distância customizados vindos do SoundManager
+        if (soundProperties.customDistanceSounds != null && soundProperties.customDistanceSounds.Length > 0)
+        {
+            distanceSounds = new DistanceSounds[soundProperties.customDistanceSounds.Length];
+            for (int i = 0; i < soundProperties.customDistanceSounds.Length; i++)
+            {
+                var customData = soundProperties.customDistanceSounds[i];
+
+                // Tenta pegar o AudioClip direto. Se for nulo (recebido via rede), busca o AudioClip no cache pelo nome.
+                AudioClip resolvedClip = customData.clip;
+                if (resolvedClip == null && !string.IsNullOrEmpty(customData.soundName))
+                {
+                    resolvedClip = SoundManager.Instance.GetClip(customData.soundName);
+                }
+
+                distanceSounds[i] = new DistanceSounds
+                {
+                    audio = resolvedClip,
+                    min_distance = customData.min_distance,
+                    max_distance = customData.max_distance
+                };
+            }
+        }
+        
     }
 
     public void StartGrowth()
@@ -158,24 +199,6 @@ public class AudioDistanceController : LocalPooledObject
     {
         alreadyPlayedObjects.Clear();
         currentSoundForObject.Clear();
-    }
-
-    public void ApplySoundProperties(AudioClip clip, SoundManager.SoundProperties properties)
-    {
-        if (audioSource == null) return;
-        audioSource.playOnAwake = false;
-        audioSource.clip = clip;
-        audioSource.priority = properties.priority;
-        audioSource.volume = properties.volume;
-        audioSource.pitch = properties.pitch;
-        audioSource.panStereo = properties.stereoPan;
-        audioSource.spatialBlend = properties.spatialBlend;
-        audioSource.reverbZoneMix = properties.reverbZoneMix;
-        audioSource.dopplerLevel = properties.dopplerLevel;
-        audioSource.spread = properties.spread;
-        audioSource.rolloffMode = properties.rolloffMode;
-        audioSource.minDistance = properties.minDistance;
-        audioSource.maxDistance = properties.maxDistance;
     }
 
     [System.Serializable]

@@ -4,18 +4,28 @@ public class DummyBullet : LocalPooledObject
 {
     [SerializeField] private Rigidbody rb;
     [SerializeField] private TrailRenderer trailRenderer;
+    [SerializeField] private Light bulletLight;
     private Transform ignoredTransform;
     private Vector3 lastPosition;
     private float bulletDropMultiplier;
+    private int layerMask;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        layerMask = ~(1 << LayerMask.NameToLayer("Projectile") | 1 << LayerMask.NameToLayer("Player"));
+    }
+
     public void CreateBullet(Bullet.BulletData data, Transform ignoredObject = null)
     {
-        Activate();
-
         bulletDropMultiplier = data.dropMultiplier;
         ignoredTransform = ignoredObject;
-
-        transform.rotation = data.rotation;
         transform.position = data.position;
+        transform.rotation = data.rotation;
+        rb.position = data.position;
+        rb.rotation = data.rotation;
+
+        Activate();
 
         lastPosition = transform.position;
 
@@ -23,6 +33,7 @@ public class DummyBullet : LocalPooledObject
         {
             trailRenderer.Clear();
             trailRenderer.enabled = true;
+            bulletLight.enabled = true;
         }
 
         SetDirection(data.direction, data.speed);
@@ -35,7 +46,7 @@ public class DummyBullet : LocalPooledObject
 
     void OnTriggerEnter(Collider collider)
     {
-        
+
         // Ignora colisões com balas ou física do player
         if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") ||
             collider.gameObject.layer == LayerMask.NameToLayer("Player"))
@@ -64,7 +75,7 @@ public class DummyBullet : LocalPooledObject
 
         if (distance > 0)
         {
-            int layerMask = ~(1 << LayerMask.NameToLayer("Projectile") | 1 << LayerMask.NameToLayer("Player"));
+
             int hits = Physics.RaycastNonAlloc(lastPosition, direction.normalized, hit_results, distance, layerMask);
 
             if (hits > 0)
@@ -102,6 +113,12 @@ public class DummyBullet : LocalPooledObject
     public override void Deactivate()
     {
         base.Deactivate();
+        if (trailRenderer != null)
+        {
+            trailRenderer.Clear();
+            trailRenderer.enabled = false;
+            bulletLight.enabled = false;
+        }
         transform.localPosition = Vector3.zero;
         rb.linearVelocity = Vector3.zero;
     }

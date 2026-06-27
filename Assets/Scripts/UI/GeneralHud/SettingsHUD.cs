@@ -9,17 +9,17 @@ using System.Collections;
 using FishNet;
 using UnityEngine.SceneManagement;
 
-public class SettingsHUD : MonoBehaviour
+public class SettingsHUD : PersistentLocalSingleton<SettingsHUD>
 {
-    public static SettingsHUD Instance { get; private set; }
-
+    //public static SettingsHUD Instance { get; private set; }
+    
     [SerializeField] private GameObject reset_keyBind_button;
     [SerializeField] private GameObject error_image;
-    [SerializeField] private UnityEngine.UI.Button close_image_error_button;
+    [SerializeField] private Button close_image_error_button;
     [SerializeField] private GameObject settings_menu;
     [SerializeField] private Image background_image;
     [SerializeField] private TextMeshProUGUI tab_title;
-    [HideInInspector] public bool is_menu_settings_active = false;
+    public bool is_menu_settings_active = false;
 
     [Header("Tabs")]
     [SerializeField] private GameObject audio_tab;
@@ -193,14 +193,16 @@ public class SettingsHUD : MonoBehaviour
     [SerializeField] private TextMeshProUGUI HELICOPTER_gunnerSeatButton;
     [SerializeField] private TextMeshProUGUI HELICOPTER_pilotSeatButton;
 
-
     private bool is_mouse_over_close_error_message_button;
     private bool show_message_error = false;
     private string message_error;
     TextMeshProUGUI text_error;
-    void Awake()
+    protected override void Awake()
     {
-        Instance = this;
+        base.Awake();
+
+        if (Instance != this) return;
+
         text_error = error_image.GetComponentInChildren<TextMeshProUGUI>();
 
         if (settings_menu != null)
@@ -242,7 +244,11 @@ public class SettingsHUD : MonoBehaviour
     float scrollSpeed = 3000f;
     void Update()
     {
-        if (Settings.Instance == null) return;
+        if (Settings.Instance == null)
+        {
+            Debug.LogError("Settings.Instance é nulo");
+            return;
+        } 
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -717,36 +723,42 @@ public class SettingsHUD : MonoBehaviour
     public void OnGeneralVolumeChanged(float value)
     {
         Settings.Instance._audio.general_volume = value;
+        AudioMixerManager.SetMasterVolume(value);
         PlayerPrefs.SetFloat(SettingsKeys.GENERAL_VOLUME, value);
     }
 
     public void OnVoipVolumeChanged(float value)
     {
         Settings.Instance._audio.in_world_voip_volume = value;
+        AudioMixerManager.SetInWorldVoipVolume(value);
         PlayerPrefs.SetFloat(SettingsKeys.VOIP_VOLUME, value);
     }
 
     public void OnMusicVolumeChanged(float value)
     {
         Settings.Instance._audio.music_volume = value;
+        AudioMixerManager.SetMusicVolume(value);
         PlayerPrefs.SetFloat(SettingsKeys.MUSIC_VOLUME, value);
     }
 
     public void OnWorldVolumeChanged(float value)
     {
         Settings.Instance._audio.world_volume = value;
+        AudioMixerManager.SetWorldVolume(value);
         PlayerPrefs.SetFloat(SettingsKeys.WORLD_VOLUME, value);
     }
 
     public void OnHitVolumeChanged(float value)
     {
         Settings.Instance._audio.hit_volume = value;
+        AudioMixerManager.SetHitVolume(value);
         PlayerPrefs.SetFloat(SettingsKeys.HIT_VOLUME, value);
     }
 
     public void OnKillVolumeChanged(float value)
     {
         Settings.Instance._audio.kill_volume = value;
+        AudioMixerManager.SetKillVolume(value);
         PlayerPrefs.SetFloat(SettingsKeys.KILL_VOLUME, value);
     }
     

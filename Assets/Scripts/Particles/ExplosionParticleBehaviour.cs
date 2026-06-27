@@ -11,11 +11,9 @@ public class ExplosionParticleBehaviour : ParticlesBehaviour
     [SerializeField] private LayerMask groundLayer; // Adicionar camada pelo Inspector
     [SerializeField] private Light explosion_light;
 
-    public override void OnStartClient()
+    protected override void Awake()
     {
-        base.OnStartClient();
-
-        Invoke(nameof(DestroyAfterTime), destroyTimer);
+        base.Awake();
 
         if (explosion_light != null) explosion_light.enabled = true;
 
@@ -112,31 +110,4 @@ public class ExplosionParticleBehaviour : ParticlesBehaviour
         }
 
     }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestDespawn()
-    {
-        if (IsSpawned)
-        {
-            Despawn(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestDespawn(GameObject gameObject)
-    {
-        if (IsSpawned)
-        {
-            Despawn(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
-
 }

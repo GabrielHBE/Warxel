@@ -2,9 +2,9 @@ using TMPro;
 using UnityEngine;
 using System.Collections;
 
-public class DamageMarker : MonoBehaviour
+public class DamageMarker : PersistentLocalSingleton<DamageMarker>
 {
-    public static DamageMarker Instance {get; private set;}
+    //public static DamageMarker Instance {get; private set;}
     [SerializeField] private TextMeshProUGUI damage_text;
     [SerializeField] private float fadeDuration = 0.5f; // Duração do fade out
     [SerializeField] private float idleTimeToFade = 1f; // Tempo sem chamadas para começar a desaparecer
@@ -14,9 +14,10 @@ public class DamageMarker : MonoBehaviour
     private float lastUpdateTime;
     private CanvasGroup canvasGroup;
 
-    private void Awake()
+    protected override void Awake()
     {
-        Instance = this;
+        base.Awake();
+        
         // Garantir que temos um CanvasGroup para controlar a transparência
         canvasGroup = damage_text.GetComponent<CanvasGroup>();
         if (canvasGroup == null)

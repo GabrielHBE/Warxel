@@ -73,74 +73,40 @@ public abstract class Missiles : NetworkBehaviour
 
     protected virtual void OnCollisionEnter(Collision collision)
     {
+        // Verifica se o objeto ainda está ativo na rede
         if (!IsSpawned || hasExploded || collision.gameObject == parent_gameobject) return;
 
-        GameObject ignoreGoInExplosion = null;
+        // Verifica se o NetworkTransform ainda está ativo
+        if (GetComponent<FishNet.Component.Transforming.NetworkTransform>() != null)
+        {
+            // Desativa o NetworkTransform para evitar atualizações futuras
+            GetComponent<FishNet.Component.Transforming.NetworkTransform>().enabled = false;
+        }
 
         trail.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         trail.transform.SetParent(null, true);
         trail.transform.localScale = Vector3.one;
         Destroy(trail.gameObject, trail.main.duration + trail.main.startLifetime.constantMax);
 
-
         hasExploded = true;
 
         if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
         {
             ProcessHit.VehicleHit(collision.gameObject, infantary_damage, gameObject);
-            /*
-            Vehicle vehicle = collision.gameObject.GetComponent<Vehicle>() ?? collision.gameObject.GetComponentInParent<Vehicle>();
-
-            if (vehicle != null && !vehicle.vehicle_destroyed.Value)
-            {
-                ignoreGoInExplosion = vehicle.gameObject;
-
-                string[] occupantNames = vehicle.GetOccupantNames();
-
-                float target_resistance = vehicle.GetResistance();
-                float final_actual_damage = vehicle_damage * ((100f - target_resistance) / 100f);
-                vehicle.RequestDamage(vehicle_damage);
-
-                if (vehicle.vehicle_destroyed.Value)
-                    ProcessKill.ProcessVehicleKill(gameObject, occupantNames);
-                else
-                    DamageMarker.Instance?.UpdateDamage(final_actual_damage);
-            }
-            */
-
         }
         else if (collision.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
         {
             ProcessHit.PlayerHit(collision.gameObject, infantary_damage, 2, gameObject);
-
-            /*
-            PlayerController player = collision.gameObject.GetComponent<PlayerController>() ?? collision.gameObject.GetComponentInParent<PlayerController>();
-            PlayerProperties player_properties = player.GetComponent<PlayerProperties>();
-            player.RequestDamage(infantary_damage);
-            float target_resistance = player.GetResistance();
-            float final_actual_damage = infantary_damage * ((100f - target_resistance) / 100f);
-
-            ignoreGoInExplosion = player.gameObject;
-
-            if (player_properties.is_dead.Value)
-            {
-                ProcessKill.ProcessInfantryKill(gameObject, false, player_properties.player_name.Value);
-            }
-            else
-            {
-                DamageMarker.Instance.UpdateDamage(final_actual_damage);
-            }
-            */
-
         }
 
         missile_collider.enabled = false;
 
         SoundManager.Play3dSoundLocal(explosionSound, explosionSoundProperties, collision.contacts[0].point);
 
-        voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage, ignoreGoInExplosion);
-        Explode(collision.contacts[0].point);
+        voxCollider.SphereExplosion(collision.contacts[0].point, infantary_damage, vehicle_damage);
 
+        // Explode e desspawna
+        Explode(collision.contacts[0].point);
     }
     #endregion
 
@@ -154,7 +120,7 @@ public abstract class Missiles : NetworkBehaviour
             explosion.transform.localScale *= 2;
         }
 
-        RequestDespawn();
+        if (IsServerInitialized) RequestDespawn();
     }
 
 
@@ -176,7 +142,7 @@ public abstract class Missiles : NetworkBehaviour
             voxCollider.parent_vehicle = vehicle;
         }
     }
-    [ServerRpc]
+    [Server]
     private void RequestDespawn()
     {
 

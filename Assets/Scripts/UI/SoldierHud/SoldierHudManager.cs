@@ -49,7 +49,7 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
     {
         ammoCanvas.gameObject.SetActive(false);
         armoryCanvas.gameObject.SetActive(false);
-        miscelaniousCanvas.gameObject.SetActive(false);
+        miscelaniousCanvas.gameObject.SetActive(true);
         deadPlayerCanvas.gameObject.SetActive(false);
         hpCanvas.gameObject.SetActive(true);
         reticleCanvas.gameObject.SetActive(false);
@@ -58,7 +58,7 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
     {
         ammoCanvas.gameObject.SetActive(false);
         armoryCanvas.gameObject.SetActive(false);
-        miscelaniousCanvas.gameObject.SetActive(false);
+        miscelaniousCanvas.gameObject.SetActive(true);
         deadPlayerCanvas.gameObject.SetActive(true);
         hpCanvas.gameObject.SetActive(false);
         reticleCanvas.gameObject.SetActive(false);

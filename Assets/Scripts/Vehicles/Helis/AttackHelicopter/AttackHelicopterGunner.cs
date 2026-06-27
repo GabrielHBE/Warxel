@@ -1,6 +1,5 @@
 using UnityEngine;
 using FishNet.Object;
-using System.Collections;
 
 public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 {
@@ -15,8 +14,25 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     private bool is_overheated;
     private float current_spread;
     private Vector3 shakeOffset;
-    private float current_camera;
+    private float current_camera = 1;
     private bool isActive = true;
+
+    // Rotação acumulada (Para espelhar o PlayerController e evitar bugs com shakeOffset)
+    private float verticalRotation;
+    private float horizontalRotation;
+    private bool hasInitializedRotations = false;
+
+    // Estado Interno (Recuo)
+    private float recoilVerticalTarget;
+    private float recoilVerticalCurrent;
+    private float recoilVerticalVelocity;
+
+    private float horizontalRecoilTarget;
+    private float horizontalRecoilCurrent;
+    private float horizontalRecoilVelocity;
+
+    private int recoil_position_in_array = 0;
+    private bool is_first_shot = false;
 
     void Update()
     {
@@ -33,14 +49,16 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         if (gunnerGunCamera.enabled)
         {
             RotateGun(transform);
-            Vector3 finalRotation = transform.localEulerAngles + shakeOffset;
+
+            // O shakeOffset agora é aplicado por cima de uma rotação limpa,
+            // garantindo que não seja "assimilado" permanentemente pela câmera no próximo frame.
+            Vector3 finalRotation = new Vector3(verticalRotation, horizontalRotation, 0f) + shakeOffset;
             transform.localEulerAngles = finalRotation;
         }
         else
         {
             ApplyFreeLookRotation();
         }
-
     }
 
     public void UpdateCooldown(float dt)
@@ -94,20 +112,62 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     public void RotateGun(Transform gunTransform)
     {
+        // Inicializa as variáveis baseadas na rotação atual assim que a arma começa a ser rotacionada
+        if (!hasInitializedRotations)
+        {
+            Vector3 currentEuler = gunTransform.localEulerAngles;
+            verticalRotation = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
+            horizontalRotation = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
+            hasInitializedRotations = true;
+        }
+
         float mouseX = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
         float mouseY = InputManager.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
 
-        Vector3 currentEuler = gunTransform.localEulerAngles;
-        float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
-        float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
+        float applySpeed = Mathf.Max(properties.weapon_apply_recoil_speed, 0.01f);
 
-        currentY += mouseX;
-        currentX -= mouseY;
+        horizontalRecoilCurrent = Mathf.SmoothDamp(horizontalRecoilCurrent, horizontalRecoilTarget, ref horizontalRecoilVelocity, applySpeed);
+        recoilVerticalCurrent = Mathf.SmoothDamp(recoilVerticalCurrent, recoilVerticalTarget, ref recoilVerticalVelocity, applySpeed);
 
-        currentX = Mathf.Clamp(currentX, -5f, 80f);
-        currentY = Mathf.Clamp(currentY, -90f, 90f);
+        // Aplica o input + recuo de forma aditiva nas variáveis isoladas, idêntico ao PlayerController
+        horizontalRotation += mouseX + horizontalRecoilCurrent;
+        verticalRotation -= (mouseY + recoilVerticalCurrent);
 
-        gunTransform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+        verticalRotation = Mathf.Clamp(verticalRotation, -5f, 80f);
+        horizontalRotation = Mathf.Clamp(horizontalRotation, -90f, 90f);
+
+        gunTransform.localRotation = Quaternion.Euler(verticalRotation, horizontalRotation, 0f);
+
+        // Zera os alvos logo após aplicá-los para não acumular forças irreais
+        horizontalRecoilTarget = 0f;
+        recoilVerticalTarget = 0f;
+    }
+
+    private void ApplyGunnerRecoil()
+    {
+        if (properties.recoilPattern == null || properties.recoilPattern.Length == 0) return;
+
+        if (recoil_position_in_array >= properties.recoilPattern.Length)
+        {
+            recoil_position_in_array = 0;
+        }
+
+        float vr = properties.recoilPattern[recoil_position_in_array].verticalRecoil;
+        float hr = properties.recoilPattern[recoil_position_in_array].horizontalRecoil;
+
+        var recoil = Recoil.CalculateCameraRecoil(
+            vr,
+            hr,
+            properties.first_shoot_increaser,
+            is_first_shot,
+            2
+        );
+
+        recoilVerticalTarget += recoil.vertical;
+        horizontalRecoilTarget += recoil.horizontal;
+
+        is_first_shot = true;
+        recoil_position_in_array++;
     }
 
     private void Fire()
@@ -115,6 +175,8 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPos, current_spread);
 
         current_spread = Spread.AddSpread(current_spread, properties.spread, properties.max_spread);
+
+        ApplyGunnerRecoil();
 
         Bullet.BulletData data = new Bullet.BulletData
         {
@@ -134,10 +196,9 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
             delaytoEnableForNonOwner = 0,
         };
 
-        DummyBullet instantiatedDummyBullet = ObjectPooling.Instance.GetLocalPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
+        DummyBullet instantiatedDummyBullet = LocalObjectPooling.Instance.GetPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
         if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
 
-        // Chama a lógica de rede
         CmdFireGunner(data);
     }
 
@@ -149,44 +210,11 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         bullet.CreateBullet(data, transform.root, null);
     }
 
-    private IEnumerator ShakeRoutine()
-    {
-        float elapsed = 0f;
-        float intensity = 0.1f;
-        float duration = 0.2f;
-
-        shakeOffset = Vector3.zero;
-        while (elapsed < duration)
-        {
-            float time = Time.time * 20f;
-            shakeOffset = new Vector3(
-                    (Mathf.PerlinNoise(time * 1.2f, 0) * 2f - 1f) * intensity * 2f,
-                    ((Mathf.PerlinNoise(0, time * 1.5f) * 2f - 1f) * 0.4f +
-                     (Mathf.Sin(time * 3f) * 0.6f)) * intensity * 0.8f,
-                    (Mathf.PerlinNoise(time * 0.8f, time * 0.8f) * 2f - 1f) * intensity * 0.7f
-                );
-
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        float returnTime = Mathf.Min(0.1f, duration * 0.5f);
-        elapsed = 0f;
-        Vector3 startingShake = shakeOffset;
-
-        while (elapsed < returnTime)
-        {
-            float t = elapsed / returnTime;
-            shakeOffset = Vector3.Lerp(startingShake, Vector3.zero, t);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        shakeOffset = Vector3.zero;
-    }
-
     private void StopFire()
     {
+        recoil_position_in_array = 0;
+        is_first_shot = false;
+
         current_spread = Spread.ResetSpread(current_spread);
 
         float coolSpeed = is_overheated ? (Time.deltaTime / 2f) : Time.deltaTime;
@@ -195,7 +223,6 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         if (current_overheat <= 0) is_overheated = false;
     }
 
-    // Implementações da Interface
     public void Shoot()
     {
         float dt = Time.deltaTime;

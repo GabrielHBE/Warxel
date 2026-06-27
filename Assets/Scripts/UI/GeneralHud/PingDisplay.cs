@@ -2,19 +2,22 @@ using UnityEngine;
 using FishNet.Managing;
 using FishNet;
 using TMPro;
-public class PingDisplay : MonoBehaviour
+
+public class PingDisplay : PersistentLocalSingleton<PingDisplay>
 {
+    //public static PingDisplay Instance {get; private set;}
 
     [SerializeField] private TextMeshProUGUI pingText;
     private NetworkManager networkManager;
 
-    private void Start()
+    protected override void Awake()
     {
+        base.Awake();
         networkManager = InstanceFinder.NetworkManager;
     }
 
     private void Update()
-    {   
+    {
         if (networkManager != null && Settings.Instance._gameplay.show_network_status)
         {
             float ping = networkManager.TimeManager.RoundTripTime;

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using FishNet.Object;
 using FishNet.Connection;
+using UnityEngine.Audio;
+using FishNet.Serializing;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -12,10 +14,27 @@ public class SoundManager : NetworkBehaviour
 {
     public static SoundManager Instance { get; private set; }
 
-    [Header("Pool de Áudio")]
+    [Header("Audio Pool")]
     [SerializeField] private AudioDistanceController audioDistanceControllerPrefab;
     [SerializeField, Tooltip("Prefab genérico vazio com o script LocalPooledObject e um AudioSource para sons 2D e Loops")]
     private GameObject audio2DPrefab;
+
+    [Header("Audio Mixer Group")]
+    [SerializeField] private AudioMixer mainMixer;
+    [SerializeField] private AudioMixerGroup inWorldVoipAudioMixerGroup;
+    [SerializeField] private AudioMixerGroup radioVoipAudioMixerGroup;
+    [SerializeField] private AudioMixerGroup musicAudioMixerGroup;
+    [SerializeField] private AudioMixerGroup worldAudioMixerGroup;
+    [SerializeField] private AudioMixerGroup enviromentAudioMixerGroup;
+    [SerializeField] private AudioMixerGroup hitAudioMixerGroup;
+
+    public static AudioMixerGroup staticInWorldVoipAudioMixerGroup;
+    public static AudioMixerGroup staticRadioVoipAudioMixerGroup;
+    public static AudioMixerGroup staticMusicAudioMixerGroup;
+    public static AudioMixerGroup staticWorldAudioMixerGroup;
+    public static AudioMixerGroup staticEnviromentAudioMixerGroup;
+    public static AudioMixerGroup staticHitAudioMixerGroup;
+    public static AudioMixer staticMainMixer;
 
     [Header("Configurações de Áudio (Atualizado Automatically)")]
     [SerializeField] private List<AudioClip> internalAudioList = new List<AudioClip>();
@@ -30,10 +49,23 @@ public class SoundManager : NetworkBehaviour
 
     void Start()
     {
-        staticAudioDistanceController = audioDistanceControllerPrefab;
-        staticAudio2DPrefab = audio2DPrefab;
+        DefineStatics();
+
         Instance = this;
         InitializeAudioCache();
+    }
+
+    private void DefineStatics()
+    {
+        staticMainMixer = mainMixer;
+        staticInWorldVoipAudioMixerGroup = inWorldVoipAudioMixerGroup;
+        staticRadioVoipAudioMixerGroup = radioVoipAudioMixerGroup;
+        staticMusicAudioMixerGroup = musicAudioMixerGroup;
+        staticWorldAudioMixerGroup = worldAudioMixerGroup;
+        staticEnviromentAudioMixerGroup = enviromentAudioMixerGroup;
+        staticHitAudioMixerGroup = hitAudioMixerGroup;
+        staticAudioDistanceController = audioDistanceControllerPrefab;
+        staticAudio2DPrefab = audio2DPrefab;
     }
 
     void Update()
@@ -113,12 +145,45 @@ public class SoundManager : NetworkBehaviour
     }
 
     #region Helpers de Criação de Áudio
-    private static AudioSource CreateConfiguredAudioSource(GameObject go, AudioClip clip, SoundProperties props, bool is3D, bool loop)
+    public static AudioSource CreateConfiguredAudioSource(GameObject go, AudioClip clip, SoundProperties props, bool is3D, bool loop)
     {
         // Se vier do Pool, usa o componente existente para não adicionar múltiplos AudioSources
         if (!go.TryGetComponent(out AudioSource audioSource))
         {
             audioSource = go.AddComponent<AudioSource>();
+        }
+
+        if (audioSource == null) return null;
+
+        switch (props.soundType)
+        {
+            case SoundType.Enviroment:
+                audioSource.outputAudioMixerGroup = staticEnviromentAudioMixerGroup;
+                break;
+
+            case SoundType.Hit:
+                audioSource.outputAudioMixerGroup = staticHitAudioMixerGroup;
+                break;
+
+            case SoundType.InWorldVoip:
+                audioSource.outputAudioMixerGroup = staticInWorldVoipAudioMixerGroup;
+                break;
+
+            case SoundType.Music:
+                audioSource.outputAudioMixerGroup = staticMusicAudioMixerGroup;
+                break;
+
+            case SoundType.RadioVoip:
+                audioSource.outputAudioMixerGroup = staticRadioVoipAudioMixerGroup;
+                break;
+
+            case SoundType.World:
+                audioSource.outputAudioMixerGroup = staticWorldAudioMixerGroup;
+                break;
+
+            default:
+                audioSource.outputAudioMixerGroup = null;
+                break;
         }
 
         audioSource.playOnAwake = false;
@@ -155,7 +220,7 @@ public class SoundManager : NetworkBehaviour
         }
 
         // Pega do Pool em vez de fazer "new GameObject()"
-        GameObject loopObject = ObjectPooling.Instance.GetLocalPooledItem(staticAudio2DPrefab);
+        GameObject loopObject = LocalObjectPooling.Instance.GetPooledItem(staticAudio2DPrefab);
         if (loopObject == null) return;
 
         loopObject.GetComponent<LocalPooledObject>().Activate();
@@ -234,7 +299,7 @@ public class SoundManager : NetworkBehaviour
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip))
         {
-            GameObject pooledObj = ObjectPooling.Instance.GetLocalPooledItem(audioDistanceControllerPrefab.gameObject);
+            GameObject pooledObj = LocalObjectPooling.Instance.GetPooledItem(audioDistanceControllerPrefab.gameObject);
             if (pooledObj != null)
             {
                 pooledObj.transform.position = position;
@@ -463,7 +528,7 @@ public class SoundManager : NetworkBehaviour
     #region Static Methods
     public static void Play2dSoundLocal(AudioClip clip, SoundProperties soundProperties)
     {
-        GameObject tempGO = ObjectPooling.Instance.GetLocalPooledItem(staticAudio2DPrefab);
+        GameObject tempGO = LocalObjectPooling.Instance.GetPooledItem(staticAudio2DPrefab);
         if (tempGO == null) return;
 
         tempGO.GetComponent<LocalPooledObject>().Activate();
@@ -487,7 +552,7 @@ public class SoundManager : NetworkBehaviour
 
     public static void Play3dSoundLocal(AudioClip clip, SoundProperties soundProperties, Vector3 position)
     {
-        GameObject pooledObj = ObjectPooling.Instance.GetLocalPooledItem(staticAudioDistanceController.gameObject);
+        GameObject pooledObj = LocalObjectPooling.Instance.GetPooledItem(staticAudioDistanceController.gameObject);
         if (pooledObj != null)
         {
             pooledObj.transform.position = position;
@@ -528,11 +593,12 @@ public class SoundManager : NetworkBehaviour
     }
     #endregion
 
-    #region structs & classes
-    [System.Serializable]
+    #region structs & enums
+    [Serializable]
     public struct SoundProperties
     {
         public int priority;
+        public SoundType soundType;
         [Range(0, 1)] public float volume;
         [Range(-3, 3)] public float pitch;
         [Range(-1, 1)] public float stereoPan;
@@ -547,6 +613,9 @@ public class SoundManager : NetworkBehaviour
         public float cameraShakeIntensity;
         public float cameraShakeDuration;
 
+        // NOVO: Array para sons de distância customizados
+        public DistanceSoundData[] customDistanceSounds;
+
         public static SoundProperties Default => new SoundProperties
         {
             priority = 128,
@@ -559,8 +628,30 @@ public class SoundManager : NetworkBehaviour
             reverbZoneMix = 1,
             enableCameraShake = false,
             cameraShakeIntensity = 2,
-            cameraShakeDuration = 1
+            cameraShakeDuration = 1,
+            customDistanceSounds = null // Inicializa vazio por padrão
         };
+    }
+
+    // NOVO: Struct preparada para o Inspector e para o FishNet
+    [Serializable]
+    public struct DistanceSoundData
+    {
+        public AudioClip clip; // Aparecerá no Inspector para você arrastar o áudio
+        [HideInInspector] public string soundName; // Guardará o nome do som para o Client
+        public float min_distance;
+        public float max_distance;
+    }
+
+    public enum SoundType
+    {
+        None,
+        InWorldVoip,
+        RadioVoip,
+        Music,
+        World,
+        Enviroment,
+        Hit,
     }
 
     public struct LoopAudio
@@ -571,4 +662,26 @@ public class SoundManager : NetworkBehaviour
         public GameObject gameObject;
     }
     #endregion
+}
+
+public static class FishNetAudioSerializers
+{
+    public static void WriteDistanceSoundData(this Writer writer, SoundManager.DistanceSoundData value)
+    {
+        string nameToSend = value.clip != null ? value.clip.name : (value.soundName ?? "");
+
+        writer.WriteString(nameToSend);
+        writer.WriteSingle(value.min_distance);
+        writer.WriteSingle(value.max_distance);
+    }
+
+    public static SoundManager.DistanceSoundData ReadDistanceSoundData(this Reader reader)
+    {
+        return new SoundManager.DistanceSoundData
+        {
+            soundName = reader.ReadStringAllocated(),
+            min_distance = reader.ReadSingle(),
+            max_distance = reader.ReadSingle()
+        };
+    }
 }

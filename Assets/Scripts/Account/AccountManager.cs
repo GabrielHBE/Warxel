@@ -2,9 +2,9 @@ using FishNet.Object;
 using TMPro;
 using UnityEngine;
 
-public class AccountManager : MonoBehaviour
+public class AccountManager : PersistentLocalSingleton<AccountManager>
 {
-    public static AccountManager Instance { get; private set; }
+    //public static AccountManager Instance { get; private set; }
     public AccountStatus status;
     public string account_name;
     public string id;
@@ -19,14 +19,12 @@ public class AccountManager : MonoBehaviour
     //Testing
     public UnityEngine.UI.Button switch_faction_button;
 
-    private void Awake()
+    protected override void Awake()
     {
-        
-        Instance = this;
+        base.Awake();
         LoadData();
 
     }
-
 
     private void Update()
     {

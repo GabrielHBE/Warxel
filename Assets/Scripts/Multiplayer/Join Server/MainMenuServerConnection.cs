@@ -68,9 +68,6 @@ public class MainMenuConnection : MonoBehaviour
     {
         ShowLoading(message);
 
-        if (AccountManager.Instance != null) Destroy(AccountManager.Instance.gameObject);
-        if (Settings.Instance != null) Destroy(Settings.Instance.gameObject);
-
     }
 
     // Este evento é disparado automaticamente quando o status do Servidor muda

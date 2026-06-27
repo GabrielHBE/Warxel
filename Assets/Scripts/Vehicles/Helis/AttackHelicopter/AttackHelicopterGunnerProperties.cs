@@ -17,7 +17,16 @@ public class AttackHelicopterGunnerProperties : MonoBehaviour, IsVehicleCustomiz
     public float bullet_drop;
     public float minimum_damage;
 
-
+    [Header("Recoil Settings")]
+    public bool manual_calculate_recoil;
+    public float weapon_reset_recoil_speed;
+    public float weapon_apply_recoil_speed;
+    public Vector3 visual_recoil;
+    [Range(Recoil.MIN_FIRTSHOTINCREASER_VALUE, Recoil.MAX_FIRTSHOTINCREASER_VALUE)]
+    public float first_shoot_increaser;
+    public Recoil.RecoilPattern[] recoilPattern = new Recoil.RecoilPattern[0];
+    [HideInInspector] public float horizontal_recoil_media;
+    [HideInInspector] public float vertical_recoil_media;
     [Header("Cannon")]
     public float infantary_damage;
     public float vehicle_damage;
@@ -29,6 +38,16 @@ public class AttackHelicopterGunnerProperties : MonoBehaviour, IsVehicleCustomiz
     public float damage_dropoff_timer;
     public float destruction_force;
     public float interval => 60f / fire_rate;
+
+    public void Awake()
+    {
+
+        if (!manual_calculate_recoil)
+        {
+            weapon_reset_recoil_speed = interval / 2;
+            weapon_apply_recoil_speed = interval / 2;
+        }
+    }
 
     public void Activate()
     {

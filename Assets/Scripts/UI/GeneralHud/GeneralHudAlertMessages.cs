@@ -3,17 +3,13 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class GeneralHudAlertMessages : MonoBehaviour
+public class GeneralHudAlertMessages : PersistentLocalSingleton<GeneralHudAlertMessages>
 {
-    public static GeneralHudAlertMessages Instance { get; private set; }
+    //public static GeneralHudAlertMessages Instance { get; private set; }
     [SerializeField] private TextMeshProUGUI message;
     [SerializeField] private Image message_image;
     private Coroutine current_message;
 
-    void Awake()
-    {
-        Instance = this;
-    }
 
     public void CreateMessage(string msg, float duration = 2)
     {

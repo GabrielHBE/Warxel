@@ -20,21 +20,15 @@ public class ScoutHelicopterMainMinigunProperties : MonoBehaviour, IsVehicleCust
     [Header("Cannon")]
     public float infantary_damage;
     public float vehicle_damage;
-    public float spread;
-    public float max_spread;
+    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)] public float spread;
+    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)] public float max_spread;
     public float fire_rate;
     public float interval => 60f / fire_rate;
     public float overheat_time;
     public float damage_dropoff;
     public float damage_dropoff_timer;
     public float destruction_force;
-
-    /*
-    void Start()
-    {
-        interval = 60f / fire_rate;
-    }
-    */
+    
     #region Interface Methods
 
     public void Activate()

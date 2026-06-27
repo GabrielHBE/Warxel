@@ -580,7 +580,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         foreach (GameObject weapon in primaryWeapons)
         {
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
-            if (HasClassAccessToWeapon(wp))
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp))
             {
                 CreateWeaponButton(weapon, wp, weaponIndex);
                 weaponIndex++;
@@ -594,7 +594,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         foreach (GameObject weapon in secondaryWeapons)
         {
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
-            if (HasClassAccessToWeapon(wp))
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp))
             {
                 CreateWeaponButton(weapon, wp, weaponIndex);
                 weaponIndex++;
@@ -606,6 +606,19 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     {
 
         if (weaponProperties.class_weapon.Any(c => c == _selectedClass))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HasFactionAccessToWeapon(WeaponProperties weaponProperties)
+    {
+
+        if (AccountManager.Instance == null) return true;
+
+        if (weaponProperties.faction.Any(c => c == AccountManager.Instance.faction))
         {
             return true;
         }
@@ -1248,8 +1261,8 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         spreadIncreaserText.text = wp.spread_increaser.ToString("F2");
         maxSpreadText.text = wp.max_spread.ToString("F2");
 
-        horizontalRecoilText.text = string.Join(" / ", wp.horizontal_recoil.Select(v => v.ToString("F2")));
-        verticalRecoilText.text = string.Join(" / ", wp.vertical_recoil.Select(v => v.ToString("F2")));
+        horizontalRecoilText.text = string.Join(" / ", wp.recoilPattern.Select(v => v.horizontalRecoil.ToString("F2")));
+        verticalRecoilText.text = string.Join(" / ", wp.recoilPattern.Select(v => v.verticalRecoil.ToString("F2")));
 
         //verticalRecoilText.text = wp.vertical_recoil_media.ToString("F2");
         firstShotRecoilIncreaserText.text = "x" + wp.first_shoot_increaser.ToString("F1");
@@ -1272,16 +1285,11 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
             if (wp == null) continue;
 
-            if (HasClassAccessToWeapon(wp))
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battle_coins_to_unlock == 0)
             {
-                if (wp.battle_coins_to_unlock == 0 && HasClassAccessToWeapon(wp))
-                {
-                    selected_primary = weapon;
-                    return weapon;
-                }
+                selected_primary = weapon;
+                return weapon;
             }
-
-
         }
 
         return null;
@@ -1299,15 +1307,11 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
             if (wp == null) continue;
 
-            if (HasClassAccessToWeapon(wp))
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battle_coins_to_unlock == 0)
             {
-                if (wp.battle_coins_to_unlock == 0 && HasClassAccessToWeapon(wp))
-                {
-                    selected_secondary = weapon;
-                    return weapon;
-                }
+                selected_secondary = weapon;
+                return weapon;
             }
-
 
         }
 

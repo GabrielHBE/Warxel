@@ -10,16 +10,13 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
     public float muzzle_velocity;
     public float bullet_drop;
     public float minimum_damage;
-    public GameObject bullet_hit_effect;
 
     [Header("MainCannon Stats")]
     public Transform shootPosition;
     public float infantary_damage;
     public float vehicle_damage;
     public Sprite hud_icon;
-    public Transform bulletPref;
     public float fire_rate;
-    public float zoom;
     public float overheat_time;
     public float damage_dropoff;
     public float damage_dropoff_timer;
@@ -110,7 +107,7 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
                 vehicleDamage = vehicle_damage
             };
 
-            DummyBullet instantiatedDummyBullet = ObjectPooling.Instance.GetLocalPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>();
+            DummyBullet instantiatedDummyBullet = LocalObjectPooling.Instance.GetPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>();
             if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
 
             CmdFire(data);

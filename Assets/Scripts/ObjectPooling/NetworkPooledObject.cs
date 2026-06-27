@@ -6,7 +6,8 @@ public class NetworkPooledObject : NetworkBehaviour
     private Transform poolFolder;
     private bool isDestroying = false;
 
-    private void Awake()
+    
+    protected virtual void Awake()
     {
         SetupFolder();
     }
@@ -14,16 +15,16 @@ public class NetworkPooledObject : NetworkBehaviour
     private void SetupFolder()
     {
         // Garante que o nosso Manager existe na cena
-        if (ObjectPooling.Instance == null) return;
+        if (ServerObjectPooling.Instance == null) return;
 
         string cleanName = gameObject.name.Replace("(Clone)", "").Trim();
         string folderName = $"[Pool Server] {cleanName}";
 
-        Transform existingFolder = ObjectPooling.Instance.transform.Find(folderName);
+        Transform existingFolder = ServerObjectPooling.Instance.transform.Find(folderName);
         if (existingFolder == null)
         {
             GameObject newFolder = new GameObject(folderName);
-            newFolder.transform.SetParent(ObjectPooling.Instance.transform);
+            newFolder.transform.SetParent(ServerObjectPooling.Instance.transform);
             poolFolder = newFolder.transform;
         }
         else
@@ -73,4 +74,5 @@ public class NetworkPooledObject : NetworkBehaviour
     {
         isDestroying = true;
     }
+    
 }

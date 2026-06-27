@@ -1,8 +1,6 @@
-using UnityEngine;
-
-public class Settings : MonoBehaviour
+public class Settings : PersistentLocalSingleton<Settings>
 { 
-    public static Settings Instance {get; private set;}
+    //public static Settings Instance {get; private set;}
 
     public Audio _audio;
     public Controls _controls;
@@ -10,9 +8,5 @@ public class Settings : MonoBehaviour
     public KeyBinds _keybinds;
     public Video _video;
 
-    private void Awake()
-    {
-        Instance = this;
-    }
     
 }

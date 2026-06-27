@@ -1,10 +1,11 @@
 using System.Collections;
 using FishNet.Object;
+using Unity.VisualScripting;
 using UnityEngine;
 using VoxelDestructionPro.Tools;
 using VoxelDestructionPro.VoxelObjects;
 
-public class Bullet : NetworkBehaviour
+public class Bullet : NetworkPooledObject
 {
     [Header("References")]
     [SerializeField] private BulletHitEffects hitEffects;
@@ -16,6 +17,7 @@ public class Bullet : NetworkBehaviour
     [SerializeField] private TrailRenderer trail;
     [SerializeField] private Rigidbody rb;
     [SerializeField] private VoxCollider voxCollider;
+    [SerializeField] private Light bulletLight;
 
     //Private variables
     private float bulletDropMultiplier;
@@ -33,8 +35,10 @@ public class Bullet : NetworkBehaviour
     private Transform ignoredTransform;
     private GameObject shoot_root;
 
-    // Flag de controle para evitar múltiplas execuções de desativação na mesma frame
     private bool _isDespawning;
+    private bool _visualsEnabled = false;
+
+    private float timerToAnebleForNonOwners = 0;
 
     public struct BulletData
     {
@@ -54,10 +58,49 @@ public class Bullet : NetworkBehaviour
         public float delaytoEnableForNonOwner;
     }
 
+    #region Unity Lifecycle
+    private void OnEnable()
+    {
+        _isDespawning = false;
+        _visualsEnabled = false;
+
+        if (bullet_collider != null)
+            bullet_collider.enabled = false;
+
+        if (!IsOwner)
+        {
+            SetVisualsActive(false);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (trail != null)
+        {
+            trail.Clear();
+            trail.enabled = false;
+        }
+
+        _isDespawning = true;
+        _visualsEnabled = false;
+    }
+    #endregion
+
     #region Bullet Creation
     [ObserversRpc]
     public void CreateBullet(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
+        // Reseta estado
+        timerToAnebleForNonOwners = 0;
+        _isDespawning = false;
+        _visualsEnabled = false;
+        timer = 0f;
+        SetVisualsActive(false);
+
+        // Ativa o GameObject
+        gameObject.SetActive(true);
+
+        // Configura o rigidbody
         if (rb != null)
         {
             rb.isKinematic = false;
@@ -65,45 +108,26 @@ public class Bullet : NetworkBehaviour
             rb.angularVelocity = Vector3.zero;
         }
 
-        gameObject.SetActive(true);
+        // Ativa o collider
+        if (bullet_collider != null)
+            bullet_collider.enabled = true;
 
-        // Reseta o estado da flag de despawn para o Object Pooling funcionar nesta nova vida
-        _isDespawning = false;
-        timer = 0f; // Reseta o cronômetro do dropoff de dano
+        SetBulletProperties(data, ignoredObject, root);
 
-        delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
-        voxCollider.destructionRadius = data.destructionForce;
-        transform.position = data.position;
-        transform.rotation = data.rotation;
-        bullet_collider.enabled = true;
-
-        // 3. Aplica a nova velocidade após limpar o estado antigo
         SetDirection(data.direction, data.speed);
 
         if (IsServerInitialized)
         {
-            // Para segurança do Pool, interrompe qualquer contagem antiga antes de iniciar a nova
             StopAllCoroutines();
             StartCoroutine(DespawnTimer());
         }
-
-        if (!IsOwner)
-        {
-            // Se não for o dono, pode ocultar temporariamente baseado no seu delay, se configurado
-            if (delaytoEnableForNonOwner > 0f)
-            {
-                if (meshRenderer != null) meshRenderer.enabled = false;
-                if (trail != null) trail.enabled = false;
-                StartCoroutine(EnableViewForNonOwners());
-            }
-            return;
-        }
-
-        SetBulletProperties(data, ignoredObject, root);
     }
+
 
     private void SetBulletProperties(BulletData data, Transform ignoredObject = null, GameObject root = null)
     {
+        delaytoEnableForNonOwner = data.delaytoEnableForNonOwner;
+        voxCollider.destructionRadius = data.destructionForce;
         ignoredTransform = ignoredObject;
         shoot_root = root;
         did_ricochet = false;
@@ -116,19 +140,16 @@ public class Bullet : NetworkBehaviour
         vehicle_damage = data.vehicleDamage;
         bulletDropMultiplier = data.dropMultiplier;
         lastPosition = transform.position;
+        transform.position = data.position;
+        transform.rotation = data.rotation;
     }
 
     public void SetDirection(Vector3 direction, float speed)
     {
-        rb.linearVelocity = direction * speed;
-    }
-
-    private IEnumerator EnableViewForNonOwners()
-    {
-        yield return new WaitForSeconds(delaytoEnableForNonOwner);
-
-        if (meshRenderer != null) meshRenderer.enabled = true;
-        if (trail != null) trail.enabled = true;
+        if (rb != null)
+        {
+            rb.linearVelocity = direction * speed;
+        }
     }
     #endregion
 
@@ -137,14 +158,16 @@ public class Bullet : NetworkBehaviour
 
     void FixedUpdate()
     {
-        // Impede física e detecção se o projétil já iniciou o processo de destruição
         if (_isDespawning) return;
 
-        rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
+        if (rb != null)
+        {
+            rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
+        }
 
         if (!IsOwner) return;
 
-        if (bullet_collider.isTrigger)
+        if (bullet_collider != null && bullet_collider.isTrigger)
         {
             Vector3 currentPosition = transform.position;
             Vector3 direction = currentPosition - lastPosition;
@@ -192,7 +215,18 @@ public class Bullet : NetworkBehaviour
 
     void Update()
     {
-        if (_isDespawning || !IsOwner) return;
+        if (!IsOwner)
+        {
+            timerToAnebleForNonOwners += Time.deltaTime;
+            if (timerToAnebleForNonOwners >= delaytoEnableForNonOwner && !_visualsEnabled)
+            {
+                _visualsEnabled = true;
+                SetVisualsActive(true);
+            }
+            return;
+        }
+
+        if (_isDespawning) return;
 
         if (infantary_damage > minimum_damage && damage_dropoff != 0)
         {
@@ -206,6 +240,7 @@ public class Bullet : NetworkBehaviour
     }
     #endregion
 
+    #region Collision Methods
     private void HandleBulletHit(GameObject hitObject, Vector3 hitPoint, Vector3 hitNormal, Collider collider)
     {
         if (did_ricochet)
@@ -236,7 +271,6 @@ public class Bullet : NetworkBehaviour
         if (hitObject.layer == LayerMask.NameToLayer("Vehicle") && can_damage_vehicles)
         {
             ProcessHit.VehicleHit(hitObject, infantary_damage, shoot_root);
-            //ProcessVehicleCollision(collider);
             hitEffects.RequestMetalHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
             soundEffects.PlayHitSound(BulletSoundEffect.HitSoundType.Metal, hitPoint);
         }
@@ -244,17 +278,15 @@ public class Bullet : NetworkBehaviour
         if (hitObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
         {
             ProcessHit.PlayerHit(hitObject, infantary_damage, hs_multiplier, shoot_root);
-            //ProcessPlayerCollision(hitObject);
             hitEffects.RequestBloodHitEffect(hitPoint, Quaternion.LookRotation(hitNormal == Vector3.zero ? -transform.forward : hitNormal));
         }
 
         RequestDisableBullet();
     }
 
-    #region TriggerEnter
     void OnTriggerEnter(Collider collider)
     {
-        if (!IsOwner || _isDespawning || !bullet_collider.isTrigger) return;
+        if (!IsOwner || _isDespawning || bullet_collider == null || !bullet_collider.isTrigger) return;
 
         if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") ||
             collider.gameObject.layer == LayerMask.NameToLayer("Player"))
@@ -269,9 +301,7 @@ public class Bullet : NetworkBehaviour
 
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
     }
-    #endregion
 
-    #region Collision / Trigger Helper Methods
     private void ProcessVoxelCollision(Collider collision, Vector3 position)
     {
         if (voxCollider.destructionRadius > 2)
@@ -290,31 +320,40 @@ public class Bullet : NetworkBehaviour
     }
     #endregion
 
-    #region Extras
+    #region Visual Management
+    private void SetVisualsActive(bool active)
+    {
+        if (meshRenderer != null)
+            meshRenderer.enabled = active;
+
+        if (bulletLight != null)
+            bulletLight.enabled = active;
+
+        if (trail != null)
+        {
+            trail.enabled = active;
+            trail.Clear();
+        }
+
+        _visualsEnabled = active;
+    }
+    #endregion
+
+    #region Despawning
     private IEnumerator DespawnTimer()
     {
         yield return new WaitForSeconds(10f);
         RequestDisableBullet();
     }
-    #endregion
 
-    #region Despawning
     private void RequestDisableBullet()
     {
         if (_isDespawning) return;
         _isDespawning = true;
 
-        // Desativa imediatamente a física local para evitar registros fantasmas
-        if (bullet_collider != null) bullet_collider.enabled = false;
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.isKinematic = true;
-        }
-
         if (IsServerInitialized)
         {
-            ExecuteServerDespawn();
+            Despawn(gameObject);
         }
         else
         {
@@ -323,8 +362,42 @@ public class Bullet : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void CmdRequestDespawn() => ExecuteServerDespawn();
+    private void CmdRequestDespawn()
+    {
+        Despawn(gameObject);
+    }
 
-    private void ExecuteServerDespawn() => ServerManager.Despawn(GetComponent<NetworkObject>());
+    public override void OnStopServer()
+    {
+        base.OnStopServer();
+        DisableBulletCompletely();
+    }
+
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+        if (!IsServerStarted)
+        {
+            DisableBulletCompletely();
+        }
+    }
+
+    private void DisableBulletCompletely()
+    {
+
+        if (bullet_collider != null)
+            bullet_collider.enabled = false;
+
+        SetVisualsActive(false);
+        _visualsEnabled = false;
+        _isDespawning = true;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+        }
+    }
     #endregion
 }

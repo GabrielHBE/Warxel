@@ -21,7 +21,7 @@ public class VehicleLockInMissile : Missiles
         if (target_vehicle.used_locking_countermeasure == false)
         {
 
-            target_transform = target_vehicle.GetGameObject().transform;
+            target_transform = target_vehicle.gameObject.transform;
 
         }
         else

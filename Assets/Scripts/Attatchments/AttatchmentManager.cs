@@ -4,10 +4,6 @@ using System.Collections.Generic;
 
 public class AttatchmentManager : MonoBehaviour
 {
-    // Constante para o valor mínimo de recoil
-    private const float MIN_RECOIL_VALUE = 0.1f;
-    private const float MAX_RECOIL_VALUE = 10f;
-
     // Estruturas para guardar os valores dos attachments
     [Serializable]
     public class AttachmentData
@@ -40,7 +36,7 @@ public class AttatchmentManager : MonoBehaviour
         public float reload_speed_changer;
         public bool is_tape_mag;
 
-        // Ergonomics (NOVO)
+        // Ergonomics
         public Vector3 visual_recoil_change;
         public List<WeaponProperties.FireMode> fire_modes_change = new List<WeaponProperties.FireMode>();
         public float rate_of_fire_change;
@@ -55,11 +51,8 @@ public class AttatchmentManager : MonoBehaviour
     private AttachmentData currentMag;
     private AttachmentData currentSideGrip;
     private AttachmentData currentErgonomics;
-
-    // Referência para o WeaponProperties
     private WeaponProperties weaponProperties;
 
-    // Nome da arma para salvar/carregar
     private string weaponName;
 
     public void InitializeAttachments()
@@ -68,7 +61,6 @@ public class AttatchmentManager : MonoBehaviour
         if (weaponProperties != null)
             weaponName = weaponProperties.weapon_name;
 
-        // Desativa todos os attachments no início
         Grip[] grips = GetComponentsInChildren<Grip>(true);
         foreach (Grip grip in grips)
         {
@@ -99,14 +91,12 @@ public class AttatchmentManager : MonoBehaviour
             sideGrip.gameObject.SetActive(false);
         }
 
-        // NOVO
         Ergonomics[] ergonomics = GetComponentsInChildren<Ergonomics>(true);
         foreach (Ergonomics ergo in ergonomics)
         {
             ergo.gameObject.SetActive(false);
         }
 
-        // Carrega attachments salvos
         LoadAttachmentsFromPlayerPrefs();
     }
 
@@ -177,7 +167,6 @@ public class AttatchmentManager : MonoBehaviour
         };
     }
 
-    // NOVO
     private AttachmentData CreateErgonomicsData(Ergonomics e)
     {
         return new AttachmentData
@@ -190,7 +179,7 @@ public class AttatchmentManager : MonoBehaviour
             pick_up_weapon_speed_change = e.pickupWeaponSpeedChange,
             store_weapon_speed_change = e.storeWeaponSpeedChange,
             fire_modes_change = new List<WeaponProperties.FireMode>(e.fireModesChange),
-            rate_of_fire_change = e.rafeOfFireChange, // Mantido do seu script original
+            rate_of_fire_change = e.rafeOfFireChange,
             burst_bullets_per_tap_change = e.burstBulletsPerTapChange,
             burst_time_between_bursts_change = e.burstTimeBetweenBurstsChange
         };
@@ -202,16 +191,45 @@ public class AttatchmentManager : MonoBehaviour
 
     private void AddGripStats(WeaponProperties wp, AttachmentData grip)
     {
+        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        {
+            //Vertical Recoil
+            if (wp.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
+            else
+                wp.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
+
+            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+
+            //Horizontal Recoil
+            if (wp.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
+            else
+                wp.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
+
+            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+        /*
         for (int i = 0; i < wp.vertical_recoil.Length; i++)
         {
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] + grip.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
+            if (wp.vertical_recoil[i] < 0)
+                wp.vertical_recoil[i] -= grip.vertical_recoil_change;
+            else
+                wp.vertical_recoil[i] += grip.vertical_recoil_change;
+
+            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
         {
-            wp.horizontal_recoil[i] += grip.horizontal_recoil_change;
-        }
+            if (wp.horizontal_recoil[i] < 0)
+                wp.horizontal_recoil[i] -= grip.horizontal_recoil_change;
+            else
+                wp.horizontal_recoil[i] += grip.horizontal_recoil_change;
 
+            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+        */
         wp.current_attachment_points += grip.points;
         wp.first_shoot_increaser += grip.first_shoot_change;
         wp.pick_up_weapon_speed += grip.pick_up_weapon_speed_change;
@@ -224,9 +242,33 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || barrel == null) return;
 
+        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        {
+            //Vertical Recoil
+            if (wp.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
+            else
+                wp.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
+
+            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+
+            //Horizontal Recoil
+            if (wp.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
+            else
+                wp.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
+
+            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+        /*
         for (int i = 0; i < wp.vertical_recoil.Length; i++)
         {
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] + barrel.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
+            if (wp.vertical_recoil[i] < 0)
+                wp.vertical_recoil[i] -= barrel.vertical_recoil_change;
+            else
+                wp.vertical_recoil[i] += barrel.vertical_recoil_change;
+
+            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
@@ -235,7 +277,10 @@ public class AttatchmentManager : MonoBehaviour
                 wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
             else
                 wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
+
+            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
+        */
 
         wp.current_attachment_points += barrel.points;
         wp.first_shoot_increaser += barrel.first_shoot_change;
@@ -269,19 +314,6 @@ public class AttatchmentManager : MonoBehaviour
     private void AddErgonomicsStats(WeaponProperties wp, AttachmentData ergo)
     {
         if (wp == null || ergo == null) return;
-
-        for (int i = 0; i < wp.vertical_recoil.Length; i++)
-        {
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] + ergo.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
-        }
-
-        for (int i = 0; i < wp.horizontal_recoil.Length; i++)
-        {
-            if (wp.horizontal_recoil[i] < 0)
-                wp.horizontal_recoil[i] -= ergo.horizontal_recoil_change;
-            else
-                wp.horizontal_recoil[i] += ergo.horizontal_recoil_change;
-        }
 
         wp.current_attachment_points += ergo.points;
         wp.first_shoot_increaser += ergo.first_shoot_change;
@@ -343,15 +375,45 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || grip == null) return;
 
+        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        {
+            //Vertical Recoil
+            if (wp.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
+            else
+                wp.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
+
+            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+
+            //Horizontal Recoil
+            if (wp.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
+            else
+                wp.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
+
+            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+        /*
         for (int i = 0; i < wp.vertical_recoil.Length; i++)
         {
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] - grip.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
+            if (wp.vertical_recoil[i] < 0)
+                wp.vertical_recoil[i] += grip.vertical_recoil_change;
+            else
+                wp.vertical_recoil[i] -= grip.vertical_recoil_change;
+
+            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
         {
-            wp.horizontal_recoil[i] -= grip.horizontal_recoil_change;
+            if (wp.horizontal_recoil[i] < 0)
+                wp.horizontal_recoil[i] += grip.horizontal_recoil_change;
+            else
+                wp.horizontal_recoil[i] -= grip.horizontal_recoil_change;
+
+            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
+        */
 
         wp.current_attachment_points -= grip.points;
         wp.first_shoot_increaser -= grip.first_shoot_change;
@@ -367,9 +429,33 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || barrel == null) return;
 
+        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        {
+            //Vertical Recoil
+            if (wp.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
+            else
+                wp.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
+
+            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+
+            //Horizontal Recoil
+            if (wp.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
+            else
+                wp.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
+
+            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+        /*
         for (int i = 0; i < wp.vertical_recoil.Length; i++)
         {
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i] - barrel.vertical_recoil_change, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
+            if (wp.vertical_recoil[i] < 0)
+                wp.vertical_recoil[i] += barrel.vertical_recoil_change;
+            else
+                wp.vertical_recoil[i] -= barrel.vertical_recoil_change;
+
+            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         for (int i = 0; i < wp.horizontal_recoil.Length; i++)
@@ -378,7 +464,10 @@ public class AttatchmentManager : MonoBehaviour
                 wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
             else
                 wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
+
+            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
+        */
 
         wp.current_attachment_points -= barrel.points;
         wp.first_shoot_increaser -= barrel.first_shoot_change;

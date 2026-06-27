@@ -48,7 +48,7 @@ public static class Recoil
         Vector3 randomizedRecoil = new Vector3(
             (baseVisualRecoil.x / 100) * randomSignX,
             (baseVisualRecoil.y / 100) * randomSignY,
-            - baseVisualRecoil.z / 10
+            -baseVisualRecoil.z / 10
         );
 
         if (!isAiming)
@@ -91,5 +91,12 @@ public static class Recoil
         // Calcula o limite do recuo Z somando as médias e multiplicando por 2
         float range = (horizontalMedia + verticalMedia) * 2f;
         return Random.Range(-range, range);
+    }
+
+    [System.Serializable]
+    public struct RecoilPattern
+    {
+        [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float verticalRecoil;
+        [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float horizontalRecoil;
     }
 }
