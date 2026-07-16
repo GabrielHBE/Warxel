@@ -13,7 +13,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     #region Serialized Fields
     public Transform spot_position;
     [Header("Multiplayer / Player")]
-    [SerializeField] private BoxCollider[] player_hit_colliders;
     [SerializeField] private AudioListener camera_audio;
     public GameObject first_person_player_components;
     [SerializeField] private MeshRenderer[] hideToOwnerItems;
@@ -30,6 +29,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     [Header("Camera Settings")]
     public Camera playerCamera;
+
     [Header("Movement Settings - Tutorial Style")]
     public Transform orientation;
     [SerializeField] private float walkSpeed = 14f;
@@ -69,7 +69,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     [SerializeField] private SwayNBobScript SwayNBob;
     [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     public PlayerProperties playerProperties;
-    public PlayerAnimation playerAnimation;
 
     [Header("Volumes")]
     [SerializeField] private Volume nightVision_volume;
@@ -113,7 +112,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     private float horizontalRecoilCurrent;
     private float horizontalRecoilVelocity;
     private float currentRecoilZ;
-    private float recoilResetVelocity;
     private float targetRecoilZ;
     private float recoilZVelocity;
     private float resetRecoilSpeed;
@@ -128,7 +126,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     private bool grounded;
 
     // Interaction & Caching
-    public const float INTERACT_DISTANCE = 10f;
     private int interactivesLayer;
     private int vehicleLayer;
     private int playerLayer;
@@ -159,24 +156,19 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     void Update()
     {
-
         if (!IsOwner) return;
 
         UpdateColliderStateLocal();
 
-        // Se estiver em um veículo, roda a lógica do veículo e aborta o resto
         if (playerProperties.is_in_vehicle)
         {
             playerProperties.isGrounded = true;
-            //if (first_person_player_components.activeSelf) first_person_player_components.SetActive(false);
             UpdateHeadRotation();
             return;
         }
 
         HandleDebugInputManager();
         UpdateDamageVignette();
-
-        //if (!first_person_player_components.activeSelf) first_person_player_components.SetActive(true);
 
         FootstepSound();
         UpdateGroundCheck();
@@ -225,19 +217,10 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         Instance = this;
         HideOwnerItems(true);
 
-        playerAnimation.can_update_animation = true;
         playerCamera.enabled = true;
         playerCamera.GetComponent<AudioListener>().enabled = true;
         soldierHudManager.hud.gameObject.SetActive(true);
         fist_person.SetActive(true);
-
-        playerProperties.faction.Value = AccountManager.Instance.faction;
-        playerProperties.selected_class = AccountManager.Instance.selected_class;
-
-        foreach (BoxCollider c in player_hit_colliders)
-        {
-            c.enabled = false;
-        }
 
         camera_audio.enabled = true;
         footstepSound_interval = footstepSound_interval <= 0 ? 0.45f : footstepSound_interval;
@@ -261,7 +244,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
         StartCoroutine(weaponIcon.Initialize());
     }
-
 
     private void InitializeVolume()
     {
@@ -356,7 +338,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     {
         if (playerProperties.isProneTransition) return;
 
-        if (moveForward == 0 && moveHorizontal == 0)
+        if ((moveForward == 0 && moveHorizontal == 0) || playerProperties.is_firing)
         {
             playerProperties.sprinting = false;
             return;
@@ -794,7 +776,13 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void ApplyCameraRotation()
     {
-        currentRecoilZ = Mathf.SmoothDamp(currentRecoilZ, targetRecoilZ, ref recoilZVelocity, applyRecoilSpeed);
+        // Aplica o recuo Z de forma suave
+        currentRecoilZ = Mathf.SmoothDamp(
+            currentRecoilZ,
+            targetRecoilZ,
+            ref recoilZVelocity,
+            applyRecoilSpeed
+        );
 
         playerCamera.transform.localEulerAngles = new Vector3(verticalRotation, 0, currentRecoilZ);
         UpdateHeadRotation();
@@ -808,9 +796,18 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void UpdateRecoil()
     {
-        if (Mathf.Abs(currentRecoilZ) > 0.01f)
+        // Velocidade de reset do recuo Z (mais lenta para ser suave)
+        float resetSpeed = 4f; // Ajuste este valor para controlar a suavidade
+
+        // Se houver recuo Z, reduz gradualmente
+        if (Mathf.Abs(targetRecoilZ) > 0.01f)
         {
-            currentRecoilZ = Mathf.SmoothDamp(currentRecoilZ, 0f, ref recoilResetVelocity, resetRecoilSpeed);
+            // Decaimento exponencial suave
+            targetRecoilZ = Mathf.Lerp(targetRecoilZ, 0f, resetSpeed * Time.deltaTime);
+
+            // Se estiver muito próximo de zero, zera completamente para evitar vibração
+            if (Mathf.Abs(targetRecoilZ) < 0.001f)
+                targetRecoilZ = 0f;
         }
     }
 
@@ -834,23 +831,23 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
         if (weapon != null && weapon.weaponProperties != null)
         {
-            currentRecoilZ = Recoil.CalculateCameraZRoll(
-                weapon.weaponProperties.horizontal_recoil_media,
-                weapon.weaponProperties.vertical_recoil_media
+            // Acumula o recuo Z em vez de sobrescrever
+            float newRecoilZ = Recoil.CalculateCameraZRoll(
+                horizontalRecoil,
+                verticalRecoil
             );
-            recoilResetVelocity = 0f;
+
+            targetRecoilZ += newRecoilZ;
+
         }
     }
     #endregion
 
     #region Interaction
-
     private void Interact()
     {
         Vector3 origin = playerCamera.transform.position;
         Vector3 direction = playerCamera.transform.forward;
-
-        Debug.DrawRay(origin, direction * INTERACT_DISTANCE, Color.red, 1f);
 
         if (!playerProperties.is_in_vehicle)
         {
@@ -861,17 +858,15 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void TryInteractWithButton(Vector3 origin, Vector3 direction)
     {
-        if (Physics.Raycast(origin, direction, out RaycastHit hit, INTERACT_DISTANCE, interactivesLayer))
+        if (Physics.Raycast(origin, direction, out RaycastHit hit, InteractiveButton.INTERACT_DISTANCE, interactivesLayer))
         {
             InteractiveButton button = hit.collider.GetComponent<InteractiveButton>();
             button?.Interact(this);
         }
     }
-
     #endregion
 
     #region State Management
-
     public void DisableNightVison()
     {
         if (is_night_vision_active)
@@ -891,7 +886,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             weapon.weaponProperties.weapon.transform.localPosition = weapon.weaponProperties.initial_potiion;
             weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.initial_rotation;
             weapon.weaponAnimation.FinishReloadAnimation();
-
         }
     }
 
@@ -1058,7 +1052,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         {
             PlayerProperties p = medicCollidersCache[i].GetComponent<PlayerProperties>();
 
-            if (p != null && p.selected_class == ClassManager.Class.Medic)
+            if (p != null && p.selectedClass.Value == ClassManager.Class.Medic)
             {
                 float distancia = Vector3.Distance(transform.position, medicCollidersCache[i].transform.position);
                 jogadoresDetectados.Add(new PlayerInfo(medicCollidersCache[i].gameObject, p.player_name.Value, distancia));
@@ -1099,7 +1093,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     {
         playerProperties.is_dead.Value = is_dead;
     }
-
     #endregion
 
     #region Damage / Kill and Revive
@@ -1228,10 +1221,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         if (!hide) thirdPersonWeapon.ShowWeapon();
         else thirdPersonWeapon.HideWeapon();
     }
-    public ClassManager.Class GetClass() => playerProperties.selected_class;
-    public float GetHp() => playerProperties.hp.Value;
     public float GetResistance() => playerProperties.resistance.Value;
-    public bool IsPlayerDead() => playerProperties.is_dead.Value;
     public FactionManager.Faction GetFaction() => playerProperties.faction.Value;
     public Transform GetSpotPosition() => spot_position;
     #endregion

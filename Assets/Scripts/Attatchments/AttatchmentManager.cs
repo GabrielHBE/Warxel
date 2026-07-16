@@ -22,7 +22,7 @@ public class AttatchmentManager : MonoBehaviour
 
         // Barrel
         public float muzzle_lightning_change;
-        public float muzzle_velocity_change;
+        public int muzzle_velocity_change;
         public float shoot_pith_change;
         public float shoot_volume_change;
         public float spread_change;
@@ -32,14 +32,16 @@ public class AttatchmentManager : MonoBehaviour
         public float sway_change;
 
         // Mag
-        public int bullet_counter_change;
+        public int bullet_per_mag_change;
+        public int mag_count_change;
         public float reload_speed_changer;
-        public bool is_tape_mag;
+        public float time_to_transfer_ammo_change;
+        public int bullets_per_shot_change;
 
         // Ergonomics
         public Vector3 visual_recoil_change;
-        public List<WeaponProperties.FireMode> fire_modes_change = new List<WeaponProperties.FireMode>();
-        public float rate_of_fire_change;
+        public List<Firing.FireMode> fire_modes_change = new List<Firing.FireMode>();
+        public int rate_of_fire_change;
         public int burst_bullets_per_tap_change;
         public float burst_time_between_bursts_change;
     }
@@ -150,11 +152,14 @@ public class AttatchmentManager : MonoBehaviour
     {
         return new AttachmentData
         {
+            bullets_per_shot_change = m.bulletsPerSHotChange,
             attachmentName = m.gameObject.name,
             points = m.attatchment_points,
-            bullet_counter_change = m.bullet_counter_change,
-            ads_speed_change = m.ads_speed_change,
-            reload_speed_changer = m.reload_speed_changer,
+            bullet_per_mag_change = m.reloadValues.bulletsPerMag,
+            ads_speed_change = m.adsSpeedChange,
+            reload_speed_changer = m.reloadValues.reloadTime,
+            mag_count_change = m.reloadValues.magCount,
+            time_to_transfer_ammo_change = m.reloadValues.timeToTransferAmmo
         };
     }
 
@@ -178,7 +183,7 @@ public class AttatchmentManager : MonoBehaviour
             ads_speed_change = e.adsSpeedChange,
             pick_up_weapon_speed_change = e.pickupWeaponSpeedChange,
             store_weapon_speed_change = e.storeWeaponSpeedChange,
-            fire_modes_change = new List<WeaponProperties.FireMode>(e.fireModesChange),
+            fire_modes_change = new List<Firing.FireMode>(e.fireModesChange),
             rate_of_fire_change = e.rafeOfFireChange,
             burst_bullets_per_tap_change = e.burstBulletsPerTapChange,
             burst_time_between_bursts_change = e.burstTimeBetweenBurstsChange
@@ -191,50 +196,30 @@ public class AttatchmentManager : MonoBehaviour
 
     private void AddGripStats(WeaponProperties wp, AttachmentData grip)
     {
-        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
             else
-                wp.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
+                wp.recoilValues.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
 
-            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
             else
-                wp.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
+                wp.recoilValues.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
 
-            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-        /*
-        for (int i = 0; i < wp.vertical_recoil.Length; i++)
-        {
-            if (wp.vertical_recoil[i] < 0)
-                wp.vertical_recoil[i] -= grip.vertical_recoil_change;
-            else
-                wp.vertical_recoil[i] += grip.vertical_recoil_change;
-
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
-        for (int i = 0; i < wp.horizontal_recoil.Length; i++)
-        {
-            if (wp.horizontal_recoil[i] < 0)
-                wp.horizontal_recoil[i] -= grip.horizontal_recoil_change;
-            else
-                wp.horizontal_recoil[i] += grip.horizontal_recoil_change;
-
-            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-        */
         wp.current_attachment_points += grip.points;
-        wp.first_shoot_increaser += grip.first_shoot_change;
+        wp.recoilValues.firstShootRecoilMultiplier += grip.first_shoot_change;
         wp.pick_up_weapon_speed += grip.pick_up_weapon_speed_change;
         wp.store_weapon_speed += grip.store_weapon_speed_change;
-        wp.reload_time += grip.reload_speed_change;
+        wp.reloadValues.reloadTime += grip.reload_speed_change;
         wp.ads_speed += grip.ads_speed_change;
     }
 
@@ -242,52 +227,31 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || barrel == null) return;
 
-        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
             else
-                wp.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
+                wp.recoilValues.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
 
-            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
             else
-                wp.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
+                wp.recoilValues.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
 
-            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
-        /*
-        for (int i = 0; i < wp.vertical_recoil.Length; i++)
-        {
-            if (wp.vertical_recoil[i] < 0)
-                wp.vertical_recoil[i] -= barrel.vertical_recoil_change;
-            else
-                wp.vertical_recoil[i] += barrel.vertical_recoil_change;
-
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-
-        for (int i = 0; i < wp.horizontal_recoil.Length; i++)
-        {
-            if (wp.horizontal_recoil[i] < 0)
-                wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
-            else
-                wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
-
-            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-        */
 
         wp.current_attachment_points += barrel.points;
-        wp.first_shoot_increaser += barrel.first_shoot_change;
-        wp.muzzle_velocity += barrel.muzzle_velocity_change;
-        wp.weapon_sound.shootSoundProperties.pitch += barrel.shoot_pith_change;
-        wp.weapon_sound.shootSoundProperties.volume += barrel.shoot_volume_change;
-        wp.spread_increaser += barrel.spread_change;
+        wp.recoilValues.firstShootRecoilMultiplier += barrel.first_shoot_change;
+        wp.projectileValues.muzzleVelocity += barrel.muzzle_velocity_change;
+        wp.weapon_sound.shootSound.properties.pitch += barrel.shoot_pith_change;
+        wp.weapon_sound.shootSound.properties.volume += barrel.shoot_volume_change;
+        wp.spreadValues.spreadIncreaser += barrel.spread_change;
     }
 
     private void AddSightStats(WeaponProperties wp, AttachmentData sight)
@@ -300,9 +264,12 @@ public class AttatchmentManager : MonoBehaviour
     private void AddMagStats(WeaponProperties wp, AttachmentData mag)
     {
         wp.current_attachment_points += mag.points;
-        wp.bullets_per_mag = mag.bullet_counter_change;
+        wp.firing.bulletsPerShot += mag.bullets_per_shot_change;
+        wp.reloadValues.bulletsPerMag = mag.bullet_per_mag_change;
+        wp.reloadValues.magCount += mag.mag_count_change;
+        wp.reloadValues.timeToTransferAmmo += mag.time_to_transfer_ammo_change;
         wp.ads_speed += mag.ads_speed_change;
-        wp.reload_time += mag.reload_speed_changer;
+        wp.reloadValues.reloadTime += mag.reload_speed_changer;
     }
 
     private void AddSideGripStats(WeaponProperties wp, AttachmentData sideGrip)
@@ -316,24 +283,24 @@ public class AttatchmentManager : MonoBehaviour
         if (wp == null || ergo == null) return;
 
         wp.current_attachment_points += ergo.points;
-        wp.first_shoot_increaser += ergo.first_shoot_change;
-        wp.reload_time += ergo.reload_speed_change;
+        wp.recoilValues.firstShootRecoilMultiplier += ergo.first_shoot_change;
+        wp.reloadValues.reloadTime += ergo.reload_speed_change;
         wp.ads_speed += ergo.ads_speed_change;
         wp.pick_up_weapon_speed += ergo.pick_up_weapon_speed_change;
         wp.store_weapon_speed += ergo.store_weapon_speed_change;
 
         // Assumindo que essas variáveis existam em WeaponProperties. Ajuste se o nome for diferente!
-        wp.visual_recoil += ergo.visual_recoil_change;
-        wp.rate_of_fire += ergo.rate_of_fire_change;
-        wp.bullets_per_tap += ergo.burst_bullets_per_tap_change;
-        wp.time_between_bursts += ergo.burst_time_between_bursts_change;
+        wp.recoilValues.visual_recoil += ergo.visual_recoil_change;
+        wp.firing.rateOfFire += ergo.rate_of_fire_change;
+        wp.firing.burstModeSettings.bulletsPerTap += ergo.burst_bullets_per_tap_change;
+        wp.firing.burstModeSettings.timeBetweenBursts += ergo.burst_time_between_bursts_change;
 
         if (ergo.fire_modes_change != null && ergo.fire_modes_change.Count > 0)
         {
             foreach (var fm in ergo.fire_modes_change)
             {
-                if (!wp.fire_modes.Contains(fm)) // Assumindo que a lista se chama 'fire_modes'
-                    wp.fire_modes.Add(fm);
+                if (!wp.firing.fireModes.Contains(fm)) // Assumindo que a lista se chama 'fire_modes'
+                    wp.firing.fireModes.Add(fm);
             }
         }
     }
@@ -361,9 +328,8 @@ public class AttatchmentManager : MonoBehaviour
         attachment.spread_change = 0;
         attachment.zoom_change = 0;
         attachment.sway_change = 0;
-        attachment.bullet_counter_change = 0;
+        attachment.bullet_per_mag_change = 0;
         attachment.reload_speed_changer = 0;
-        attachment.is_tape_mag = false;
         attachment.visual_recoil_change = Vector3.zero;
         if (attachment.fire_modes_change != null) attachment.fire_modes_change.Clear();
         attachment.rate_of_fire_change = 0;
@@ -375,51 +341,30 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || grip == null) return;
 
-        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
             else
-                wp.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
+                wp.recoilValues.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
 
-            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
             else
-                wp.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
+                wp.recoilValues.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
 
-            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
-        /*
-        for (int i = 0; i < wp.vertical_recoil.Length; i++)
-        {
-            if (wp.vertical_recoil[i] < 0)
-                wp.vertical_recoil[i] += grip.vertical_recoil_change;
-            else
-                wp.vertical_recoil[i] -= grip.vertical_recoil_change;
-
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-
-        for (int i = 0; i < wp.horizontal_recoil.Length; i++)
-        {
-            if (wp.horizontal_recoil[i] < 0)
-                wp.horizontal_recoil[i] += grip.horizontal_recoil_change;
-            else
-                wp.horizontal_recoil[i] -= grip.horizontal_recoil_change;
-
-            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-        */
 
         wp.current_attachment_points -= grip.points;
-        wp.first_shoot_increaser -= grip.first_shoot_change;
+        wp.recoilValues.firstShootRecoilMultiplier -= grip.first_shoot_change;
         wp.pick_up_weapon_speed -= grip.pick_up_weapon_speed_change;
         wp.store_weapon_speed -= grip.store_weapon_speed_change;
-        wp.reload_time -= grip.reload_speed_change;
+        wp.reloadValues.reloadTime -= grip.reload_speed_change;
         wp.ads_speed -= grip.ads_speed_change;
 
         ResetAttachmentDataToZero(grip);
@@ -429,52 +374,31 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || barrel == null) return;
 
-        for (int i = 0; i < wp.recoilPattern.Length; i++)
+        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
             else
-                wp.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
+                wp.recoilValues.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
 
-            wp.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
+            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
+                wp.recoilValues.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
             else
-                wp.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
+                wp.recoilValues.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
 
-            wp.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
-        /*
-        for (int i = 0; i < wp.vertical_recoil.Length; i++)
-        {
-            if (wp.vertical_recoil[i] < 0)
-                wp.vertical_recoil[i] += barrel.vertical_recoil_change;
-            else
-                wp.vertical_recoil[i] -= barrel.vertical_recoil_change;
-
-            wp.vertical_recoil[i] = Math.Clamp(wp.vertical_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-
-        for (int i = 0; i < wp.horizontal_recoil.Length; i++)
-        {
-            if (wp.horizontal_recoil[i] < 0)
-                wp.horizontal_recoil[i] += barrel.horizontal_recoil_change;
-            else
-                wp.horizontal_recoil[i] -= barrel.horizontal_recoil_change;
-
-            wp.horizontal_recoil[i] = Math.Clamp(wp.horizontal_recoil[i], Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-        */
 
         wp.current_attachment_points -= barrel.points;
-        wp.first_shoot_increaser -= barrel.first_shoot_change;
-        wp.muzzle_velocity -= barrel.muzzle_velocity_change;
-        wp.weapon_sound.shootSoundProperties.pitch -= barrel.shoot_pith_change;
-        wp.weapon_sound.shootSoundProperties.volume -= barrel.shoot_volume_change;
-        wp.spread_increaser -= barrel.spread_change;
+        wp.recoilValues.firstShootRecoilMultiplier -= barrel.first_shoot_change;
+        wp.projectileValues.muzzleVelocity -= barrel.muzzle_velocity_change;
+        wp.weapon_sound.shootSound.properties.pitch -= barrel.shoot_pith_change;
+        wp.weapon_sound.shootSound.properties.volume -= barrel.shoot_volume_change;
+        wp.spreadValues.spreadIncreaser -= barrel.spread_change;
 
         ResetAttachmentDataToZero(barrel);
     }
@@ -495,9 +419,12 @@ public class AttatchmentManager : MonoBehaviour
         if (wp == null || mag == null) return;
 
         wp.current_attachment_points -= mag.points;
-        wp.bullets_per_mag -= mag.bullet_counter_change;
+        wp.firing.bulletsPerShot -= mag.bullets_per_shot_change;
+        wp.reloadValues.bulletsPerMag -= mag.bullet_per_mag_change;
         wp.ads_speed -= mag.ads_speed_change;
-        wp.reload_time -= mag.reload_speed_changer;
+        wp.reloadValues.magCount -= mag.mag_count_change;
+        wp.reloadValues.timeToTransferAmmo -= mag.time_to_transfer_ammo_change;
+        wp.reloadValues.reloadTime -= mag.reload_speed_changer;
 
         ResetAttachmentDataToZero(mag);
     }
@@ -510,27 +437,26 @@ public class AttatchmentManager : MonoBehaviour
         ResetAttachmentDataToZero(sideGrip);
     }
 
-    // NOVO
     private void RemoveErgonomicsStats(WeaponProperties wp, AttachmentData ergo)
     {
         if (wp == null || ergo == null) return;
 
         wp.current_attachment_points -= ergo.points;
-        wp.reload_time -= ergo.reload_speed_change;
+        wp.reloadValues.reloadTime -= ergo.reload_speed_change;
         wp.ads_speed -= ergo.ads_speed_change;
         wp.pick_up_weapon_speed -= ergo.pick_up_weapon_speed_change;
         wp.store_weapon_speed -= ergo.store_weapon_speed_change;
 
-        wp.visual_recoil -= ergo.visual_recoil_change;
-        wp.rate_of_fire -= ergo.rate_of_fire_change;
-        wp.bullets_per_tap -= ergo.burst_bullets_per_tap_change;
-        wp.time_between_bursts -= ergo.burst_time_between_bursts_change;
+        wp.recoilValues.visual_recoil -= ergo.visual_recoil_change;
+        wp.firing.rateOfFire -= ergo.rate_of_fire_change;
+        wp.firing.burstModeSettings.bulletsPerTap -= ergo.burst_bullets_per_tap_change;
+        wp.firing.burstModeSettings.timeBetweenBursts -= ergo.burst_time_between_bursts_change;
 
         if (ergo.fire_modes_change != null && ergo.fire_modes_change.Count > 0)
         {
             foreach (var fm in ergo.fire_modes_change)
             {
-                wp.fire_modes.Remove(fm);
+                wp.firing.fireModes.Remove(fm);
             }
         }
 

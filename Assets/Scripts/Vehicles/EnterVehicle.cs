@@ -8,12 +8,6 @@ public class EnterVehicle : InteractiveButton
     public override void Interact(PlayerController player)
     {
 
-        if (player.playerProperties.selected_class != ClassManager.Class.Pilot)
-        {
-            GeneralHudAlertMessages.Instance.CreateMessage("Only the pilot Class can drive vehicles", 2);
-            return;
-        }
-
         player.ResetWeaponAnimation();
         player.DisableNightVison();
 

@@ -12,7 +12,7 @@ public class ScoutHelicopter : Helicopter
             return;
         }
 
-        throttle = 0;
+        throttle.Value = 0;
         SetHpProperties(heliProperties.hp, heliProperties.resistance);
     }
 

@@ -2,7 +2,9 @@ using System.Runtime.Remoting.Messaging;
 using UnityEngine;
 
 public abstract class Attatchment : MonoBehaviour
-{
+{   
+    protected string attatchmentDescription;
+
     [Header("Attatchment Settings")]
     public string attachmentName;
     public float attatchment_points;
@@ -25,5 +27,7 @@ public abstract class Attatchment : MonoBehaviour
     {
         weaponProperties = GetComponentInParent<WeaponProperties>();
     }
+
+    public abstract string GetAttatchmentDescription();
 
 }

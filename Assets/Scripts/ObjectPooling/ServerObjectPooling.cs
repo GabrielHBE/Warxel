@@ -3,9 +3,10 @@ using FishNet;
 using FishNet.Object;
 using UnityEngine;
 
-public class ServerObjectPooling : NetworkBehaviour
+public class ServerObjectPooling : MonoBehaviour
 {
-    public static ServerObjectPooling Instance {get; private set;}
+    public static ServerObjectPooling Instance { get; private set; }
+    
     [System.Serializable]
     public struct ServerPoolSettings
     {
@@ -15,48 +16,107 @@ public class ServerObjectPooling : NetworkBehaviour
 
     [Header("Server Pooling")]
     [SerializeField] private List<ServerPoolSettings> serverPooledItems = new List<ServerPoolSettings>();
-
+    
+    [Header("Update Settings")]
+    [SerializeField] private bool enableLocalUpdates = true;
+    [SerializeField] private int maxUpdatesPerFrame = 50; // Limite para evitar picos de performance
+    
+    // Lista de objetos poolados ativos que precisam de update
+    private List<NetworkPooledObject> activePooledObjects = new List<NetworkPooledObject>();
+    private List<NetworkPooledObject> objectsToRemove = new List<NetworkPooledObject>();
+    
+    // Cache para evitar alocações
+    private int updateIndex = 0;
     private bool isInitialized = false;
 
-
-    public override void OnStartClient()
+    void Awake()
     {
-        base.OnStartClient();
         Instance = this;
-        // Aguarda o NetworkManager estar pronto
-        if (InstanceFinder.NetworkManager != null)
-        {
-            if (InstanceFinder.NetworkManager.IsServerStarted)
-            {
-                InitializeServerPools();
-            }
-            else
-            {
-                // Se não for servidor, desativa este GameObject
-                Debug.Log("[ServerObjectPooling] Não é servidor, desativando...");
-                gameObject.SetActive(false);
-            }
-        }
-        else
-        {
-            Debug.LogError("[ServerObjectPooling] NetworkManager não encontrado!");
-            gameObject.SetActive(false);
-        }
-    }
-
-    void OnEnable()
-    {
-        // Tenta inicializar novamente se for reativado
         if (!isInitialized && InstanceFinder.NetworkManager != null && InstanceFinder.NetworkManager.IsServerStarted)
         {
             InitializeServerPools();
         }
     }
 
+    void Update()
+    {
+        if (!enableLocalUpdates || !isInitialized) return;
+        
+        // Processa updates em lotes para evitar picos de performance
+        ProcessLocalUpdates();
+        
+        // Limpa objetos marcados para remoção
+        CleanupRemovedObjects();
+    }
+
+    private void ProcessLocalUpdates()
+    {
+        if (activePooledObjects.Count == 0) return;
+        
+        int processed = 0;
+        
+        // Processa em lotes para distribuir a carga
+        while (processed < maxUpdatesPerFrame && updateIndex < activePooledObjects.Count)
+        {
+            NetworkPooledObject obj = activePooledObjects[updateIndex];
+            
+            // Verifica se o objeto ainda está ativo antes de processar
+            if (obj != null && obj.gameObject.activeInHierarchy)
+            {
+                obj.LocalUpdate();
+                processed++;
+            }
+            
+            updateIndex++;
+        }
+        
+        // Se chegamos ao fim da lista, reiniciamos o índice
+        if (updateIndex >= activePooledObjects.Count)
+        {
+            updateIndex = 0;
+        }
+    }
+
+    private void CleanupRemovedObjects()
+    {
+        if (objectsToRemove.Count > 0)
+        {
+            foreach (var obj in objectsToRemove)
+            {
+                activePooledObjects.Remove(obj);
+            }
+            objectsToRemove.Clear();
+        }
+    }
+
+    // Método chamado quando um objeto é ativado (Enable)
+    public void RegisterPooledObject(NetworkPooledObject obj)
+    {
+        if (obj == null || !enableLocalUpdates) return;
+        
+        // Verifica se o objeto já está registrado
+        if (!activePooledObjects.Contains(obj))
+        {
+            activePooledObjects.Add(obj);
+        }
+    }
+
+    // Método chamado quando um objeto é desativado (Disable)
+    public void UnregisterPooledObject(NetworkPooledObject obj)
+    {
+        if (obj == null) return;
+        
+        // Marca para remoção na próxima limpeza (evita modificar a lista durante iteração)
+        if (!objectsToRemove.Contains(obj))
+        {
+            objectsToRemove.Add(obj);
+        }
+    }
+
     public void InitializeServerPools()
     {
         if (isInitialized) return;
-        
+
         if (InstanceFinder.NetworkManager == null)
         {
             Debug.LogError("[ServerObjectPooling] NetworkManager é nulo!");
@@ -70,8 +130,7 @@ public class ServerObjectPooling : NetworkBehaviour
         }
 
         isInitialized = true;
-
-        Debug.Log("[ServerObjectPooling] Inicializando pools do servidor...");
+        Debug.Log($"[ServerObjectPooling] Inicializando pools do servidor com {serverPooledItems.Count} itens...");
 
         foreach (ServerPoolSettings item in serverPooledItems)
         {
@@ -80,7 +139,6 @@ public class ServerObjectPooling : NetworkBehaviour
             try
             {
                 InstanceFinder.NetworkManager.CacheObjects(item.prefab, item.quantity, false);
-                Debug.Log($"[ServerObjectPooling] Pool criado para: {item.prefab.name} (x{item.quantity})");
             }
             catch (System.Exception e)
             {
@@ -89,38 +147,29 @@ public class ServerObjectPooling : NetworkBehaviour
         }
     }
 
-    // Método para verificar se o pool está inicializado
+    // Método para limpar todos os objetos registrados (útil para reinicialização)
+    public void ClearRegisteredObjects()
+    {
+        activePooledObjects.Clear();
+        objectsToRemove.Clear();
+        updateIndex = 0;
+    }
+
     public bool IsInitialized()
     {
         return isInitialized;
     }
 
-    // Método para reinicializar (se necessário)
     public void Reinitialize()
     {
+        ClearRegisteredObjects();
         isInitialized = false;
         InitializeServerPools();
     }
 
-
-    void OnDestroy()
+    // Método para obter estatísticas (debug)
+    public string GetPoolStats()
     {
-        // Limpa os pools do servidor quando destruído
-        if (InstanceFinder.NetworkManager != null && InstanceFinder.NetworkManager.IsServerStarted)
-        {
-            foreach (ServerPoolSettings item in serverPooledItems)
-            {
-                if (item.prefab == null) continue;
-                try
-                {
-                    // Nota: FishNet não tem um método ClearCache, mas os objetos serão limpos naturalmente
-                    Debug.Log($"[ServerObjectPooling] Limpando pool para: {item.prefab.name}");
-                }
-                catch (System.Exception e)
-                {
-                    Debug.LogWarning($"[ServerObjectPooling] Erro ao limpar pool: {e.Message}");
-                }
-            }
-        }
+        return $"Active Objects: {activePooledObjects.Count}, Updates per frame: {maxUpdatesPerFrame}, Current Index: {updateIndex}";
     }
 }

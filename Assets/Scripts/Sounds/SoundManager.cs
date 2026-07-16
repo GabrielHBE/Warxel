@@ -40,7 +40,7 @@ public class SoundManager : NetworkBehaviour
     [SerializeField] private List<AudioClip> internalAudioList = new List<AudioClip>();
     [SerializeField] private string rootFolder = "Assets/Sounds";
 
-    private readonly Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
+    private readonly static Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
     private static readonly List<LoopAudio> loopAudioList = new List<LoopAudio>();
 
     // Variáveis estáticas para permitir acesso nos métodos estáticos
@@ -299,6 +299,7 @@ public class SoundManager : NetworkBehaviour
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip))
         {
+
             GameObject pooledObj = LocalObjectPooling.Instance.GetPooledItem(audioDistanceControllerPrefab.gameObject);
             if (pooledObj != null)
             {
@@ -306,7 +307,7 @@ public class SoundManager : NetworkBehaviour
                 pooledObj.GetComponent<LocalPooledObject>().Activate();
 
                 AudioDistanceController controller = pooledObj.GetComponent<AudioDistanceController>();
-                controller.Setup(clip, soundProperties);
+                controller.Setup(new SoundComponents{clip = clip, properties = soundProperties});
                 controller.StartGrowth();
             }
         }
@@ -374,22 +375,6 @@ public class SoundManager : NetworkBehaviour
     private void RpcResume3dLoopSoundObservers(string soundName, Transform target)
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip)) ModifyLoopAudio(clip, target, src => src.UnPause());
-    }
-
-    // ================= PITCH =================
-    public void RequestSet3dLoopSoundPitch(string soundName, Transform target, float newPitch)
-    {
-        if (IsServerStarted) RpcSet3dLoopSoundPitchObservers(soundName, target, newPitch);
-        else ServerSet3dLoopSoundPitch(soundName, target, newPitch);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void ServerSet3dLoopSoundPitch(string soundName, Transform target, float newPitch) => RpcSet3dLoopSoundPitchObservers(soundName, target, newPitch);
-
-    [ObserversRpc]
-    private void RpcSet3dLoopSoundPitchObservers(string soundName, Transform target, float newPitch)
-    {
-        if (audioCache.TryGetValue(soundName, out AudioClip clip)) ModifyLoopAudio(clip, target, src => src.pitch = newPitch);
     }
 
     // ================= STOP =================
@@ -559,7 +544,7 @@ public class SoundManager : NetworkBehaviour
             pooledObj.GetComponent<LocalPooledObject>().Activate();
 
             AudioDistanceController controller = pooledObj.GetComponent<AudioDistanceController>();
-            controller.Setup(clip, soundProperties);
+            controller.Setup(new SoundComponents{clip = clip, properties = soundProperties});
             controller.StartGrowth();
         }
     }
@@ -583,7 +568,7 @@ public class SoundManager : NetworkBehaviour
     #endregion
 
     #region Helper
-    public AudioClip GetClip(string soundName)
+    public static AudioClip GetClip(string soundName)
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip))
         {
@@ -660,6 +645,13 @@ public class SoundManager : NetworkBehaviour
         public Transform target;
         public Transform transform;
         public GameObject gameObject;
+    }
+
+    [Serializable]
+    public class SoundComponents
+    {
+        public AudioClip clip;
+        public SoundProperties properties = SoundProperties.Default;
     }
     #endregion
 }

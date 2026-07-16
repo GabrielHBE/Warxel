@@ -21,7 +21,6 @@ public class PlayerSpawnController : NetworkBehaviour
 
     [Header("Camera Settings")]
     public Camera spawn_camera;
-    [SerializeField] private float zoomSpeed = 50f;
     [SerializeField] private float transitionDuration = 1.5f;
     [SerializeField] private AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
@@ -206,14 +205,17 @@ public class PlayerSpawnController : NetworkBehaviour
     {
         yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
 
+        // O Cliente lê seus próprios dados locais aqui
+        ClassManager.Class playerClass = AccountManager.Instance.selected_class;
+        FactionManager.Faction playerFaction = AccountManager.Instance.faction;
+
         if (currentSpawnType == CurrentSpawnType.Infantary)
         {
-            SpawnPlayer(spawn_point.position, spawn_point.rotation);
+            SpawnPlayer(spawn_point.position, spawn_point.rotation, playerClass, playerFaction);
         }
         else
         {
-            // Chama o novo método unificado
-            SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle);
+            SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle, playerClass, playerFaction);
         }
     }
 
@@ -245,10 +247,16 @@ public class PlayerSpawnController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab)
+    private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab, ClassManager.Class playerClass, FactionManager.Faction playerFaction)
     {
-        // 1. Instancia e Spawna o Player na rede
+        // 1. Instancia o Player na rede
         player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
+
+        // CORREÇÃO: Define a classe e facção no servidor IMEDIATAMENTE após instanciar e antes do spawn
+        PlayerProperties props = player_instantiated.GetComponent<PlayerProperties>();
+        props.selectedClass.Value = playerClass;
+        props.faction.Value = playerFaction;
+
         NetworkObject playerNetObj = player_instantiated.GetComponent<NetworkObject>();
         Spawn(playerNetObj, Owner);
 
@@ -257,8 +265,7 @@ public class PlayerSpawnController : NetworkBehaviour
         Vehicle vScript = spawnedVehicle.GetComponent<Vehicle>();
         Spawn(spawnedVehicle);
 
-        // 3. Força a entrada do player (roda direto no servidor, evitando delays)
-        // O método EnterVehicle da classe Vehicle já lida com RPCs de atualizar assentos e transferir Ownership
+        // 3. Força a entrada do player (Agora a classe já está validada!)
         vScript.EnterVehicle(Owner, player_instantiated);
 
         // 4. Atualiza o Cliente original de que o spawn terminou
@@ -266,17 +273,19 @@ public class PlayerSpawnController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation)
+    private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation, ClassManager.Class playerClass, FactionManager.Faction playerFaction)
     {
         player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
+
+        // CORREÇÃO: Define a classe e facção no servidor
+        PlayerProperties props = player_instantiated.GetComponent<PlayerProperties>();
+        props.selectedClass.Value = playerClass;
+        props.faction.Value = playerFaction;
+
         NetworkObject spawnedNetworkObject = player_instantiated.GetComponent<NetworkObject>();
 
-        // Spawna o objeto para o owner específico
         Spawn(spawnedNetworkObject, Owner);
-
-        // NOTIFICA APENAS O OWNER usando TargetRpc
         TargetOnSpawnPlayerComplete(Owner, spawnedNetworkObject.gameObject);
-
     }
 
     [TargetRpc]

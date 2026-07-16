@@ -26,9 +26,8 @@ public class VehicleSeats
     [HideInInspector] public PlayerController playerController;
     [HideInInspector] public Rigidbody playerRigidbody;
     [HideInInspector] public GameObject playerGameObject;
-    [HideInInspector] public PlayerAnimation playerAnimation;
+    private ThirdPersonArms thirdPersonArms;
     private SoldierHudManager soldierHudManager;
-
 
     [Header("Transform References")]
     public Transform playerSeat;
@@ -39,10 +38,14 @@ public class VehicleSeats
 
     public void EnterSeat(PlayerProperties playerProperties, PlayerController playerController, Transform playerSeat, Rigidbody playerRigidbody, GameObject playerGameObject)
     {
-        if (vehicleArmory != null && vehicleArmory.Length > 0)
+        if (vehicleArmory != null)
         {
-            currentArmory = vehicleArmory[0].GetComponent<IVehicleArmory>();
-            currentArmory.ActivateArmory();
+            if (vehicleArmory.Length > 0)
+            {
+                currentArmory = vehicleArmory[0].GetComponent<IVehicleArmory>();
+                currentArmory.ActivateArmory();
+            }
+
         }
 
         this.playerProperties = playerProperties;
@@ -53,9 +56,9 @@ public class VehicleSeats
         playerCamera = playerController.playerCamera;
         soldierHudManager = playerController.soldierHudManager;
         this.playerProperties.is_in_vehicle = true;
-        playerAnimation = playerController.playerAnimation;
-
-        if (playerAnimation != null) playerAnimation.SetVehicleIKTargets(vehicleLeftHandTarget, vehicleRightHandTarget);
+        thirdPersonArms = playerController.GetComponentInChildren<ThirdPersonArms>();
+    
+        //if (playerAnimation != null) playerAnimation.SetVehicleIKTargets(vehicleLeftHandTarget, vehicleRightHandTarget);
 
         this.playerRigidbody.isKinematic = true;
         this.playerRigidbody.interpolation = RigidbodyInterpolation.None;
@@ -64,13 +67,15 @@ public class VehicleSeats
 
         if (seatType != SeatType.Passenger)
         {
-            playerAnimation.DeactivateCurrentWeapon();
+            thirdPersonArms.RequestToDisableWeapon();
+            //playerAnimation.DeactivateCurrentWeapon();
             playerController.first_person_player_components.SetActive(false);
             playerController.HideOwnerItems(false);
         }
         else
         {
-            playerAnimation.ActivateCurrentWeapon();
+            thirdPersonArms.RequestToEnableWeapon();
+            //playerAnimation.ActivateCurrentWeapon();
             playerController.first_person_player_components.SetActive(true);
             playerController.HideOwnerItems(true);
         }
@@ -78,7 +83,7 @@ public class VehicleSeats
         if (seatHUD != null)
         {
             if (seatHUD != null) seatHUD.GetComponent<UIElementsColor>().SetColor(Color.limeGreen, 2);
-            if(soldierHudManager!=null) soldierHudManager.ActivateInVehicleHUD();
+            if (soldierHudManager != null) soldierHudManager.ActivateInVehicleHUD();
             seatHUD.SetActive(true);
         }
 
@@ -105,25 +110,33 @@ public class VehicleSeats
     public void ExitSeat()
     {
         //Player Animation Exit State
-        playerAnimation.ActivateCurrentWeapon();
-        if (playerAnimation != null)
+        if (thirdPersonArms != null)
         {
-            playerAnimation.SetVehicleIKTargets(null, null);
+            //playerAnimation.ActivateCurrentWeapon();
+            //playerAnimation.SetVehicleIKTargets(null, null);
         }
 
         //Player Controls Exit State
-        //playerController.first_person_player_components.SetActive(true);
-        playerController.first_person_player_components.SetActive(true);
-        playerController.HideOwnerItems(true);
-        playerProperties.is_in_vehicle = false;
+        if (playerController != null)
+        {
+            playerController.first_person_player_components.SetActive(true);
+            playerController.HideOwnerItems(true);
+            playerProperties.is_in_vehicle = false;
+        }
 
         //Player GameObject Exit State
-        if (!playerGameObject.activeSelf) playerGameObject.SetActive(true);
-        playerGameObject.transform.SetParent(null); // Detach the player from the vehicle seat
+        if (playerGameObject != null)
+        {
+            if (!playerGameObject.activeSelf) playerGameObject.SetActive(true);
+            playerGameObject.transform.SetParent(null); // Detach the player from the vehicle seat
+        }
 
         //Player Rigidbody Exit State
-        playerRigidbody.isKinematic = false;
-        playerRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+        if (playerRigidbody != null)
+        {
+            playerRigidbody.isKinematic = false;
+            playerRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+        }
 
         //Camera Exit State
         if (playerCamera != null)
@@ -140,9 +153,10 @@ public class VehicleSeats
     public void ClearReferences()
     {
         DeactivateAllArmory();
-        if (playerAnimation != null)
+        if (thirdPersonArms != null)
         {
-            playerAnimation.SetVehicleIKTargets(null, null);
+            thirdPersonArms.RequestToEnableWeapon();
+            //playerAnimation.SetVehicleIKTargets(null, null);
         }
 
         if (seatCamera != null)
@@ -153,7 +167,7 @@ public class VehicleSeats
 
         if (seatHUD != null)
         {
-            if(soldierHudManager!=null) soldierHudManager.ActivateStandardHUD();
+            if (soldierHudManager != null) soldierHudManager.ActivateStandardHUD();
             seatHUD.SetActive(false);
         }
 

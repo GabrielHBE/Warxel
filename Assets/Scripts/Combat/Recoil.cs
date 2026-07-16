@@ -61,36 +61,11 @@ public static class Recoil
     }
 
     /// <summary>
-    /// Calcula a rotação local aplicada ao modelo da arma (wobble/stability).
-    /// </summary>
-    public static Quaternion CalculateWeaponRotation(Quaternion currentRotation, float stability, bool isAiming)
-    {
-        if (isAiming)
-        {
-            return new Quaternion(
-                currentRotation.x + -stability / 500f,
-                currentRotation.y + stability / 500f,
-                currentRotation.z + -stability / 500f,
-                currentRotation.w
-            );
-        }
-
-        return new Quaternion(
-            currentRotation.x + Random.Range(-0.02f, 0.02f),
-            currentRotation.y + Random.Range(-0.02f, 0.02f),
-            currentRotation.z + Random.Range(-0.02f, 0.02f),
-            currentRotation.w
-        );
-    }
-
-    /// <summary>
     /// Calcula a rotação aleatória no eixo Z da câmera (efeito de trepidação lateral).
     /// </summary>
-    public static float CalculateCameraZRoll(float horizontalMedia, float verticalMedia)
+    public static float CalculateCameraZRoll(float horizontal, float vertical)
     {
-        // Calcula o limite do recuo Z somando as médias e multiplicando por 2
-        float range = (horizontalMedia + verticalMedia) * 2f;
-        return Random.Range(-range, range);
+        return ((horizontal + vertical) / 5) * (Random.value > 0.5f ? 1f : -1f);
     }
 
     [System.Serializable]
@@ -98,5 +73,42 @@ public static class Recoil
     {
         [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float verticalRecoil;
         [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float horizontalRecoil;
+    }
+
+    [System.Serializable]
+    public class RecoilValues
+    {
+        public bool manualCalculateRecoil;
+        public float resetRecoilSpeed;
+        public float applyRecoilSpeed;
+        public Vector3 visual_recoil;
+        [Range(MIN_FIRTSHOTINCREASER_VALUE, MAX_FIRTSHOTINCREASER_VALUE)]
+        public float firstShootRecoilMultiplier = 1;
+        public RecoilPattern[] recoilPattern = new RecoilPattern[1];
+        [HideInInspector] public float horizontalRecoilMedia;
+        [HideInInspector] public float verticalRecoilMedia;
+
+        public void CalculateRecoilSpeed(float interval)
+        {
+            if (manualCalculateRecoil) return;
+
+            resetRecoilSpeed = interval / 2;
+            applyRecoilSpeed = interval / 2;
+
+        }
+
+        float horizonalMedia = 0;
+        float verticalMedia = 0;
+        public void CalculateRecoilMedia()
+        {
+
+            for (int i = 0; i < recoilPattern.Length; i++)
+            {
+                horizonalMedia = recoilPattern[i].horizontalRecoil;
+                verticalMedia = recoilPattern[i].verticalRecoil;
+            }
+            verticalRecoilMedia = verticalMedia / recoilPattern.Length;
+            horizontalRecoilMedia = horizonalMedia / recoilPattern.Length;
+        }
     }
 }

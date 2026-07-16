@@ -50,10 +50,10 @@ public class FlagCapture : NetworkBehaviour
                 if (col.gameObject.layer == LayerMask.NameToLayer("Player"))
                 {
                     // Tenta acessar o PlayerController para checar a classe
-                    PlayerController playerController = col.GetComponent<PlayerController>();
+                    PlayerProperties playerProperties = col.GetComponent<PlayerProperties>();
                     
                     // Se tiver o script e a classe for Assault, aumenta o peso
-                    if (playerController != null && playerController.GetClass() == ClassManager.Class.Assault)
+                    if (playerProperties != null && playerProperties.selectedClass.Value == ClassManager.Class.Assault)
                     {
                         captureWeight = assaultClassMultiplier; // Aplica o peso 1.5x
                     }

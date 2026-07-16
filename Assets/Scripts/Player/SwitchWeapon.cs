@@ -1,10 +1,10 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class SwitchWeapon : MonoBehaviour
 {
     public Transform weapons_parent;
     public Transform gadgets_parent;
+
     [Header("Keycodes")]
     public KeyCode weapon1 = KeyCode.Alpha1;
     public KeyCode weapon2 = KeyCode.Alpha2;
@@ -22,6 +22,7 @@ public class SwitchWeapon : MonoBehaviour
 
     [Header("Instances")]
     public Reticle reticle;
+    [SerializeField] private ThirdPersonArms thirdPersonArms;
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private WeaponAnimation weaponAnimation;
@@ -47,7 +48,8 @@ public class SwitchWeapon : MonoBehaviour
     private Quaternion originalQuaternionRotation;
     private readonly Quaternion saveQuaternionRotation = new(4, 0, 0, 1);
     private Vector3 actualSavePosition;
-    private enum WeaponSlot
+
+    public enum WeaponSlot
     {
         Primary = 1,
         Secondary = 2,
@@ -61,6 +63,8 @@ public class SwitchWeapon : MonoBehaviour
         InstantiateSecodnaryWeapon();
         InstantiateGadget1();
         InstantiateGadget2();
+
+        InstantiateThirdPersonWeapons();
 
         currentWeapon = 1;
         targetWeapon = 1;
@@ -125,8 +129,59 @@ public class SwitchWeapon : MonoBehaviour
         }
     }
 
+    private void InstantiateThirdPersonWeapons()
+    {
+        GameObject thirdPersonPrimary = null;
+        GameObject thirdPersonSecondary = null;
+        GameObject thirdPersonGadget1 = null;
+        GameObject thirdPersonGadget2 = null;
+
+
+        if (primary != null)
+        {
+            WeaponProperties primaryWP = primary.GetComponent<WeaponProperties>();
+            if (primaryWP != null && primaryWP.third_person_prefab != null) 
+            {
+                thirdPersonPrimary = primaryWP.third_person_prefab;
+            }
+        }
+
+        if (secondary != null)
+        {
+            WeaponProperties secondaryWP = secondary.GetComponent<WeaponProperties>();
+            if (secondaryWP != null && secondaryWP.third_person_prefab != null) 
+            {
+                thirdPersonSecondary = secondaryWP.third_person_prefab;
+            }
+        }
+
+        if (gadget1 != null)
+        {
+            Gadget gadget1WP = primary.GetComponent<Gadget>();
+            if (gadget1WP != null && gadget1WP.third_person_prefab != null) 
+            {
+                thirdPersonGadget1 = gadget1WP.third_person_prefab;
+            }
+        }
+
+        if (gadget2 != null)
+        {
+            Gadget gadget2WP = primary.GetComponent<Gadget>();
+            if (gadget2WP != null && gadget2WP.third_person_prefab != null) 
+            {
+                thirdPersonGadget2 = gadget2WP.third_person_prefab;
+            }
+        }
+
+        thirdPersonArms.RequestInstantiateWeapons(thirdPersonPrimary,
+                                                    thirdPersonSecondary,
+                                                    thirdPersonGadget1,
+                                                    thirdPersonGadget2);
+    }
+
     void Update()
     {
+
         HandleWeaponSwitchInputManager();
 
         if (_switch)
@@ -268,18 +323,22 @@ public class SwitchWeapon : MonoBehaviour
         switch ((WeaponSlot)currentWeapon)
         {
             case WeaponSlot.Primary:
+                thirdPersonArms.RequestSwitchWeapon(WeaponSlot.Primary);
                 SetupWeapon(primary, true);
                 break;
 
             case WeaponSlot.Secondary:
+                thirdPersonArms.RequestSwitchWeapon(WeaponSlot.Secondary);
                 SetupWeapon(secondary, true);
                 break;
 
             case WeaponSlot.Gadget1:
+                thirdPersonArms.RequestSwitchWeapon(WeaponSlot.Gadget1);
                 SetupGadget(gadget1);
                 break;
 
             case WeaponSlot.Gadget2:
+                thirdPersonArms.RequestSwitchWeapon(WeaponSlot.Gadget2);
                 SetupGadget(gadget2);
                 break;
         }
@@ -329,7 +388,6 @@ public class SwitchWeapon : MonoBehaviour
         if (weaponProperties == null) return;
 
         sway.Restart(
-            weaponProperties.weapon.transform,
             weaponProperties.bob_walk_exageration,
             weaponProperties.bob_sprint_exageration,
             weaponProperties.bob_crouch_exageration,
@@ -357,7 +415,6 @@ public class SwitchWeapon : MonoBehaviour
     private void ConfigureSwayForGadget(Gadget gadget)
     {
         sway.Restart(
-            gadget.GetTransform(),
             gadget.bob_walk_exageration,
             gadget.bob_sprint_exageration,
             gadget.bob_crouch_exageration,
@@ -384,7 +441,7 @@ public class SwitchWeapon : MonoBehaviour
 
         if (weaponProperties != null)
         {
-            playerController.UpdateWeaponProperties(weaponProperties.speed_change, weaponProperties.weapon_apply_recoil_speed, weaponProperties.weapon_reset_recoil_speed);
+            playerController.UpdateWeaponProperties(weaponProperties.speed_change, weaponProperties.recoilValues.applyRecoilSpeed, weaponProperties.recoilValues.resetRecoilSpeed);
             WeaponHolder wh = weaponProperties.GetComponent<WeaponHolder>();
             wh.ResetWeaponState();
         }

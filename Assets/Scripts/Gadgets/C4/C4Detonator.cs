@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 public class C4Detonator : Gadget
 {
@@ -13,9 +12,7 @@ public class C4Detonator : Gadget
     [SerializeField] private Transform detonator_position;
 
     [Header("Sounds")]
-    [SerializeField] private AudioClip beepSound;
-    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
-
+    [SerializeField] private SoundManager.SoundComponents beepSound;
 
     [Header("Detonation timing (seconds)")]
     [SerializeField] private float initialDetonateDelay;
@@ -44,6 +41,7 @@ public class C4Detonator : Gadget
         if (c4_qtd > 0 && InputManager.GetKeyDown(Settings.Instance._keybinds.GADGET_throwC4Key))
         {
             Throw_C4();
+            UpdateAmmoHUD();
         }
 
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.GADGET_detonateC4Key) && !isDetonating)
@@ -52,7 +50,7 @@ public class C4Detonator : Gadget
 
             if (c4_list.Count > 0)
             {
-                SoundManager.Play2dSoundLocal(beepSound, soundProperties);
+                SoundManager.Play2dSoundLocal(beepSound.clip, beepSound.properties);
                 StartDetonationSequence();
             }
         }
@@ -161,6 +159,11 @@ public class C4Detonator : Gadget
 
         rb.AddForce(Camera.main.transform.forward * throw_c4_force, ForceMode.Impulse);
 
+    }
+
+    private void UpdateAmmoHUD()
+    {
+        soldierHudManager.SetCurrentAmmo(c4_qtd.ToString());
     }
 
 }

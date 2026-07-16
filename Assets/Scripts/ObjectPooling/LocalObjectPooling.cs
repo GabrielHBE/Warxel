@@ -17,8 +17,9 @@ public class LocalObjectPooling : MonoBehaviour
 
     private Dictionary<GameObject, List<GameObject>> poolDictionary = new Dictionary<GameObject, List<GameObject>>();
     private Dictionary<GameObject, Transform> poolFolders = new Dictionary<GameObject, Transform>();
-
     private bool isInitialized = false;
+
+    private List<LocalPooledObject> instantiatedLocalPooledItems = new List<LocalPooledObject>();
 
     void Awake()
     {
@@ -61,13 +62,8 @@ public class LocalObjectPooling : MonoBehaviour
             {
                 GameObject obj = Instantiate(item.prefab, folder.transform);
                 obj.SetActive(false);
-
-                if (obj.TryGetComponent(out LocalPooledObject pooledObj))
-                {
-                    pooledObj.SetupPoolParent(folder.transform);
-                }
-
                 poolDictionary[item.prefab].Add(obj);
+                instantiatedLocalPooledItems.Add(obj.GetComponent<LocalPooledObject>());
             }
         }
     }
@@ -102,13 +98,8 @@ public class LocalObjectPooling : MonoBehaviour
         Transform folderTransform = poolFolders[prefab];
         GameObject newObj = Instantiate(prefab, folderTransform);
         newObj.SetActive(false);
-
-        if (newObj.TryGetComponent(out LocalPooledObject pooledObj))
-        {
-            pooledObj.SetupPoolParent(folderTransform);
-        }
-
         poolList.Add(newObj);
+        instantiatedLocalPooledItems.Add(newObj.GetComponent<LocalPooledObject>());
         return newObj;
     }
 
@@ -139,5 +130,27 @@ public class LocalObjectPooling : MonoBehaviour
         }
         poolDictionary.Clear();
         poolFolders.Clear();
+    }
+
+    private void Update()
+    {
+        for (int i = 0; i < instantiatedLocalPooledItems.Count; i++)
+        {
+            if (instantiatedLocalPooledItems[i].gameObject.activeSelf)
+            {
+                instantiatedLocalPooledItems[i].LocalUpdate();
+            }
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        for (int i = 0; i < instantiatedLocalPooledItems.Count; i++)
+        {
+            if (instantiatedLocalPooledItems[i].gameObject.activeSelf)
+            {
+                instantiatedLocalPooledItems[i].LocalFixedUpdate();
+            }
+        }
     }
 }

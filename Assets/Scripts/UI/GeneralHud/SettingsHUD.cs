@@ -475,14 +475,14 @@ public class SettingsHUD : PersistentLocalSingleton<SettingsHUD>
         if (inWorldVoipDropdown != null)
         {
             inWorldVoipDropdown.ClearOptions();
-            inWorldVoipDropdown.AddOptions(Settings.Instance._audio.in_world_voip_modes);
+            //inWorldVoipDropdown.AddOptions(Settings.Instance._audio.in_world_voip_modes);
             inWorldVoipDropdown.value = PlayerPrefs.GetInt(SettingsKeys.IN_WORLD_VOIP_MODE, 0);
         }
 
         if (radioVoipDropdown != null)
         {
             radioVoipDropdown.ClearOptions();
-            radioVoipDropdown.AddOptions(Settings.Instance._audio.radio_world_voip_modes);
+            //radioVoipDropdown.AddOptions(Settings.Instance._audio.radio_world_voip_modes);
             radioVoipDropdown.value = PlayerPrefs.GetInt(SettingsKeys.RADIO_VOIP_MODE, 0);
         }
 
@@ -541,7 +541,7 @@ public class SettingsHUD : PersistentLocalSingleton<SettingsHUD>
         if (graphicPresetsDropdown != null)
         {
             graphicPresetsDropdown.ClearOptions();
-            graphicPresetsDropdown.AddOptions(Settings.Instance._video.graphic_presets);
+            //graphicPresetsDropdown.AddOptions(Settings.Instance._video.graphic_presets);
             graphicPresetsDropdown.value = PlayerPrefs.GetInt(SettingsKeys.GRAPHIC_PRESET, 0);
         }
 
@@ -551,21 +551,21 @@ public class SettingsHUD : PersistentLocalSingleton<SettingsHUD>
         if (shadowsDropdown != null)
         {
             shadowsDropdown.ClearOptions();
-            shadowsDropdown.AddOptions(Settings.Instance._video.shadows);
+            //shadowsDropdown.AddOptions(Settings.Instance._video.shadows);
             shadowsDropdown.value = PlayerPrefs.GetInt(SettingsKeys.SHADOWS_QUALITY, 0);
         }
 
         if (meshesDropdown != null)
         {
             meshesDropdown.ClearOptions();
-            meshesDropdown.AddOptions(Settings.Instance._video.meshes);
+            //meshesDropdown.AddOptions(Settings.Instance._video.meshes);
             meshesDropdown.value = PlayerPrefs.GetInt(SettingsKeys.MESHES_QUALITY, 0);
         }
 
         if (rainQualityDropdown != null)
         {
             rainQualityDropdown.ClearOptions();
-            rainQualityDropdown.AddOptions(Settings.Instance._video.rain_quality);
+            //rainQualityDropdown.AddOptions(Settings.Instance._video.rain_quality);
             rainQualityDropdown.value = PlayerPrefs.GetInt(SettingsKeys.RAIN_QUALITY, 0);
         }
 
@@ -770,13 +770,13 @@ public class SettingsHUD : PersistentLocalSingleton<SettingsHUD>
 
     public void OnInWorldVoipModeChanged(int index)
     {
-        Settings.Instance._audio.in_world_voip_key = GetKeyForMode(Settings.Instance._audio.in_world_voip_modes[index]);
+        //Settings.Instance._audio.in_world_voip_key = GetKeyForMode(Settings.Instance._audio.in_world_voip_modes[index]);
         PlayerPrefs.SetInt(SettingsKeys.IN_WORLD_VOIP_MODE, index);
     }
 
     public void OnRadioVoipModeChanged(int index)
     {
-        Settings.Instance._audio.radio_voip_key = GetKeyForMode(Settings.Instance._audio.radio_world_voip_modes[index]);
+        //Settings.Instance._audio.radio_voip_key = GetKeyForMode(Settings.Instance._audio.radio_world_voip_modes[index]);
         PlayerPrefs.SetInt(SettingsKeys.RADIO_VOIP_MODE, index);
     }
 

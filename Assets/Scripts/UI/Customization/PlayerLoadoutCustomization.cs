@@ -98,9 +98,9 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     [SerializeField] private float maxScrollYIncreaser = 100f;
 
     [Header("Sound Effects")]
-    [SerializeField] private AudioClip purchase_item_sfx;
-    [SerializeField] private AudioClip purchase_denial_item_sfx;
-    [SerializeField] private AudioClip select_item_item_sfx;
+    [SerializeField] private SoundManager.SoundComponents purchaseItemSfx;
+    [SerializeField] private SoundManager.SoundComponents purchaseDenialItemSfx;
+    [SerializeField] private SoundManager.SoundComponents selectItemSfx;
 
 
     [Header("Current selection")]
@@ -111,10 +111,10 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
 
     //Statics
-    [HideInInspector] public static AudioClip reference_purchase_item_sfx;
-    [HideInInspector] public static AudioClip reference_purchase_denial_item_sfx;
+    [HideInInspector] public static SoundManager.SoundComponents reference_purchase_item_sfx;
+    [HideInInspector] public static SoundManager.SoundComponents reference_purchase_denial_item_sfx;
     [HideInInspector] public static Sprite locked_item_image;
-    [HideInInspector] public static UnityEngine.UI.Button BuyWeaponButton;
+    [HideInInspector] public static Button BuyWeaponButton;
 
 
 
@@ -225,8 +225,8 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         locked_item_image = lockedItemImage;
         BuyWeaponButton = buy_weapon_button;
 
-        reference_purchase_item_sfx = purchase_item_sfx;
-        reference_purchase_denial_item_sfx = purchase_denial_item_sfx;
+        reference_purchase_item_sfx = purchaseItemSfx;
+        reference_purchase_denial_item_sfx = purchaseDenialItemSfx;
 
         _selectedClass = AccountManager.Instance.selected_class;
         if (loadoutSaver != null)
@@ -741,7 +741,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private void EquipItem(GameObject item)
     {
-        if (select_item_item_sfx != null) SoundManager.Play2dSoundLocal(select_item_item_sfx, SoundManager.SoundProperties.Default);
+        if (selectItemSfx != null) SoundManager.Play2dSoundLocal(selectItemSfx.clip, selectItemSfx.properties);
 
         switch (_currentLoadoutOption)
         {
@@ -1242,36 +1242,30 @@ public class PlayerLoadoutCustomization : MonoBehaviour
     {
         if (wp == null) return;
 
-        wp.CalculateMedia();
+        wp.recoilValues.CalculateRecoilMedia();
 
-        rateOfFireText.text = wp.rate_of_fire.ToString("F0") + " RPM";
+        rateOfFireText.text = wp.firing.rateOfFire.ToString("F0") + " RPM";
         adsSpeedText.text = wp.ads_speed.ToString("F2") + "s";
         playerSpeedModifierText.text = wp.speed_change.ToString("F0");
         zoomText.text = "x" + wp.zoom.ToString("F1");
-
-        fireModesText.text = string.Join(" / ", wp.fire_modes);
-
-        destructionForceText.text = wp.destruction_force.ToString("F0");
-        damageText.text = wp.infantry_damage.ToString("F1");
-        minimumDamageText.text = wp.minimum_damage.ToString("F1");
-        vehicleBaseDamageText.text = wp.vehicle_damage.ToString("F1");
-        headshotMultiplierText.text = wp.headshot_multiplier.ToString("F1");
-        damageDropoffText.text = wp.damage_dropoff.ToString("F0") + "%";
-        damageDropoffTimerText.text = wp.damage_dropoff_timer.ToString("F2") + "s";
-        spreadIncreaserText.text = wp.spread_increaser.ToString("F2");
-        maxSpreadText.text = wp.max_spread.ToString("F2");
-
-        horizontalRecoilText.text = string.Join(" / ", wp.recoilPattern.Select(v => v.horizontalRecoil.ToString("F2")));
-        verticalRecoilText.text = string.Join(" / ", wp.recoilPattern.Select(v => v.verticalRecoil.ToString("F2")));
-
-        //verticalRecoilText.text = wp.vertical_recoil_media.ToString("F2");
-        firstShotRecoilIncreaserText.text = "x" + wp.first_shoot_increaser.ToString("F1");
-        magCountText.text = wp.mag_count.ToString();
-        bulletsPerMagText.text = wp.bullets_per_mag.ToString();
-        reloadSpeedText.text = wp.reload_time.ToString("F2") + "s";
+        fireModesText.text = string.Join(" / ", wp.firing.fireModes);
+        destructionForceText.text = wp.projectileValues.destructionForce.ToString("F0");
+        damageText.text = wp.projectileValues.infantryDamage.ToString("F1");
+        minimumDamageText.text = wp.projectileValues.minimumDamage.ToString("F1");
+        vehicleBaseDamageText.text = wp.projectileValues.vehicleDamage.ToString("F1");
+        headshotMultiplierText.text = wp.projectileValues.headshotMultiplier.ToString("F1");
+        damageDropoffText.text = wp.projectileValues.damageDropoff.ToString("F0") + "%";
+        damageDropoffTimerText.text = wp.projectileValues.damageDropoffTimer.ToString("F2") + "s";
+        spreadIncreaserText.text = wp.spreadValues.spreadIncreaser.ToString("F2");
+        maxSpreadText.text = wp.spreadValues.maxSpread.ToString("F2");
+        horizontalRecoilText.text = string.Join(" / ", wp.recoilValues.recoilPattern.Select(v => v.horizontalRecoil.ToString("F2")));
+        verticalRecoilText.text = string.Join(" / ", wp.recoilValues.recoilPattern.Select(v => v.verticalRecoil.ToString("F2")));
+        firstShotRecoilIncreaserText.text = "x" + wp.recoilValues.firstShootRecoilMultiplier.ToString("F1");
+        magCountText.text = wp.reloadValues.magCount.ToString();
+        bulletsPerMagText.text = wp.reloadValues.bulletsPerMag.ToString();
+        reloadSpeedText.text = wp.reloadValues.reloadTime.ToString("F2") + "s";
     }
 
-    // Public getters
     // Public getters
     public GameObject GetCurrentPrimaryWeapon()
     {
@@ -1503,7 +1497,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         {
             if (AccountManager.Instance.battle_coins < _weaponProperties.battle_coins_to_unlock)
             {
-                SoundManager.Play2dSoundLocal(reference_purchase_denial_item_sfx, SoundManager.SoundProperties.Default);
+                SoundManager.Play2dSoundLocal(reference_purchase_denial_item_sfx.clip, reference_purchase_denial_item_sfx.properties);
                 return;
             }
 
@@ -1524,7 +1518,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
             // Reconfigura os eventos para permitir seleção
             SetupEvents();
 
-            SoundManager.Play2dSoundLocal(reference_purchase_item_sfx, SoundManager.SoundProperties.Default);
+            SoundManager.Play2dSoundLocal(reference_purchase_item_sfx.clip, reference_purchase_item_sfx.properties);
             AccountManager.Instance.RemoveBattleCoin(_weaponProperties.battle_coins_to_unlock);
             UnlockedWeapons.UnlockWeapon(_weaponProperties.weapon_name);
         }

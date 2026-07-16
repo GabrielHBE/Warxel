@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 public class Sight : Attatchment
@@ -13,11 +12,6 @@ public class Sight : Attatchment
     public float sway_change;
     public string reticle;
 
-    public override void Initialize()
-    {
-        return;
-    }
-
     public enum SightType
     {
         CloseRange,
@@ -26,4 +20,8 @@ public class Sight : Attatchment
         ExtremeLongRange
     }
 
+    public override string GetAttatchmentDescription()
+    {
+        throw new System.NotImplementedException();
+    }
 }

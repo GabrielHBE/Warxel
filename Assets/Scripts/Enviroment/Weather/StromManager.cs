@@ -7,8 +7,7 @@ public class StromManager : NetworkBehaviour
     [SerializeField] private WeatherStateManager weatherState;
 
     [Header("Sounds")]
-    [SerializeField] private AudioClip thunderSound; // Mudei para AudioClip
-    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents thunderSound; 
 
     [Header("Strom Effects")]
     [SerializeField] private GameObject lightningEffectPrefab; // Mudei para GameObject
@@ -58,7 +57,7 @@ public class StromManager : NetworkBehaviour
         if (ps != null)
             ps.Play();
 
-        SoundManager.Instance.RequestPlay3dSound(thunderSound.name, soundProperties, lightningPosition, true);
+        SoundManager.Instance.RequestPlay3dSound(thunderSound.clip.name, thunderSound.properties, lightningPosition, true);
 
         StartCoroutine(DestroyAfterDelay(lightningGO, lightningDestroyDelay));
     }

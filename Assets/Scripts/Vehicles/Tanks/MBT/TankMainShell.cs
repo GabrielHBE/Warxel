@@ -5,8 +5,7 @@ using VoxelDestructionPro.Tools;
 public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 {
     [Header("Sounds")]
-    [SerializeField] private AudioClip explosionSound;
-    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents explosionSound;
 
     [Header("Properties")]
     [SerializeField] private Collider shell_collider;
@@ -86,7 +85,7 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 
         shell_collider.enabled = false;
 
-        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, collision.contacts[0].point);
+        SoundManager.Play3dSoundLocal(explosionSound.clip, explosionSound.properties, collision.contacts[0].point);
 
         SpawnExplosionEffect(contact_point);
 

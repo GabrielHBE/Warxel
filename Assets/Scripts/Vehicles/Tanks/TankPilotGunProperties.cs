@@ -1,28 +1,36 @@
+using FishNet.Object;
 using UnityEngine;
 
 public class TankPilotGunProperties : MonoBehaviour, IsVehicleCustomizationPart
 {
-    [Header("Damage model")]
-    public float infantary_damage;
-    public float vehicle_damage;
-    public float muzzle_velocity;
-    public float minimum_damage;
-    public float bullet_drop;
-    public float damage_dropoff;
-    public float damage_dropoff_timer;
-    public float destruction_force;
-    public GameObject bullet_hit_effect;
-    public Sprite hud_image;
-    public Transform bullefPref;
-    public float fire_rate;
-    public float interval;
-    public float overheat_time;
-    public AudioSource shoot_shound;
+    [Header("UI")]
+    public Sprite hudIcon;
 
-    void Start()
-    {
-        interval = 60f / fire_rate;
-    }
+    [Header("Bullet Prefabs")]
+    public GameObject bulletPref;
+    public DummyProjectile dummyBullet;
+
+    [Header("Sounds")]
+    public SoundManager.SoundComponents shootSound;
+
+    [Header("Shooting & Reloading")]
+    public float delay_to_shoot_animation;
+    public ProcessReload.Reload.ReloadValues reloadValues;
+
+    [Header("Fring Settings")]
+    public Firing.FiringValues firing;
+
+    [Header("Damage & Ballistics")]
+    public Projectile.ProjectileValues projectileValues;
+
+    [Header("Spread Settings")]
+    public Spread.SpreadValues spreadValues;
+
+    [Header("Recoil Settings")]
+    public Recoil.RecoilValues recoilValues;
+
+    [Header("Heat Settings")]
+    public Heating.HeatValues heatValues;
 
     public void Activate()
     {

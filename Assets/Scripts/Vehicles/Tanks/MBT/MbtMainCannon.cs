@@ -29,7 +29,7 @@ public class MbtMainCannon : NetworkBehaviour, IVehicleArmory
 
     }
 
-    public void ActivateArmory(){ }
+    public void ActivateArmory(){ SetupFiringSystem();}
     
 
     public void DeactivateArmory(){ }
@@ -146,5 +146,21 @@ public class MbtMainCannon : NetworkBehaviour, IVehicleArmory
 
         retactableTankCannon.localPosition = originalLocalPosition;
         cannon_shoot_delay = reloadTime;
+    }
+
+    public void SetupFiringSystem()
+    {
+        /*
+        Firing.ResetState();
+
+        // Garante que o modo de tiro estático atual é válido para este armamento
+        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
+        {
+            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
+            {
+                Firing.SwitchFireMode(properties.firing.fireModes);
+            }
+        }
+        */
     }
 }

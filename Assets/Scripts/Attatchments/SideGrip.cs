@@ -8,8 +8,6 @@ public class SideGrip : Attatchment
     [SerializeField] private GameObject Object;
     [SerializeField] private bool show_in_third_person;
     
-
-
     bool state = true;
     private Weapon weapon;
     private CameraShake cameraShake;
@@ -65,6 +63,11 @@ public class SideGrip : Attatchment
         }
 
         weapon.transform.localRotation = originalRot;
+    }
+
+    public override string GetAttatchmentDescription()
+    {
+        throw new System.NotImplementedException();
     }
 
 }

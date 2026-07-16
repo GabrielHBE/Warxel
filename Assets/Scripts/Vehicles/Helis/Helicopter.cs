@@ -9,12 +9,9 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
     #region Inspector Variables
     [Header("Sounds")]
-    [SerializeField] protected AudioClip insidePropellerSound;
-    [SerializeField] protected SoundManager.SoundProperties insidePropellerSoundProperties = SoundManager.SoundProperties.Default;
-    [SerializeField] protected AudioClip outsidePropellerSound;
-    [SerializeField] protected SoundManager.SoundProperties outsidePropellerSoundProperties = SoundManager.SoundProperties.Default;
-    [SerializeField] protected AudioClip fallAlarmSound;
-    [SerializeField] protected SoundManager.SoundProperties fallAlarmSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] protected SoundManager.SoundComponents insidePropellerSound;
+    [SerializeField] protected SoundManager.SoundComponents outsidePropellerSound;
+    [SerializeField] protected SoundManager.SoundComponents fallAlarmSound;
 
     [Header("Helicopter variables")]
     [SerializeField] protected HeliProperties heliProperties;
@@ -30,8 +27,14 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
     private float lean_value;
     protected Vector3 liftDirection;
     private float currentPropellerSpeed = 0f;
-    private float propellerAccelerationTime = 10f;
-    private float propellerDecelerationTime = 1f;
+    private const float PROPELLER_ACCELARATION = 2f;
+    private const float PROPELLER_DESELERATION = 2f;
+
+    private float localThrottle;
+
+    // Engine sound tracking
+    private bool _wasEnginePlaying = false;
+    private float currentPitch = 0f;
     #endregion
 
     #region State Implementations
@@ -45,11 +48,11 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
             HandleThrottleInput(deltaTime);
             CalculateRotationInput(deltaTime);
             ApplyRotationTorque();
-            rb.AddForce(liftDirection * throttle * rb.mass);
+            rb.AddForce(liftDirection * throttle.Value * rb.mass);
         }
         else
         {
-            throttle = 0;
+            throttle.Value = 0;
             gravity_force = 0.2f;
             AddForceDown(gravity_force);
         }
@@ -58,6 +61,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
     protected override void HandleEngineOff()
     {
         base.HandleEngineOff();
+        localThrottle = 0f;
         PropellerRotation();
     }
 
@@ -115,22 +119,40 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
         if (move_upwards > 0)
         {
-            throttle += deltaTime * heliProperties.lift_force;
+            localThrottle += deltaTime * heliProperties.lift_force;
             gravity_force = 100f;
         }
         else if (move_upwards < 0)
         {
-            throttle -= deltaTime * heliProperties.lift_force * 2;
+            localThrottle -= deltaTime * heliProperties.lift_force;
             gravity_force = 100f;
         }
         else
         {
-            throttle -= deltaTime * heliProperties.lift_force;
+            localThrottle -= deltaTime * 2;
             gravity_force = 100f;
         }
 
+        localThrottle = Mathf.Clamp(localThrottle, 0, heliProperties.max_lift_force);
+
+        if (IsOwner)
+        {
+            throttle.Value = localThrottle; // <--- ADICIONE ESTA LINHA: Garante resposta imediata da física
+
+            // Envia para o servidor apenas quando necessário
+            _throttleUpdateTimer += deltaTime;
+            float throttleDiff = Mathf.Abs(localThrottle - _lastSentThrottle);
+
+            if (throttleDiff > THROTTLE_THRESHOLD && _throttleUpdateTimer >= THROTTLE_UPDATE_INTERVAL)
+            {
+                CmdUpdateThrottle(localThrottle);
+                _lastSentThrottle = localThrottle;
+                _throttleUpdateTimer = 0f;
+            }
+        }
+
         AddForceDown(gravity_force);
-        throttle = Mathf.Clamp(throttle, 0, heliProperties.max_lift_force);
+
     }
 
     protected void CalculateRotationInput(float deltaTime)
@@ -161,29 +183,75 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
     protected void PropellerRotation()
     {
-        float targetSpeed = start_engine && !vehicle_destroyed.Value ? heliProperties.max_lift_force : 0f;
-        float smoothTime = start_engine ? propellerAccelerationTime : propellerDecelerationTime;
+        float targetSpeed = startEngine.Value && !vehicle_destroyed.Value ? heliProperties.max_lift_force / 4 : 0f;
+        float smoothTime = startEngine.Value ? PROPELLER_ACCELARATION : PROPELLER_DESELERATION;
         float t = Mathf.Clamp01(Time.fixedDeltaTime / smoothTime);
 
         currentPropellerSpeed = Mathf.Lerp(currentPropellerSpeed, targetSpeed, t);
         float rotationAmount = currentPropellerSpeed * Time.fixedDeltaTime * 20;
 
-        if (main_propeller != null) main_propeller.transform.Rotate(0, rotationAmount * 4, 0, Space.Self);
-        if (back_propeller != null) back_propeller.transform.Rotate(0, 0, rotationAmount * 4, Space.Self);
+        if (main_propeller != null) main_propeller.transform.Rotate(0, rotationAmount, 0, Space.Self);
+        if (back_propeller != null) back_propeller.transform.Rotate(0, 0, rotationAmount, Space.Self);
     }
     #endregion
 
     #region Engine Audio & System
+    protected override void Update()
+    {
+        base.Update();
+        UpdatePropellerSound();
+    }
+    private void UpdatePropellerSound()
+    {
+        if (vehicle_destroyed.Value) return;
+
+        // 1. Todos os clients calculam o alvo e suavizam o pitch localmente
+        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 1.2f, throttle.Value / heliProperties.max_lift_force) : 0f;
+        currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.deltaTime * 5);
+
+        bool shouldBePlaying = currentPitch > 0.01f;
+
+        // Atualiza o pitch do AudioSource para quem já estiver tocando
+        if (shouldBePlaying)
+            SoundManager.SetLoopSoundPitchLocal(insidePropellerSound.clip, transform, currentPitch);
+
+        // 2. Apenas o Owner envia comandos de Ligar/Desligar via rede para evitar duplicatas de RPC
+        if (IsOwner)
+        {
+            if (_wasEnginePlaying && !shouldBePlaying)
+            {
+                SoundManager.Instance.RequestStop3dLoopSound(insidePropellerSound.clip.name, transform);
+                _wasEnginePlaying = false;
+            }
+            else if (!_wasEnginePlaying && shouldBePlaying)
+            {
+                SoundManager.Instance.RequestPlay3dLoopSound(insidePropellerSound.clip.name, insidePropellerSound.properties, transform, true);
+                _wasEnginePlaying = true;
+            }
+        }
+    }
+
+    [ServerRpc]
+    private void CmdUpdateThrottle(float newThrottle)
+    {
+        // O servidor confirma o valor (pode adicionar validação/clamp aqui)
+        throttle.Value = Mathf.Clamp(newThrottle, 0, heliProperties.max_lift_force);
+    }
+
     protected override void StartStopEngine()
     {
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey) && IsOwner)
         {
-            start_engine = !start_engine;
-            if (start_engine)
-                SoundManager.Instance.RequestPlay3dLoopSound(insidePropellerSound.name, insidePropellerSoundProperties, transform, true);
-            else
-                SoundManager.Instance.RequestPause3dLoopSound(insidePropellerSound.name, transform);
+            bool targetState = !startEngine.Value;
+            startEngine.Value = targetState; // Atualiza a predição localmente
+            CmdSetEngineState(targetState);  // Envia o estado explícito para evitar dessincronização
         }
+    }
+
+    [ServerRpc]
+    private void CmdSetEngineState(bool state) // Substitui o antigo CmdToggleEngine
+    {
+        startEngine.Value = state;
     }
 
     protected override void OnCollisionEnter(Collision collision)
@@ -191,10 +259,12 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         base.OnCollisionEnter(collision);
         if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers))
         {
-            SoundManager.Play2dSoundLocal(fallAlarmSound, fallAlarmSoundProperties);
+            SoundManager.Play2dSoundLocal(fallAlarmSound.clip, fallAlarmSound.properties);
         }
     }
 
+
+    public override float GetCurrentThrottle() => localThrottle;
     public override float GetMinFov() => Settings.Instance._video.helicopter_fov;
     public override float GetMaxThrottle() => heliProperties.max_lift_force;
     public float GetXRotation() => transform.eulerAngles.x;

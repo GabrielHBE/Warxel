@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class KeyBinds : MonoBehaviour
 {
+    [Header("General")]
+    public KeyCode WEAPON_shootKey = KeyCode.Mouse0;
 
     [Header("Player")]
     public KeyCode PLAYER_moveFowardKey = KeyCode.W;
@@ -24,7 +26,6 @@ public class KeyBinds : MonoBehaviour
     [Header("Weapons")]
     public KeyCode WEAPON_composeBulletsKey = KeyCode.P;
     public KeyCode WEAPON_activateSideGrip = KeyCode.T;
-    public KeyCode WEAPON_shootKey = KeyCode.Mouse0;
     public KeyCode WEAPON_reloadKey = KeyCode.R;
     public KeyCode WEAPON_aimKey = KeyCode.Mouse1;
     public KeyCode WEAPON_switchFireModeKey = KeyCode.X;
@@ -44,7 +45,8 @@ public class KeyBinds : MonoBehaviour
     [Header("Vehicle")]
     public KeyCode VEHICLE_startEngineKey = KeyCode.E;
     public KeyCode VEHICLE_freeLookKey = KeyCode.Mouse2;
-    public KeyCode VEHICLE_countermeasureKey = KeyCode.X;
+    public KeyCode VEHICLE_countermeasureKey = KeyCode.C;
+    public KeyCode VEHICLE_switchFireModeKey = KeyCode.X;
     public KeyCode VEHICLE_switchSeatKey = KeyCode.LeftControl;
     public KeyCode VEHICLE_weapon1 = KeyCode.Alpha1;
     public KeyCode VEHICLE_weapon2 = KeyCode.Alpha2;

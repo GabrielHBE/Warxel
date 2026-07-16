@@ -20,8 +20,6 @@ public class JetProperties : MonoBehaviour
     public float dive_speed_boost = 50f;
 
     [Header("Sounds")]
-    public AudioClip interiorTurbineSound;
-    public SoundManager.SoundProperties interiorTurbineSoundProperties = SoundManager.SoundProperties.Default;
-    public AudioClip exteriorTurbineSound;
-    public SoundManager.SoundProperties exteriorTurbineSoundProperties = SoundManager.SoundProperties.Default;
+    public SoundManager.SoundComponents interiorTurbineSound;
+    public SoundManager.SoundComponents  exteriorTurbineSound;
 }

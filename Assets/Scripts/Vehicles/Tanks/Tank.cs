@@ -342,8 +342,8 @@ public class Tank : Vehicle
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
-            start_engine = !start_engine;
-            foreach (Light light in lights) light.enabled = start_engine;
+            startEngine.Value = !startEngine.Value;
+            foreach (Light light in lights) light.enabled = startEngine.Value;
         }
     }
     #endregion

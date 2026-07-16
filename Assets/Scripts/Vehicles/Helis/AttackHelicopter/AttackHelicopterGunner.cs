@@ -8,10 +8,10 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     public AttackHelicopterGunnerProperties properties;
     public Transform shootPos;
 
-    // Estado Interno
-    private float next_time_to_fire = 0;
-    private float current_overheat;
-    private bool is_overheated;
+    // REMOVIDO: private int firingStateId;
+    private bool wasOverheatedLastFrame = false;
+
+    // Estado Interno - Visual
     private float current_spread;
     private Vector3 shakeOffset;
     private float current_camera = 1;
@@ -34,17 +34,41 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     private int recoil_position_in_array = 0;
     private bool is_first_shot = false;
 
+    void Awake()
+    {
+        // ATUALIZADO: sem stateId, apenas reseta o estado
+        Firing.ResetState();
+        // Garante que o estado de superaquecimento comece falso
+        properties.heatValues.heatState.isOverheated = false;
+    }
+
     void Update()
     {
         if (!IsOwner) return;
 
         if (!isActive)
         {
-            StopFire();
+            StopFire(Time.deltaTime);
             return;
         }
 
         HandleSwitchCamera();
+
+        // Se estiver superaquecido, força o resfriamento no Update também
+        if (Heating.isOverheated(properties.heatValues))
+        {
+            // Se acabou de superaquecer, para o som
+            if (!wasOverheatedLastFrame)
+            {
+                SoundManager.Instance.RequestPlay3dSound(properties.shootSound.clip.name, properties.shootSound.properties, transform.position, false);
+                wasOverheatedLastFrame = true;
+            }
+            StopFire(Time.deltaTime);
+        }
+        else
+        {
+            wasOverheatedLastFrame = false;
+        }
 
         if (gunnerGunCamera.enabled)
         {
@@ -59,13 +83,6 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         {
             ApplyFreeLookRotation();
         }
-    }
-
-    public void UpdateCooldown(float dt)
-    {
-        float coolSpeed = is_overheated ? (dt / 2f) : dt;
-        current_overheat = Mathf.MoveTowards(current_overheat, 0f, coolSpeed);
-        if (current_overheat <= 0) is_overheated = false;
     }
 
     private void HandleSwitchCamera()
@@ -124,14 +141,14 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         float mouseX = InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility;
         float mouseY = InputManager.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility;
 
-        float applySpeed = Mathf.Max(properties.weapon_apply_recoil_speed, 0.01f);
+        float applySpeed = Mathf.Max(properties.recoilValues.applyRecoilSpeed, 0.01f);
 
         horizontalRecoilCurrent = Mathf.SmoothDamp(horizontalRecoilCurrent, horizontalRecoilTarget, ref horizontalRecoilVelocity, applySpeed);
         recoilVerticalCurrent = Mathf.SmoothDamp(recoilVerticalCurrent, recoilVerticalTarget, ref recoilVerticalVelocity, applySpeed);
 
         // Aplica o input + recuo de forma aditiva nas variáveis isoladas, idêntico ao PlayerController
         horizontalRotation += mouseX + horizontalRecoilCurrent;
-        verticalRotation -= (mouseY + recoilVerticalCurrent);
+        verticalRotation -= mouseY + recoilVerticalCurrent;
 
         verticalRotation = Mathf.Clamp(verticalRotation, -5f, 80f);
         horizontalRotation = Mathf.Clamp(horizontalRotation, -90f, 90f);
@@ -145,20 +162,20 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     private void ApplyGunnerRecoil()
     {
-        if (properties.recoilPattern == null || properties.recoilPattern.Length == 0) return;
+        if (properties.recoilValues.recoilPattern == null || properties.recoilValues.recoilPattern.Length == 0) return;
 
-        if (recoil_position_in_array >= properties.recoilPattern.Length)
+        if (recoil_position_in_array >= properties.recoilValues.recoilPattern.Length)
         {
             recoil_position_in_array = 0;
         }
 
-        float vr = properties.recoilPattern[recoil_position_in_array].verticalRecoil;
-        float hr = properties.recoilPattern[recoil_position_in_array].horizontalRecoil;
+        float vr = properties.recoilValues.recoilPattern[recoil_position_in_array].verticalRecoil;
+        float hr = properties.recoilValues.recoilPattern[recoil_position_in_array].horizontalRecoil;
 
         var recoil = Recoil.CalculateCameraRecoil(
             vr,
             hr,
-            properties.first_shoot_increaser,
+            properties.recoilValues.firstShootRecoilMultiplier,
             is_first_shot,
             2
         );
@@ -170,88 +187,128 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         recoil_position_in_array++;
     }
 
-    private void Fire()
+    private void ExecuteFire()
     {
+        SoundManager.Instance.RequestPlay3dSound(properties.shootSound.clip.name, properties.shootSound.properties, transform.position, false);
+        SoundManager.Play2dSoundLocal(properties.shootSound.clip, properties.shootSound.properties);
+
         Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPos, current_spread);
 
-        current_spread = Spread.AddSpread(current_spread, properties.spread, properties.max_spread);
+        current_spread = Spread.AddSpread(current_spread, properties.spreadValues.spreadIncreaser, properties.spreadValues.maxSpread);
 
         ApplyGunnerRecoil();
 
-        Bullet.BulletData data = new Bullet.BulletData
+        Projectile.ProjectileProperties prop = new Projectile.ProjectileProperties
         {
             position = shootPos.position,
-            rotation = shootPos.rotation,
-            direction = finalRotation * Vector3.forward,
-            speed = properties.muzzle_velocity,
-            dropMultiplier = properties.bullet_drop,
-            infantaryDamage = properties.infantary_damage,
-            damageDropoff = properties.damage_dropoff,
-            damageDropoffTimer = properties.damage_dropoff_timer,
-            destructionForce = properties.destruction_force,
-            minimumDamage = properties.minimum_damage,
-            hsMultiplier = 2,
-            canDamageVehicles = true,
-            vehicleDamage = properties.vehicle_damage,
-            delaytoEnableForNonOwner = 0,
+            rotation = finalRotation,
+            ignoredObject = transform.root,
+            root = gameObject
         };
 
-        DummyBullet instantiatedDummyBullet = LocalObjectPooling.Instance.GetPooledItem(properties.dummyBullet.gameObject).GetComponent<DummyBullet>();
-        if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
-
-        CmdFireGunner(data);
+        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(properties.bulletPref, properties.dummyBullet.gameObject, prop, properties.projectileValues);
     }
 
-    [ServerRpc(RequireOwnership = true)]
-    private void CmdFireGunner(Bullet.BulletData data)
-    {
-        Bullet bullet = NetworkManager.GetPooledInstantiated(properties.networkBullet, IsServerInitialized).GetComponent<Bullet>();
-        Spawn(bullet, Owner);
-        bullet.CreateBullet(data, transform.root, null);
-    }
-
-    private void StopFire()
+    private void StopFire(float deltaTime)
     {
         recoil_position_in_array = 0;
         is_first_shot = false;
 
-        current_spread = Spread.ResetSpread(current_spread);
+        current_spread = Spread.ResetSpread(current_spread, properties.spreadValues.baseSpread, properties.spreadValues.spreadRecovery);
 
-        float coolSpeed = is_overheated ? (Time.deltaTime / 2f) : Time.deltaTime;
-        current_overheat = Mathf.MoveTowards(current_overheat, 0f, coolSpeed);
-
-        if (current_overheat <= 0) is_overheated = false;
+        // APENAS RESFRIAMENTO
+        properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
     }
 
     public void Shoot()
     {
-        float dt = Time.deltaTime;
-        next_time_to_fire -= dt;
+        float deltaTime = Time.deltaTime;
 
-        if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key) && !is_overheated)
+        // Obtém inputs
+        bool isInputHeld = InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_shoot_key);
+        bool isInputPressed = InputManager.GetKeyDown(Settings.Instance._keybinds.HELICOPTER_shoot_key);
+
+        // Verifica se está superaquecido (usando o estado persistente)
+        if (Heating.isOverheated(properties.heatValues))
         {
+            // Força o resfriamento
+            StopFire(deltaTime);
+            return;
+        }
 
-            if (next_time_to_fire <= 0f)
+        // ATUALIZADO: sem stateId
+        Firing.UpdateTimeToFire(deltaTime);
+
+        // Processa o tiro usando o sistema Firing (sem stateId)
+        var shootResult = Firing.ProcessShooting(
+            properties.firing,
+            isInputHeld,
+            isInputPressed,
+            isReloading: false,
+            isRolling: false,
+            isDead: false,
+            currentAmmo: 1,
+            deltaTime
+        );
+
+        // Obtém o estado atual de disparo (sem stateId)
+        Firing.FireMode currentMode = Firing.GetCurrentFireMode();
+
+        if (shootResult.shouldShoot)
+        {
+            ExecuteFire();
+        }
+
+        // ATUALIZADO: Heating.ShouldHeat agora recebe o currentMode diretamente
+        if (Heating.ShouldHeat(currentMode, isInputHeld))
+        {
+            // Aplica aquecimento
+            properties.heatValues.heatState.currentHeat = Heating.HandleHeating(properties.heatValues, deltaTime);
+
+            // Verifica se atingiu o limite de superaquecimento
+            if (properties.heatValues.heatState.currentHeat >= properties.heatValues.maxHeat)
             {
-                SoundManager.Instance.RequestPlay3dSound(properties.shoot_sound.name, properties.shootSoundProperties, transform.position, false);
-                SoundManager.Play2dSoundLocal(properties.shoot_sound, properties.shootSoundProperties);
-                Fire();
-                next_time_to_fire = properties.interval;
-                current_overheat += dt;
+                // Marca como superaquecido
+                properties.heatValues.heatState.isOverheated = true;
+
+                // Para o som ao superaquecer
+                SoundManager.Instance.RequestPlay3dSound(properties.shootSound.clip.name, properties.shootSound.properties, transform.position, false);
+
+                // Aplica um pequeno resfriamento para começar a esfriar
+                properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
             }
-
-            if (current_overheat >= properties.overheat_time) is_overheated = true;
-
         }
         else
         {
-            StopFire();
+            // RESFRIAMENTO: parou de atirar ou soltou o botão
+            StopFire(deltaTime);
         }
     }
-    public float GetHeatingLevel() => current_overheat;
-    public float GetMaxOverheat() => properties.overheat_time;
-    public Sprite GetArmoryIcon() => properties.image_hud;
-    public void ActivateArmory() => isActive = true;
+
+    public float GetHeatingLevel() => properties.heatValues.heatState.currentHeat;
+    public float GetMaxOverheat() => properties.heatValues.maxHeat;
+    public Sprite GetArmoryIcon() => properties.hudIcon;
+
+    public void ActivateArmory()
+    {
+        isActive = true;
+        SetupFiringSystem();
+    }
+
+    public void SetupFiringSystem()
+    {
+        Firing.ResetState();
+
+        // Garante que o modo de tiro estático atual é válido para este armamento
+        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
+        {
+            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
+            {
+                Firing.SwitchFireMode(properties.firing.fireModes);
+            }
+        }
+    }
+
     public void DeactivateArmory()
     {
         current_camera = 2;
@@ -259,5 +316,6 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
         isActive = false;
         helicopter.currentSeat.playerController.playerCamera.enabled = true;
     }
+
     public string GetCurrentAmmo() => "";
 }

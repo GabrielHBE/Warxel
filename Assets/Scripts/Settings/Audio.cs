@@ -23,9 +23,16 @@ public class Audio : MonoBehaviour
 
     [Header("Voip")]
     public bool enable_deth_voip;
-    public List<string> in_world_voip_modes = new List<string> { "Off", "Push", "Enabled" };
-    public List<string> radio_world_voip_modes = new List<string> { "Off", "Push", "Enabled" };
+    public VoipModes selected_in_world_voip_mode;
+    public VoipModes selected_radio_world_voip_mode;
     public KeyCode in_world_voip_key = KeyCode.V;
     public KeyCode radio_voip_key = KeyCode.B;
+
+    public enum VoipModes
+    {
+        Off,
+        Push,
+        Enabled
+    }
 
 }

@@ -40,15 +40,14 @@ public abstract class Vehicle : NetworkBehaviour,
     public Countermeasures countermeasures;
 
     [Header("Crash Sound Properties")]
-    [SerializeField] protected AudioClip crashSound;
-    [SerializeField] protected SoundManager.SoundProperties crashSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] protected SoundManager.SoundComponents crashSound;
 
     [Header("Vehicle State")]
     [HideInInspector] public bool is_in_vehicle = false;
     [HideInInspector] public bool ignore_damage;
     [HideInInspector] public bool used_locking_countermeasure;
-    [HideInInspector] public float throttle;
-    [HideInInspector] public bool start_engine = false;
+    [HideInInspector] public readonly SyncVar<float> throttle = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    [HideInInspector] public readonly SyncVar<bool> startEngine = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     [HideInInspector] public readonly SyncVar<bool> vehicle_destroyed = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     private bool did_explode = false;
     protected float exit_cooldown;
@@ -65,6 +64,12 @@ public abstract class Vehicle : NetworkBehaviour,
     protected bool _isDestructionInitialized = false;
     protected float _destructionTimer = 0f;
 
+
+    protected float _lastSentThrottle = -1f;
+    protected float _throttleUpdateTimer = 0f;
+    protected const float THROTTLE_THRESHOLD = 0.05f;
+    protected const float THROTTLE_UPDATE_INTERVAL = 0.1f;
+
     #region Unity Lifecycle
     protected virtual void Update()
     {
@@ -78,7 +83,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
         if (is_in_vehicle)
         {
-            
+
             // Validação de jogador
             if (currentSeat == null || currentSeat.playerGameObject == null || (currentSeat.playerProperties != null && currentSeat.playerProperties.is_dead.Value))
             {
@@ -112,7 +117,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
         if (!is_in_vehicle)
             HandleEmptyVehicle();
-        else if (!start_engine)
+        else if (!startEngine.Value)
             HandleEngineOff();
         else
             HandleEngineOn();
@@ -182,13 +187,13 @@ public abstract class Vehicle : NetworkBehaviour,
 
     protected virtual void HandleEmptyVehicle()
     {
-        throttle = 0;
+        throttle.Value = 0;
         AddForceDown();
     }
 
     protected virtual void HandleEngineOff()
     {
-        throttle = 0;
+        throttle.Value = 0;
         AddForceDown();
     }
 
@@ -283,7 +288,7 @@ public abstract class Vehicle : NetworkBehaviour,
     }
     #endregion
 
-    #region Player Interaction & Entry/Exit
+    #region Player Entry/Exit
     protected void SyncPlayerPosition()
     {
         if (currentSeat == null || currentSeat.playerGameObject == null) return;
@@ -294,24 +299,52 @@ public abstract class Vehicle : NetworkBehaviour,
 
     public virtual void EnterVehicle(NetworkConnection conn, GameObject _player)
     {
+        // Verifica se o jogador possui os componentes necessários
+        if (!_player.TryGetComponent(out PlayerProperties props)) return;
+        bool foundSeat = false;
+
         for (int i = 0; i < vehicleSeats.Length; i++)
         {
             VehicleSeats seat = vehicleSeats[i];
-            if (seat.isOccupied) continue;
 
+            // Verifica se o assento já está ocupado
+            if (seat.isOccupied) continue;
+            
+            // Regra de restrição: Se não for Piloto, só pode ocupar assentos do tipo Passenger
+            if (props.selectedClass.Value != ClassManager.Class.Pilot)
+            {
+                if (seat.seatType != VehicleSeats.SeatType.Passenger)
+                    continue;
+            }
+
+            // Se passou pelas verificações, ocupa o assento
             seat.isOccupied = true;
-            if (_player.TryGetComponent(out PlayerProperties props)) occupantsNames.Add(props.player_name.Value);
+            occupantsNames.Add(props.player_name.Value);
 
             if (seat.vehicleArmory?.Length > 0) seat.SetAuthority(conn);
-
             if (seat.seatType == VehicleSeats.SeatType.Pilot) NetworkObject.GiveOwnership(conn);
 
             NetworkObject playerNetObj = _player.GetComponent<NetworkObject>();
             RpcUpdateSeatStatus(i, true, playerNetObj, conn);
             TargetVehicleEntered(conn, i, _player);
+
+            foundSeat = true;
             break;
         }
+
+        // Se percorreu todos os assentos e não encontrou um válido
+        if (!foundSeat)
+        {
+            TargetRpx(conn, "All seats are occupied", 2);
+        }
+
         TargetDisableEnterVehicleUI(conn);
+    }
+
+    [TargetRpc]
+    private void TargetRpx(NetworkConnection conn, string message, float duration)
+    {
+        GeneralHudAlertMessages.Instance.CreateMessage(message, duration);
     }
 
     [TargetRpc] private void TargetDisableEnterVehicleUI(NetworkConnection conn) => enterVehicle.gameObject.SetActive(false);
@@ -390,17 +423,32 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (vehicleSeats.Length <= 1) return;
 
+        // Obtém as propriedades do jogador atual
+        PlayerProperties props = currentSeat.playerProperties;
+        if (props == null) return;
+
         int searchIndex = (playerSeatIndex == vehicleSeats.Length - 1) ? 0 : playerSeatIndex + 1;
 
-        for (int i = searchIndex; i < vehicleSeats.Length; i++)
+        for (int i = 0; i < vehicleSeats.Length; i++)
         {
-            VehicleSeats seat = vehicleSeats[i];
+            // Garante que o loop verifique todos os assentos a partir do próximo
+            int index = (searchIndex + i) % vehicleSeats.Length;
+            VehicleSeats seat = vehicleSeats[index];
+
+            // Pula assentos ocupados
             if (seat.isOccupied) continue;
 
-            int oldIndex = playerSeatIndex;
-            int newIndex = i;
+            // Regra de restrição: Se não for Piloto, não pode ocupar Pilot ou Gunner[cite: 1, 2]
+            if (props.selectedClass.Value != ClassManager.Class.Pilot)
+            {
+                if (seat.seatType == VehicleSeats.SeatType.Pilot || seat.seatType == VehicleSeats.SeatType.Gunner)
+                    continue;
+            }
 
-            PlayerProperties props = currentSeat.playerProperties;
+            // Executa a troca se o assento for válido[cite: 1]
+            int oldIndex = playerSeatIndex;
+            int newIndex = index;
+
             PlayerController controller = currentSeat.playerController;
             Rigidbody rb = currentSeat.playerRigidbody;
             GameObject pGo = currentSeat.playerGameObject;
@@ -522,7 +570,7 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (did_explode) return;
         did_explode = true;
-        SoundManager.Play3dSoundLocal(crashSound, crashSoundProperties, contact_point);
+        SoundManager.Play3dSoundLocal(crashSound.clip, crashSound.properties, contact_point);
         GameObject prefabToSpawn = layer == LayerMask.NameToLayer("Ground") ? ground_explosion : crash_explosion;
         Instantiate(prefabToSpawn, contact_point, Quaternion.identity);
         RequestDespawn();
@@ -646,7 +694,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
     public virtual float GetCurrentSpeed() => rb.linearVelocity.magnitude;
     public virtual float GetMaxSpeed() => float.MaxValue;
-    public virtual float GetCurrentThrottle() => throttle;
+    public virtual float GetCurrentThrottle() => throttle.Value;
     public virtual float GetMaxThrottle() => float.MaxValue;
     public int GetUpgradeLevel() => 1;
     #endregion

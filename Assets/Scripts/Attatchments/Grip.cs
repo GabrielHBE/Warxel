@@ -13,11 +13,6 @@ public class Grip : Attatchment
     public float pick_up_weapon_speed_change;
     public float store_weapon_speed_change;
 
-    public override void Initialize()
-    {
-        return;
-    }
-
     void Update()
     {
         if (left_hand_holder != null)
@@ -26,6 +21,11 @@ public class Grip : Attatchment
             left_hand_holder.transform.rotation = grip_holder.transform.rotation;
         }
 
+    }
+
+    public override string GetAttatchmentDescription()
+    {
+        throw new System.NotImplementedException();
     }
 
 }

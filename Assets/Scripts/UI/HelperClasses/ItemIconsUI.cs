@@ -62,22 +62,17 @@ public class ItemIconsUI : MonoBehaviour
 
     private void SetItemIcons(List<Sprite> itemIcons)
     {
-        if (itemIcons == null) return; //Pre-definido para evitar erros caso o método seja chamado antes de o itemIcons ser definido no script que implementa IItemIconsUIValues
-
-        print("itemSlots.Count: " + itemSlots.Count);
+        if (itemIcons == null) return;
 
         for (int i = 0; i < itemSlots.Count; i++)
         {
             if (i < itemIcons.Count)
             {
-                // Se houver um ícone para este slot, define o sprite e ativa a imagem
                 itemSlots[i].image.sprite = itemIcons[i];
                 itemSlots[i].image.enabled = true;
             }
             else
             {
-                // Se NÃO houver ícone para este slot (ex: Jet tem 2 armas mas UI tem 9 slots)
-                // Desativamos o slot excedente para não mostrar ícones errados ou vazios
                 itemSlots[i].image.enabled = false;
             }
         }

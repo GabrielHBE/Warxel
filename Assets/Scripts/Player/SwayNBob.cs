@@ -3,12 +3,7 @@ using UnityEngine;
 
 public class SwayNBobScript : MonoBehaviour
 {
-
-    [HideInInspector]
-    public PlayerController mover;
     private PlayerProperties playerProperties;
-
-    [Header("Weapon")]
     private SwitchWeapon switchWeapon;
 
     [Header("Sway")]
@@ -17,49 +12,29 @@ public class SwayNBobScript : MonoBehaviour
     [HideInInspector] public Vector3 swayPos;
 
     [Header("Aiming Movement Rotation")]
-    public float aimMoveRotationAmount = 5f; // Quantidade de rotação para cima/baixo
-    public float aimMoveRotationSpeed = 5f; // Velocidade da rotação
-
+    public float aimMoveRotationAmount = 5f;
+    public float aimMoveRotationSpeed = 5f;
 
     [Header("Sway Rotation")]
     public float rotationStep = 4f;
     public float maxRotationStep = 5f;
     [HideInInspector] public Vector3 swayEulerRot;
-
     public float smooth = 10f;
-    float smoothRot = 12f;
+    private float smoothRot = 12f;
 
     [Header("Bobbing")]
     public float speedCurve;
-    float curveSin { get => Mathf.Sin(speedCurve); }
-    float curveCos { get => Mathf.Cos(speedCurve); }
-
     public Vector3 travelLimit = Vector3.one * 0.025f;
     public Vector3 bobLimit = Vector3.one * 0.01f;
-    Vector3 bobPosition;
-
     public float bobExaggeration;
 
-    [Header("Bob Rotation")]
-    private Vector3 current_multiplier;
-    Vector3 bobEulerRotation;
+    [HideInInspector] public float[] vector3Values = new float[3];
+    [HideInInspector] public float[] quaternionValues = new float[3];
 
-    private Quaternion sprintTargetWeaponRotation;
-    private Vector3 sprintTargetWeaponPosition;
-
-    [Header("Bob Rotation/Position Values")]
-    Vector3 inicialVector3;
-    PlayerController playerController;
-    Quaternion initial_rotation;
-    Vector3 initial_position;
-    bool do_land_camera_chake_once;
-    bool do_jump_camera_chake_once;
-    float max_position_sprinting = 1;
-    float current_position_sprinting = 0;
-    int sprintDirection = 1;
-    bool restarted;
+    private PlayerController playerController;
     private Transform myTransform;
 
+    // Player state cache
     private bool isAiming;
     private bool isSprinting;
     private bool isGrounded;
@@ -69,58 +44,93 @@ public class SwayNBobScript : MonoBehaviour
     private bool isRolling;
     private bool isProne;
 
+    private Quaternion initialRotation;
+    private Vector3 initialPosition;
+    private Vector3 initialVector3;
+    private bool isRestarted;
+    private Vector2 lookInput;
+    private Vector3 shakeOffset = Vector3.zero;
+    private Vector3 bobPosition;
+    private Vector3 bobEulerRotation;
+    private Vector2 walkInput;
+    private float CurveSin => Mathf.Sin(speedCurve);
+    private float CurveCos => Mathf.Cos(speedCurve);
+    private const float MaxPositionSprinting = 1f;
+    private float currentPositionSprinting;
+    private int sprintDirection = 1;
+    private Quaternion sprintTargetWeaponRotation;
+    private Vector3 sprintTargetWeaponPosition;
+    private float bobWalkExaggeration;
+    private float bobSprintExaggeration;
+    private float bobCrouchExaggeration;
+    private float bobAimExaggeration;
+    private Vector3 walkMultiplier;
+    private Vector3 sprintMultiplier;
+    private Vector3 aimMultiplier;
+    private Vector3 crouchMultiplier;
+    private Vector3 currentMultiplier;
 
-    //Itens that change with the item
-    Transform item;
-    float bob_walk_exageration;
-    float bob_sprint_exageration;
-    float bob_crouch_exageration;
-    float bob_aim_exageration;
-    Vector3 walk_multiplier;
-    Vector3 sprint_multiplier;
-    Vector3 aim_multiplier;
-    Vector3 crouch_multiplier;
-    [HideInInspector] public float[] vector3Values = new float[3];
-    [HideInInspector] public float[] quaternionValues = new float[3];
+    private const int YRotationMultiplier = 4;
+    private const int ZRotationMultiplier = 4;
+    private const int XRotationMultiplier = 4;
 
-    // Multiplicadores (ajuste conforme necessidade)
-    const int yRotationMultiplier = 4; // Ajuste para valores por SEGUNDO
-    const int zRotationMultiplier = 4;
-    const int xRotationMultiplier = 4;
+    #region Unity Lifecycle
 
-    void Awake()
+    private void Awake()
     {
-
-
-        restarted = false;
-        initial_rotation = transform.localRotation;
-        initial_position = transform.localPosition;
-
+        isRestarted = false;
+        initialRotation = transform.localRotation;
+        initialPosition = transform.localPosition;
         myTransform = transform;
     }
 
-    public void Restart(Transform item,
-                        float bob_walk_exageration,
-                        float bob_sprint_exageration,
-                        float bob_crouch_exageration,
-                        float bob_aim_exageration,
-                        Vector3 walk_multiplier,
-                        Vector3 sprint_multiplier,
-                        Vector3 aim_multiplier,
-                        Vector3 crouch_multiplier,
-                        float[] vector3Values,
-                        float[] quaternionValues)
+    private void Update()
     {
+        if (!isRestarted) return;
 
-        this.item = item;
-        this.bob_walk_exageration = bob_walk_exageration;
-        this.bob_sprint_exageration = bob_sprint_exageration;
-        this.bob_crouch_exageration = bob_crouch_exageration;
-        this.bob_aim_exageration = bob_aim_exageration;
-        this.walk_multiplier = walk_multiplier;
-        this.sprint_multiplier = sprint_multiplier;
-        this.aim_multiplier = aim_multiplier;
-        this.crouch_multiplier = crouch_multiplier;
+        CachePlayerProperties();
+
+        if (ShouldApplyDeadState())
+        {
+            ApplyDeadState();
+            return;
+        }
+
+        UpdateBobMultipliers();
+        HandleSprinting();
+
+        StoreWeapon();
+        UpdateSwayRotation();
+        UpdateSway();
+        UpdateBobOffset();
+        UpdateBobRotation();
+        UpdateCompositePositionRotation();
+    }
+
+    #endregion
+
+    #region Public Methods
+
+    public void Restart(
+        float bobWalkExaggeration,
+        float bobSprintExaggeration,
+        float bobCrouchExaggeration,
+        float bobAimExaggeration,
+        Vector3 walkMultiplier,
+        Vector3 sprintMultiplier,
+        Vector3 aimMultiplier,
+        Vector3 crouchMultiplier,
+        float[] vector3Values,
+        float[] quaternionValues)
+    {
+        this.bobWalkExaggeration = bobWalkExaggeration;
+        this.bobSprintExaggeration = bobSprintExaggeration;
+        this.bobCrouchExaggeration = bobCrouchExaggeration;
+        this.bobAimExaggeration = bobAimExaggeration;
+        this.walkMultiplier = walkMultiplier;
+        this.sprintMultiplier = sprintMultiplier;
+        this.aimMultiplier = aimMultiplier;
+        this.crouchMultiplier = crouchMultiplier;
         this.vector3Values = vector3Values;
         this.quaternionValues = quaternionValues;
 
@@ -128,380 +138,13 @@ public class SwayNBobScript : MonoBehaviour
         playerController = GetComponentInParent<PlayerController>();
         playerProperties = GetComponentInParent<PlayerProperties>();
 
-        current_multiplier = this.walk_multiplier;
+        currentMultiplier = this.walkMultiplier;
+        initialVector3 = currentMultiplier;
+        sprintTargetWeaponRotation = initialRotation;
 
-        sprintTargetWeaponRotation = initial_rotation;
-
-        inicialVector3 = current_multiplier;
-
-
-        CachePlayerProperties();
-
-        restarted = true;
-
+        isRestarted = true;
     }
 
-    private void CachePlayerProperties()
-    {
-        isAiming = playerProperties.is_aiming;
-        isSprinting = playerProperties.sprinting;
-        isGrounded = playerProperties.isGrounded;
-        isCrouched = playerProperties.crouched;
-        isReloading = playerProperties.is_reloading;
-        isFiring = playerProperties.is_firing;
-        isProne = playerProperties.is_proned;
-        isRolling = playerProperties.roll;
-
-    }
-
-    Vector3 shakeOffset = Vector3.zero;
-    void Update()
-    {
-        if (!restarted)
-        {
-            return;
-        }
-
-        CachePlayerProperties();
-
-        // Verificar se o jogador está morto
-        if (playerProperties.is_dead.Value || playerProperties.isProneTransition || playerProperties.is_composing_bullets)
-        {
-            // Apenas aplicar rotação de morte
-            Quaternion deadRotation = Quaternion.Euler(40f, 0f, 0f);
-            myTransform.localRotation = Quaternion.Lerp(
-                myTransform.localRotation,
-                deadRotation,
-                Time.deltaTime * smoothRot
-            );
-
-            // Retornar para evitar outros cálculos
-            return;
-        }
-
-        if (playerProperties.sprinting && !switchWeapon._switch && !playerProperties.is_aiming && !playerProperties.is_proned && !playerProperties.roll && !playerProperties.isProneTransition)
-        {
-            bobExaggeration = bob_sprint_exageration;
-            current_multiplier = sprint_multiplier;
-
-        }
-        else
-        {
-            current_position_sprinting = 0f;
-            bobExaggeration = bob_walk_exageration;
-
-            sprintTargetWeaponPosition = initial_position;
-            sprintTargetWeaponRotation = initial_rotation;
-
-            current_multiplier.x = inicialVector3.x;
-            current_multiplier.y = inicialVector3.y;
-            current_multiplier.z = inicialVector3.z;
-        }
-
-        if (((playerProperties.crouched || playerProperties.is_proned) && !playerProperties.sprinting) || playerProperties.is_aiming)
-        {
-
-            bobExaggeration = bob_crouch_exageration;
-            current_multiplier = crouch_multiplier;
-
-
-        }
-
-        if (playerController.moveForward == 0f && playerController.moveHorizontal == 0f)
-        {
-            bobExaggeration = 0f;
-            sprintTargetWeaponPosition = initial_position;
-            sprintTargetWeaponRotation = initial_rotation;
-
-            current_multiplier.x = 0.1f;
-            current_multiplier.y = 0.1f;
-            current_multiplier.z = 0.1f;
-
-        }
-
-        if (playerProperties.is_aiming && (playerController.moveForward != 0f || playerController.moveHorizontal != 0f))
-        {
-
-            bobExaggeration = bob_aim_exageration;
-            current_multiplier.x = aim_multiplier.x;
-            current_multiplier.y = aim_multiplier.y;
-            current_multiplier.z = aim_multiplier.z;
-        }
-
-        //if ((!playerProperties.is_aiming && !playerProperties.is_firing && !playerProperties.is_reloading && !playerProperties.is_proned) || playerProperties.roll) Sprinting();
-        if (playerProperties.sprinting) Sprinting();
-
-        StoreWeapon();
-        SwayRotation();
-        Sway();
-        BobOffset();
-        BobRotation();
-        GetInputManager();
-        CompositePositionRotation();
-
-        transform.localPosition = Vector3.Lerp(transform.localPosition,
-        new Vector3(transform.localPosition.x + current_position_sprinting, transform.localPosition.y, transform.localPosition.z),
-        Time.deltaTime
-        );
-
-    }
-
-    Vector2 walkInputManager;
-    Vector2 lookInputManager;
-
-
-    private void StoreWeapon()
-    {
-        if (((playerProperties.sprinting || playerProperties.roll) && !playerProperties.is_reloading) || SettingsHUD.Instance.is_menu_settings_active)
-        {
-            sprintTargetWeaponPosition = initial_position + new Vector3(vector3Values[0], vector3Values[1], vector3Values[2]);
-            sprintTargetWeaponRotation = initial_rotation * Quaternion.Euler(quaternionValues[0], quaternionValues[1], quaternionValues[2]);
-        }
-        else
-        {
-            // Garante o reset da arma para a posição original quando a condição falhar
-            sprintTargetWeaponPosition = initial_position;
-            sprintTargetWeaponRotation = initial_rotation;
-        }
-    }
-
-    void Sprinting()
-    {
-
-        current_position_sprinting += sprintDirection * Time.deltaTime * 8;
-
-        if (isGrounded)
-        {
-            if (current_position_sprinting >= max_position_sprinting)
-            {
-                current_position_sprinting = max_position_sprinting;
-                sprintDirection = -1;
-            }
-            else if (current_position_sprinting <= -max_position_sprinting)
-            {
-                current_position_sprinting = -max_position_sprinting;
-                sprintDirection = 1;
-            }
-        }
-        else
-        {
-            current_position_sprinting = 0;
-        }
-    }
-
-
-    void GetInputManager()
-    {
-        walkInputManager.x = playerController.moveHorizontal;
-        walkInputManager.y = playerController.moveForward;
-        walkInputManager = walkInputManager.normalized;
-
-        lookInputManager.x = InputManager.GetAxis("Mouse X");
-        lookInputManager.y = InputManager.GetAxis("Mouse Y");
-
-    }
-
-    void Sway()
-    {
-        Vector3 invertLook = (lookInputManager * -step).normalized;
-        invertLook.x = Mathf.Clamp(invertLook.x, -maxStepDistance, maxStepDistance);
-        invertLook.y = Mathf.Clamp(invertLook.y, -maxStepDistance, maxStepDistance);
-
-        swayPos = invertLook;
-    }
-
-    void SwayRotation()
-    {
-
-        Vector2 invertLook = (lookInputManager * -rotationStep).normalized;
-        invertLook.x = Mathf.Clamp(invertLook.x, -maxRotationStep, maxRotationStep);
-        invertLook.y = Mathf.Clamp(invertLook.y, -maxRotationStep, maxRotationStep);
-        swayEulerRot = new Vector3(invertLook.y, invertLook.x, invertLook.x).normalized;
-
-    }
-
-    void CompositePositionRotation()
-    {
-        float deltaTime = Time.deltaTime;
-
-        Quaternion combinedRotation;
-        Vector3 combinedPosition;
-
-        // Reutilizar os valores já obtidos em GetInputManager()
-        float x_InputManager_amount = lookInputManager.x;
-        float y_InputManager_amount = lookInputManager.y;
-
-        // Aplicar clamp
-        x_InputManager_amount = Mathf.Clamp(x_InputManager_amount, -5f, 5f);
-        y_InputManager_amount = Mathf.Clamp(y_InputManager_amount, -5f, 5f);
-
-
-
-        // Agora escalado por deltaTime
-        float enhancedYRotation = x_InputManager_amount * yRotationMultiplier;
-        float enhancedZRotation = x_InputManager_amount * zRotationMultiplier;
-        float enhancedXRotation = y_InputManager_amount * xRotationMultiplier;
-
-
-        float verticalAimMoveRotation = 0f;
-
-        if (isAiming && (playerController.moveForward != 0f || playerController.moveHorizontal != 0f) && !isSprinting && !isReloading && !isRolling)
-        {
-            float sinTime = Mathf.Sin(Time.time * aimMoveRotationSpeed);
-            verticalAimMoveRotation = sinTime * aimMoveRotationAmount;
-
-            if (isCrouched || isProne)
-            {
-                verticalAimMoveRotation /= 2;
-            }
-        }
-
-        if (!isAiming)
-        {
-            combinedRotation = sprintTargetWeaponRotation * Quaternion.Euler(swayEulerRot) * Quaternion.Euler(bobEulerRotation);
-            combinedPosition = sprintTargetWeaponPosition + swayPos + bobPosition;
-        }
-        else
-        {
-            float divisor = isFiring ? 20f : 5f;
-
-            Vector3 aimingRotation = swayEulerRot / divisor;
-            aimingRotation.x += verticalAimMoveRotation;
-
-            combinedRotation = sprintTargetWeaponRotation *
-                              Quaternion.Euler(aimingRotation) *
-                              Quaternion.Euler(bobEulerRotation / divisor);
-            combinedPosition = sprintTargetWeaponPosition + swayPos / divisor + bobPosition / divisor;
-        }
-
-        // ADICIONAR SHAKEOFFSET À ROTAÇÃO FINAL
-        Quaternion shakeRotation = Quaternion.Euler(shakeOffset);
-        combinedRotation = combinedRotation * shakeRotation;
-
-        if (!isGrounded)
-        {
-            float tiltAmount = InputManager.GetAxis("Horizontal") * 10f;
-
-            Quaternion targetRotation = Quaternion.Euler(15, enhancedYRotation, -tiltAmount + enhancedZRotation);
-
-            myTransform.localRotation = Quaternion.Lerp(
-                myTransform.localRotation,
-                combinedRotation * targetRotation,
-                deltaTime * smoothRot
-            );
-
-            myTransform.localPosition = Vector3.Lerp(
-                myTransform.localPosition,
-                new Vector3(combinedPosition.x, combinedPosition.y - 0.01f, combinedPosition.z),
-                deltaTime * smooth
-            );
-
-            if (do_jump_camera_chake_once)
-            {
-                //StartCoroutine(JumpWeaponShake());
-                do_jump_camera_chake_once = false;
-            }
-
-            do_land_camera_chake_once = true;
-        }
-        else
-        {
-            Quaternion targetRotation;
-
-            if (isFiring)
-            {
-                targetRotation = Quaternion.Euler(enhancedXRotation / 8, enhancedYRotation, -enhancedZRotation);
-            }
-            else
-            {
-                targetRotation = Quaternion.Euler(enhancedXRotation, enhancedYRotation, -enhancedZRotation);
-            }
-
-            if (do_land_camera_chake_once)
-            {
-                //StartCoroutine(JumpWeaponShake());
-                do_land_camera_chake_once = false;
-            }
-
-            myTransform.localRotation = Quaternion.Lerp(
-                myTransform.localRotation,
-                combinedRotation * targetRotation,
-                deltaTime * smoothRot
-            );
-
-            myTransform.localPosition = Vector3.Lerp(
-                myTransform.localPosition,
-                combinedPosition,
-                deltaTime * smooth
-            );
-            do_jump_camera_chake_once = true;
-        }
-    }
-
-    void BobOffset()
-    {
-        // Otimizar verificação de InputManager
-        float axis_bob = (InputManager.GetAxis("Vertical") != 0 || InputManager.GetAxis("Horizontal") != 0) ? 1 : 0;
-
-        speedCurve += Time.deltaTime * (isGrounded ? axis_bob * bobExaggeration : 1f) + 0.005f;
-
-        // Pré-calcular curvas
-        float cosCurve = curveCos;
-        float sinCurve = curveSin;
-        float groundedMultiplier = isGrounded ? 1 : 0;
-
-        bobPosition.x = (cosCurve * bobLimit.x * groundedMultiplier) - (walkInputManager.x * travelLimit.x);
-        bobPosition.y = (sinCurve * bobLimit.y) - (InputManager.GetAxis("Vertical") * travelLimit.y);
-        bobPosition.z = -(walkInputManager.y * travelLimit.z);
-    }
-
-    void BobRotation()
-    {
-        bool isMoving = walkInputManager != Vector2.zero;
-        float sin2x = Mathf.Sin(2 * speedCurve);
-
-        bobEulerRotation.x = isMoving ? current_multiplier.x * sin2x : current_multiplier.x * (sin2x / 2);
-        bobEulerRotation.y = isMoving ? current_multiplier.y * curveCos : 0;
-        bobEulerRotation.z = isMoving ? current_multiplier.z * curveCos * walkInputManager.x : 0;
-    }
-
-    IEnumerator JumpWeaponShake()
-    {
-
-        float intensity_local = 3;
-        Quaternion originalRot = item.localRotation;
-
-        // Usar valores pré-calculados para evitar Random.Range múltiplo
-        float randomX = UnityEngine.Random.Range(-intensity_local, intensity_local);
-        float randomY = UnityEngine.Random.Range(-intensity_local, intensity_local);
-        float randomZ = UnityEngine.Random.Range(-intensity_local, intensity_local);
-
-        Quaternion upRot = originalRot * Quaternion.Euler(randomX, randomY, randomZ);
-
-        float duration = 0.1f;
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            item.localRotation = Quaternion.Lerp(originalRot, upRot, elapsed / duration);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        item.localRotation = upRot;
-
-        elapsed = 0f;
-        while (elapsed < duration)
-        {
-            item.localRotation = Quaternion.Lerp(upRot, originalRot, elapsed / duration);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        item.localRotation = originalRot;
-    }
-
-    float intensity = 2f;
     public IEnumerator CrouchWeaponShake()
     {
         float elapsed = 0f;
@@ -509,18 +152,13 @@ public class SwayNBobScript : MonoBehaviour
 
         while (elapsed < duration)
         {
-            // Calcula o offset do shake
-            float crouchTime = Time.time * 5f; // Frequência diferente para cada eixo
+            float crouchTime = Time.time * 5f;
+            float intensity = 2f;
 
             shakeOffset = new Vector3(
-                // Eixo X: mistura de Perlin noise com seno para movimento orgânico
-                (Mathf.PerlinNoise(crouchTime * 1.2f, 0) * 2f - 1f) * 3f * intensity,
-
-                // Eixo Y: usa combinação de noises para variação
-                ((Mathf.PerlinNoise(0, crouchTime * 1.5f) * 2f - 1f) * 0.4f +
+                (Mathf.PerlinNoise(crouchTime * 1.2f, 0f) * 2f - 1f) * 3f * intensity,
+                ((Mathf.PerlinNoise(0f, crouchTime * 1.5f) * 2f - 1f) * 0.4f +
                  (Mathf.Sin(crouchTime * 3f) * 0.6f)) * 0.8f * intensity,
-
-                // Eixo Z: noise com offset diferente para variar
                 (Mathf.PerlinNoise(crouchTime * 0.8f, crouchTime * 0.8f) * 2f - 1f) * 0.7f * intensity
             );
 
@@ -535,9 +173,7 @@ public class SwayNBobScript : MonoBehaviour
         while (elapsed < returnTime)
         {
             float t = elapsed / returnTime;
-            // Interpola suavemente de volta a zero
             shakeOffset = Vector3.Lerp(startingShake, Vector3.zero, t);
-
             elapsed += Time.deltaTime;
             yield return null;
         }
@@ -545,4 +181,364 @@ public class SwayNBobScript : MonoBehaviour
         shakeOffset = Vector3.zero;
     }
 
+    #endregion
+
+    #region State Management
+
+    private void CachePlayerProperties()
+    {
+        isAiming = playerProperties.is_aiming;
+        isSprinting = playerProperties.sprinting;
+        isGrounded = playerProperties.isGrounded;
+        isCrouched = playerProperties.crouched;
+        isReloading = playerProperties.is_reloading;
+        isFiring = playerProperties.is_firing;
+        isProne = playerProperties.is_proned;
+        isRolling = playerProperties.roll;
+    }
+
+    private bool ShouldApplyDeadState()
+    {
+        return playerProperties.is_dead.Value ||
+               playerProperties.isProneTransition ||
+               playerProperties.is_composing_bullets;
+    }
+
+    private void ApplyDeadState()
+    {
+        Quaternion deadRotation = Quaternion.Euler(40f, 0f, 0f);
+        myTransform.localRotation = Quaternion.Lerp(
+            myTransform.localRotation,
+            deadRotation,
+            Time.deltaTime * smoothRot
+        );
+    }
+
+    #endregion
+
+    #region Bob Multipliers Logic
+
+    private void UpdateBobMultipliers()
+    {
+        bool isSprintingActive = playerProperties.sprinting &&
+                                 !switchWeapon._switch &&
+                                 !playerProperties.is_aiming &&
+                                 !playerProperties.is_proned &&
+                                 !playerProperties.roll &&
+                                 !playerProperties.isProneTransition;
+
+        if (isSprintingActive)
+        {
+            bobExaggeration = bobSprintExaggeration;
+            currentMultiplier = sprintMultiplier;
+        }
+        else
+        {
+            currentPositionSprinting = 0f;
+            bobExaggeration = bobWalkExaggeration;
+            sprintTargetWeaponPosition = initialPosition;
+            sprintTargetWeaponRotation = initialRotation;
+            currentMultiplier = initialVector3;
+        }
+
+        bool isCrouchingOrProne = (playerProperties.crouched || playerProperties.is_proned) &&
+                                  !playerProperties.sprinting;
+
+        if (isCrouchingOrProne || playerProperties.is_aiming)
+        {
+            bobExaggeration = bobCrouchExaggeration;
+            currentMultiplier = crouchMultiplier;
+        }
+
+        bool isNotMoving = Mathf.Approximately(playerController.moveForward, 0f) &&
+                          Mathf.Approximately(playerController.moveHorizontal, 0f);
+
+        if (isNotMoving)
+        {
+            bobExaggeration = 0f;
+            sprintTargetWeaponPosition = initialPosition;
+            sprintTargetWeaponRotation = initialRotation;
+            currentMultiplier = new Vector3(0.1f, 0.1f, 0.1f);
+        }
+
+        bool isAimingAndMoving = playerProperties.is_aiming && !isNotMoving;
+
+        if (isAimingAndMoving)
+        {
+            bobExaggeration = bobAimExaggeration;
+            currentMultiplier = aimMultiplier;
+        }
+    }
+
+    #endregion
+
+    #region Sprinting Logic
+
+    private void HandleSprinting()
+    {
+        if (!playerProperties.sprinting || playerProperties.is_firing) return;
+
+        currentPositionSprinting += sprintDirection * Time.deltaTime * 8f;
+
+        if (!isGrounded)
+        {
+            currentPositionSprinting = 0f;
+            return;
+        }
+
+        if (currentPositionSprinting >= MaxPositionSprinting)
+        {
+            currentPositionSprinting = MaxPositionSprinting;
+            sprintDirection = -1;
+        }
+        else if (currentPositionSprinting <= -MaxPositionSprinting)
+        {
+            currentPositionSprinting = -MaxPositionSprinting;
+            sprintDirection = 1;
+        }
+    }
+
+    private void StoreWeapon()
+    {
+        bool shouldStoreWeapon = (playerProperties.sprinting || playerProperties.roll) &&
+                                 !playerProperties.is_reloading &&
+                                 !playerProperties.is_firing;
+
+        if (shouldStoreWeapon || SettingsHUD.Instance.is_menu_settings_active)
+        {
+            sprintTargetWeaponPosition = initialPosition + new Vector3(
+                vector3Values[0],
+                vector3Values[1],
+                vector3Values[2]
+            );
+            sprintTargetWeaponRotation = initialRotation * Quaternion.Euler(
+                quaternionValues[0],
+                quaternionValues[1],
+                quaternionValues[2]
+            );
+        }
+        else
+        {
+            sprintTargetWeaponPosition = initialPosition;
+            sprintTargetWeaponRotation = initialRotation;
+        }
+    }
+
+    #endregion
+
+    #region Input Handling
+
+    private void UpdateInputs()
+    {
+        walkInput.x = playerController.moveHorizontal;
+        walkInput.y = playerController.moveForward;
+        walkInput.Normalize();
+
+        lookInput.x = -InputManager.GetAxis("Mouse X");
+        lookInput.y = InputManager.GetAxis("Mouse Y");
+    }
+
+    #endregion
+
+    #region Sway Logic
+
+    private void UpdateSway()
+    {
+        Vector3 invertedLook = (lookInput * -step).normalized;
+        invertedLook.x = Mathf.Clamp(invertedLook.x, -maxStepDistance, maxStepDistance);
+        invertedLook.y = Mathf.Clamp(invertedLook.y, -maxStepDistance, maxStepDistance);
+        swayPos = invertedLook;
+    }
+
+    private void UpdateSwayRotation()
+    {
+        Vector2 invertedLook = (lookInput * -rotationStep).normalized;
+        invertedLook.x = Mathf.Clamp(invertedLook.x, -maxRotationStep, maxRotationStep);
+        invertedLook.y = Mathf.Clamp(invertedLook.y, -maxRotationStep, maxRotationStep);
+        swayEulerRot = new Vector3(invertedLook.y, invertedLook.x, invertedLook.x).normalized;
+    }
+
+    #endregion
+
+    #region Bobbing Logic
+
+    private void UpdateBobOffset()
+    {
+        float movementInput = (Mathf.Abs(InputManager.GetAxis("Vertical")) > 0.01f ||
+                               Mathf.Abs(InputManager.GetAxis("Horizontal")) > 0.01f) ? 1f : 0f;
+
+        float deltaTime = Time.deltaTime;
+        speedCurve += deltaTime * (isGrounded ? movementInput * bobExaggeration : 1f) + 0.005f;
+
+        float cosCurve = CurveCos;
+        float sinCurve = CurveSin;
+        float groundedMultiplier = isGrounded ? 1f : 0f;
+
+        bobPosition.x = (cosCurve * bobLimit.x * groundedMultiplier) - (walkInput.x * travelLimit.x);
+        bobPosition.y = (sinCurve * bobLimit.y) - (InputManager.GetAxis("Vertical") * travelLimit.y);
+        bobPosition.z = -(walkInput.y * travelLimit.z);
+    }
+
+    private void UpdateBobRotation()
+    {
+        bool isMoving = walkInput != Vector2.zero;
+        float sin2x = Mathf.Sin(2f * speedCurve);
+        float cosCurve = CurveCos;
+
+        bobEulerRotation.x = currentMultiplier.x * sin2x * (isMoving ? 1f : 0.5f);
+        bobEulerRotation.y = isMoving ? currentMultiplier.y * cosCurve : 0f;
+        bobEulerRotation.z = isMoving ? currentMultiplier.z * cosCurve * walkInput.x : 0f;
+    }
+
+    #endregion
+
+    #region Composite Position & Rotation
+
+    private void UpdateCompositePositionRotation()
+    {
+        UpdateInputs();
+
+        float deltaTime = Time.deltaTime;
+        float clampedX = Mathf.Clamp(lookInput.x, -5f, 5f);
+        float clampedY = Mathf.Clamp(lookInput.y, -5f, 5f);
+
+        float enhancedYRotation = clampedX * YRotationMultiplier;
+        float enhancedZRotation = clampedX * ZRotationMultiplier;
+        float enhancedXRotation = clampedY * XRotationMultiplier;
+
+        float verticalAimMoveRotation = CalculateAimMoveRotation();
+
+        Quaternion combinedRotation = CalculateCombinedRotation(enhancedXRotation, verticalAimMoveRotation);
+        Vector3 combinedPosition = CalculateCombinedPosition();
+
+        combinedRotation *= Quaternion.Euler(shakeOffset);
+
+        if (!isGrounded)
+        {
+            ApplyAirborneState(deltaTime, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
+        }
+        else
+        {
+            ApplyGroundedState(deltaTime, enhancedXRotation, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
+        }
+    }
+
+    #endregion
+
+    #region Aim Movement Rotation
+
+    private float CalculateAimMoveRotation()
+    {
+        if (!isAiming) return 0f;
+
+        bool isMoving = !Mathf.Approximately(playerController.moveForward, 0f) ||
+                       !Mathf.Approximately(playerController.moveHorizontal, 0f);
+
+        if (!isMoving || isSprinting || isReloading || isRolling) return 0f;
+
+        float sinTime = Mathf.Sin(Time.time * aimMoveRotationSpeed);
+        float rotation = sinTime * aimMoveRotationAmount;
+
+        if (isCrouched || isProne)
+        {
+            rotation *= 0.5f;
+        }
+
+        return rotation;
+    }
+
+    #endregion
+
+    #region Combined Calculation
+
+    private Quaternion CalculateCombinedRotation(float enhancedXRotation, float verticalAimMoveRotation)
+    {
+        Quaternion baseRotation;
+
+        if (!isAiming)
+        {
+            baseRotation = sprintTargetWeaponRotation *
+                          Quaternion.Euler(swayEulerRot) *
+                          Quaternion.Euler(bobEulerRotation);
+        }
+        else
+        {
+            float divisor = isFiring ? 20f : 5f;
+
+            Vector3 aimingRotation = swayEulerRot / divisor;
+            aimingRotation.x += verticalAimMoveRotation;
+
+            baseRotation = sprintTargetWeaponRotation *
+                          Quaternion.Euler(aimingRotation) *
+                          Quaternion.Euler(bobEulerRotation / divisor);
+        }
+
+        return baseRotation;
+    }
+
+    private Vector3 CalculateCombinedPosition()
+    {
+        if (!isAiming)
+        {
+            return sprintTargetWeaponPosition + swayPos + bobPosition;
+        }
+
+        float divisor = isFiring ? 20f : 5f;
+        return sprintTargetWeaponPosition + (swayPos / divisor) + (bobPosition / divisor);
+    }
+
+    #endregion
+
+    #region State Application
+
+    private void ApplyAirborneState(
+        float deltaTime,
+        float enhancedYRotation,
+        float enhancedZRotation,
+        Quaternion combinedRotation,
+        Vector3 combinedPosition)
+    {
+        float tiltAmount = InputManager.GetAxis("Horizontal") * 10f;
+        Quaternion targetRotation = Quaternion.Euler(15f, enhancedYRotation, -tiltAmount + enhancedZRotation);
+
+        myTransform.localRotation = Quaternion.Lerp(
+            myTransform.localRotation,
+            combinedRotation * targetRotation,
+            deltaTime * smoothRot
+        );
+
+        myTransform.localPosition = Vector3.Lerp(
+            myTransform.localPosition,
+            new Vector3(combinedPosition.x, combinedPosition.y - 0.01f, combinedPosition.z),
+            deltaTime * smooth
+        );
+    }
+
+    private void ApplyGroundedState(
+        float deltaTime,
+        float enhancedXRotation,
+        float enhancedYRotation,
+        float enhancedZRotation,
+        Quaternion combinedRotation,
+        Vector3 combinedPosition)
+    {
+        Quaternion targetRotation = isFiring
+            ? Quaternion.Euler(enhancedXRotation / 8f, enhancedYRotation, -enhancedZRotation)
+            : Quaternion.Euler(enhancedXRotation, enhancedYRotation, -enhancedZRotation);
+
+        myTransform.localRotation = Quaternion.Lerp(
+            myTransform.localRotation,
+            combinedRotation * targetRotation,
+            deltaTime * smoothRot
+        );
+
+        myTransform.localPosition = Vector3.Lerp(
+            myTransform.localPosition,
+            combinedPosition,
+            deltaTime * smooth
+        );
+
+    }
+
+    #endregion
 }

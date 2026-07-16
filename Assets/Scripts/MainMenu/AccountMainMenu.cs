@@ -61,10 +61,10 @@ public class AccountMainMenu : MainMenuTabs
         current_battle_coins.text = "Current Battle Coins: " + AccountManager.Instance.battle_coins.ToString();
         account_level.text = "Accont Level: " + AccountManager.Instance.level.ToString();
         account_faction.text = "Current Faction: " + AccountManager.Instance.faction.ToString();
-        selected_class.text = "Selected Class: " + AccountManager.Instance.selected_class.ToString();
+        selected_class.text = "Selected Class: " + AccountManager.Instance.selected_class.ToString().Replace("_", " ");
 
         //Account Status
-        most_used_class.text = "Most Used Class: " + AccountManager.Instance.status.most_used_class.ToString();
+        most_used_class.text = "Most Used Class: " + AccountManager.Instance.status.most_used_class.ToString().Replace("_", " ");
         kd_ratio.text = "K/D Ratio: " + AccountManager.Instance.status.kd_ratio.ToString();
         total_head_shot_kills.text = "Head Shot Kills: " + AccountManager.Instance.status.total_head_shot_kills.ToString();
         total_kills.text = "Total Kills: " + AccountManager.Instance.status.total_kills.ToString();

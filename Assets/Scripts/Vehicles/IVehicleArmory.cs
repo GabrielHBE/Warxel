@@ -9,4 +9,5 @@ public interface IVehicleArmory
     public string GetCurrentAmmo();
     public float GetHeatingLevel();
     public float GetMaxOverheat();
+    public void SetupFiringSystem();
 }

@@ -116,17 +116,17 @@ public class Jet : Vehicle
         {
             if (moveForward > 0)
             {
-                throttle += _properties.aceleration * deltaTime;
-                throttle = Mathf.Min(throttle, _properties.max_throttle);
+                throttle.Value += _properties.aceleration * deltaTime;
+                throttle.Value = Mathf.Min(throttle.Value, _properties.max_throttle);
             }
             else if (moveForward < 0)
             {
                 float limit = isNearGround ? -50f : 100f;
-                if (throttle > limit) throttle -= _properties.aceleration * deltaTime * (isNearGround ? 2f : 1f);
+                if (throttle.Value > limit) throttle.Value -= _properties.aceleration * deltaTime * (isNearGround ? 2f : 1f);
             }
             else
             {
-                throttle = Mathf.MoveTowards(throttle, 0, (isNearGround ? _properties.aceleration * 0.8f : 1f) * deltaTime);
+                throttle.Value = Mathf.MoveTowards(throttle.Value, 0, (isNearGround ? 0.8f : 1f) * deltaTime);
             }
         }
         else
@@ -145,8 +145,8 @@ public class Jet : Vehicle
 
         if (Settings.Instance._controls.invert_vertical_jet_mouse) mouseY *= -1;
 
-        if (Math.Abs(mouseY) > 1 && throttle > 0 && !isNearGround)
-            throttle -= Math.Abs(mouseY) * Time.fixedDeltaTime * 10;
+        if (Math.Abs(mouseY) > 1 && throttle.Value > 0 && !isNearGround)
+            throttle.Value -= Math.Abs(mouseY) * Time.fixedDeltaTime * 10;
 
         UpdateTrails();
         rb.AddTorque(-transform.forward * mouseX * speed * _properties.rotation_value * (rb.mass / 100));
@@ -158,7 +158,7 @@ public class Jet : Vehicle
         float speedFactor = Mathf.Clamp01(speed / maxSpeed);
         if (Mathf.Abs(rb.angularVelocity.y) >= _properties.max_lean_speed) return;
 
-        float forceMultiplier = (isNearGround && (throttle >= 20 || throttle < -10) && throttle <= 50) ? 70 : speedFactor;
+        float forceMultiplier = (isNearGround && (throttle.Value >= 20 || throttle.Value < -10) && throttle.Value <= 50) ? 70 : speedFactor;
         rb.AddTorque(transform.up * leanValue * _properties.lean_value * rb.mass * forceMultiplier);
     }
 
@@ -167,7 +167,7 @@ public class Jet : Vehicle
         rb.AddForce(Physics.gravity * _currentGravity * rb.mass);
         if (speed < maxSpeed)
         {
-            _totalThrottle = throttle + _diveSpeedModifier + _afterburnerSpeedModifier;
+            _totalThrottle = throttle.Value + _diveSpeedModifier + _afterburnerSpeedModifier;
             rb.AddForce(transform.forward * _totalThrottle * _properties.max_throttle);
         }
     }
@@ -202,7 +202,7 @@ public class Jet : Vehicle
         if (_downwardComponent > 0.3f) targetGravity = (moveForward > 0 ? (_properties.max_throttle / (speed * 2)) : (_properties.max_throttle / speed)) * -_downwardComponent;
         else if (_downwardComponent < -0.3f) targetGravity = (moveForward > 0 ? 1.5f : (_properties.max_throttle / speed)) * -_downwardComponent;
         else if (moveForward > 0) targetGravity = 0;
-        else if (throttle < 100) targetGravity = _properties.max_throttle / (speed * 10);
+        else if (throttle.Value < 100) targetGravity = _properties.max_throttle / (speed * 10);
 
         _currentGravity = Mathf.Clamp(Mathf.Lerp(_currentGravity, targetGravity, Time.fixedDeltaTime), 0f, 5f);
     }
@@ -224,7 +224,7 @@ public class Jet : Vehicle
     {
         _diveSpeedModifier = 0;
         _afterburnerSpeedModifier = 0;
-        throttle = Mathf.Lerp(throttle, 0, Time.fixedDeltaTime / 2);
+        throttle.Value = Mathf.Lerp(throttle.Value, 0, Time.fixedDeltaTime / 2);
     }
 
     protected void UpdateLandingGear()
@@ -239,7 +239,7 @@ public class Jet : Vehicle
         base.HandleVehicleInput();
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
         {
-            if (throttle > 10) EjectPlayer();
+            if (throttle.Value > 10) EjectPlayer();
         }
     }
 
@@ -264,28 +264,28 @@ public class Jet : Vehicle
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey))
         {
-            start_engine = !start_engine;
-            if (start_engine) SoundManager.Instance.RequestPlay3dLoopSound(_properties.interiorTurbineSound.name, _properties.interiorTurbineSoundProperties, transform, true);
+            startEngine.Value = !startEngine.Value;
+            if (startEngine.Value) SoundManager.Instance.RequestPlay3dLoopSound(_properties.interiorTurbineSound.clip.name, _properties.interiorTurbineSound.properties, transform, true);
         }
     }
 
     private void UpdateEngineSound()
     {
         if (vehicle_destroyed.Value) return;
-        float targetPitch = start_engine ? Mathf.Lerp(0.4f, 2f, throttle / _properties.max_throttle) : 0f;
+        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 2f, throttle.Value / _properties.max_throttle) : 0f;
         _currentPitch = Mathf.Lerp(_currentPitch, targetPitch, Time.deltaTime * 2);
         
         bool shouldBePlaying = _currentPitch > 0.01f;
-        if (shouldBePlaying) SoundManager.SetLoopSoundPitchLocal(_properties.interiorTurbineSound, transform, _currentPitch);
+        if (shouldBePlaying) SoundManager.SetLoopSoundPitchLocal(_properties.interiorTurbineSound.clip, transform, _currentPitch);
 
         if (_wasEnginePlaying && !shouldBePlaying)
         {
-            SoundManager.Instance.RequestStop3dLoopSound(_properties.interiorTurbineSound.name, transform);
+            SoundManager.Instance.RequestStop3dLoopSound(_properties.interiorTurbineSound.clip.name, transform);
             _wasEnginePlaying = false;
         }
         else if (!_wasEnginePlaying && shouldBePlaying)
         {
-            SoundManager.Instance.RequestPlay3dLoopSound(_properties.interiorTurbineSound.name, _properties.interiorTurbineSoundProperties, transform, true);
+            SoundManager.Instance.RequestPlay3dLoopSound(_properties.interiorTurbineSound.clip.name, _properties.interiorTurbineSound.properties, transform, true);
             _wasEnginePlaying = true;
         }
     }

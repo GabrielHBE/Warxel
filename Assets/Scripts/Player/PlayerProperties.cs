@@ -5,8 +5,8 @@ using UnityEngine;
 public class PlayerProperties : NetworkBehaviour
 {
     public readonly SyncVar<string> player_name = new SyncVar<string>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    public ClassManager.Class selected_class;
-    public readonly SyncVar<FactionManager.Faction> faction = new SyncVar<FactionManager.Faction>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    public readonly SyncVar<ClassManager.Class> selectedClass = new SyncVar<ClassManager.Class>();
+    public readonly SyncVar<FactionManager.Faction> faction = new SyncVar<FactionManager.Faction>();
     public bool crouched;
     public bool sprinting;
     public bool is_aiming;

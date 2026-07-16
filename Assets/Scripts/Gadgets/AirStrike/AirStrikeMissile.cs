@@ -6,8 +6,7 @@ using VoxelDestructionPro.Tools;
 public class AirStrikeMissile : NetworkBehaviour
 {
     [Header("Sounds")]
-    [SerializeField] private AudioClip explosionSound;    
-    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents explosionSound;
 
     [Header("Settings")]
     [SerializeField] private GameObject trail;
@@ -15,7 +14,7 @@ public class AirStrikeMissile : NetworkBehaviour
 
     [SerializeField] private GameObject explosion_effect;
 
-    private float missileSpeed = 200f;
+    private float missileSpeed = 5f;
     private float infantary_damage = 200;
     private float vehicle_damage = 100;
 
@@ -24,33 +23,38 @@ public class AirStrikeMissile : NetworkBehaviour
     {
         trail.SetActive(true);
         trail.GetComponent<ParticleSystem>().Play();
-        StartCoroutine(GoToLogation(pos));
+        StartCoroutine(GoToLocation(pos));
     }
 
-    private IEnumerator GoToLogation(Vector3 pos)
+    private IEnumerator GoToLocation(Vector3 pos)
     {
         transform.LookAt(pos);
 
-        while (Vector3.Distance(transform.position, pos) > 1f)
+        Vector3 startPosition = transform.position;
+        float elapsedTime = 0f;
+
+        while (elapsedTime < missileSpeed)
         {
-            // Move o míssil
-            transform.position = Vector3.MoveTowards(transform.position, pos, missileSpeed * Time.deltaTime);
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / missileSpeed; // Progresso de 0 a 1
+
+            // Interpolação linear entre posição inicial e destino
+            transform.position = Vector3.Lerp(startPosition, pos, t);
+
             yield return null;
         }
 
-        // Garante que a posição final seja exatamente a posição calculada pelo raio 
-        // antes de detonar.
+        // Garante a posição final exata
         transform.position = pos;
 
-        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, transform.position);
+        SoundManager.Play3dSoundLocal(explosionSound.clip, explosionSound.properties, transform.position);
         Detonate();
         ShephereExplosion();
-
     }
     void OnCollisionEnter(Collision collision)
     {
         //SoundManager.Instance.RequestPlay3dSound(explosionSound.name, soundProperties, collision.contacts[0].point, true);
-        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, collision.contacts[0].point);
+        SoundManager.Play3dSoundLocal(explosionSound.clip, explosionSound.properties, collision.contacts[0].point);
         Detonate();
         ShephereExplosion();
     }

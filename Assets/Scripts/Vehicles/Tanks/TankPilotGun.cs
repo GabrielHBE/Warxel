@@ -5,23 +5,33 @@ using UnityEngine;
 public class TankPilotGun : NetworkBehaviour, IVehicleArmory
 {
     [Header("Properties")]
-    [SerializeField] private TankPilotGunProperties tankPilotGunProperties;
+    [SerializeField] private TankPilotGunProperties properties;
 
     [Header("Instances")]
-    [SerializeField] private DummyBullet dummyBullet;
-    [SerializeField] private Transform pilotGunShootPos;
+    [SerializeField] private Transform shootPos;
     [SerializeField] private Transform tankGunnerGun;
-
     [SerializeField] private Tank tankContext;
-    private float pilot_gun_overheat_amount;
-    private bool is_pilot_gun_overheated = false;
-    private float pilot_gun_next_time_to_fire;
+
+    // Weapon State Variables
+    private float _currentSpread;
+    private bool wasOverheatedLastFrame = false;
+    private bool isActive = true;
 
     private Vector3 gunnerGunOriginalLocalPosition;
     private Quaternion gunnerGunOriginalLocalRotation;
     private bool isGunnerGunRecoiling = false;
     private Coroutine gunnerGunRecoilCoroutine;
     private bool wasFiringThisFrame = false;
+
+    void Awake()
+    {
+        // Reseta o estado de disparo
+        Firing.ResetState();
+        // Garante que o estado de superaquecimento comece falso
+        properties.heatValues.heatState.isOverheated = false;
+        // Reseta o spread
+        _currentSpread = properties.spreadValues.baseSpread;
+    }
 
     void Start()
     {
@@ -32,82 +42,127 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    private void Update()
+    void Update()
     {
-        if (!IsOwner) return;
-
-        // Gerencia o resfriamento da arma de forma independente sempre que não estiver atirando
-        if (!wasFiringThisFrame)
+        if (!IsOwner)
         {
-            CoolDownGun();
+            CoolDownGun(Time.deltaTime);
+            return;
         }
 
-        if (pilot_gun_next_time_to_fire > 0f)
+        if (!isActive)
         {
-            pilot_gun_next_time_to_fire -= Time.deltaTime;
+            CoolDownGun(Time.deltaTime);
+            return;
         }
 
-        wasFiringThisFrame = false; // Reseta o estado para o próximo frame
+        // Se estiver superaquecido, força o resfriamento
+        if (Heating.isOverheated(properties.heatValues))
+        {
+            if (!wasOverheatedLastFrame)
+            {
+                wasOverheatedLastFrame = true;
+            }
+            CoolDownGun(Time.deltaTime);
+        }
+        else
+        {
+            wasOverheatedLastFrame = false;
+        }
+
+        UpdateWeapon(Time.deltaTime, isActive && InputManager.GetKey(Settings.Instance._keybinds.TANK_shoot_key));
+    }
+
+    public void UpdateWeapon(float deltaTime, bool isShooting)
+    {
+        // Atualiza o tempo para o próximo tiro
+        Firing.UpdateTimeToFire(deltaTime);
     }
 
     public void Shoot()
     {
         if (!IsOwner) return;
 
-        bool isShooting = InputManager.GetKey(Settings.Instance._keybinds.TANK_shoot_key);
+        float deltaTime = Time.deltaTime;
 
-        if (isShooting && !is_pilot_gun_overheated)
+        // Obtém inputs
+        bool isInputHeld = InputManager.GetKey(Settings.Instance._keybinds.TANK_shoot_key);
+        bool isInputPressed = InputManager.GetKeyDown(Settings.Instance._keybinds.TANK_shoot_key);
+
+        // Verifica se está superaquecido
+        if (Heating.isOverheated(properties.heatValues))
         {
-            wasFiringThisFrame = true;
+            // Força o resfriamento
+            CoolDownGun(deltaTime);
+            return;
+        }
 
-            if (pilot_gun_next_time_to_fire <= 0f)
+        // Atualiza o tempo para o próximo tiro
+        Firing.UpdateTimeToFire(deltaTime);
+
+        // Processa o tiro usando o sistema Firing
+        var shootResult = Firing.ProcessShooting(
+            properties.firing,
+            isInputHeld,
+            isInputPressed,
+            isReloading: false,
+            isRolling: false,
+            isDead: false,
+            currentAmmo: 1,
+            deltaTime
+        );
+
+        // Obtém o estado atual de disparo
+        Firing.FireMode currentMode = Firing.GetCurrentFireMode();
+
+        if (shootResult.shouldShoot)
+        {
+            ExecuteFire();
+        }
+
+        // Gerencia o aquecimento
+        if (Heating.ShouldHeat(currentMode, isInputHeld))
+        {
+            // Aplica aquecimento
+            properties.heatValues.heatState.currentHeat = Heating.HandleHeating(properties.heatValues, deltaTime);
+
+            // Verifica se atingiu o limite de superaquecimento
+            if (properties.heatValues.heatState.currentHeat >= properties.heatValues.maxHeat)
             {
-                ApplyMachineGunRecoil();
+                // Marca como superaquecido
+                properties.heatValues.heatState.isOverheated = true;
 
-                Bullet.BulletData data = new Bullet.BulletData
-                {
-                    position = pilotGunShootPos.position,
-                    rotation = pilotGunShootPos.rotation,
-                    direction = pilotGunShootPos.forward,
-                    speed = tankPilotGunProperties.muzzle_velocity,
-                    dropMultiplier = tankPilotGunProperties.bullet_drop,
-                    infantaryDamage = tankPilotGunProperties.infantary_damage,
-                    damageDropoff = tankPilotGunProperties.damage_dropoff,
-                    damageDropoffTimer = tankPilotGunProperties.damage_dropoff_timer,
-                    destructionForce = tankPilotGunProperties.destruction_force,
-                    minimumDamage = tankPilotGunProperties.minimum_damage,
-                    hsMultiplier = 2,
-                    canDamageVehicles = false,
-                    vehicleDamage = tankPilotGunProperties.vehicle_damage,
-                    delaytoEnableForNonOwner = 0,
-                };
-
-                DummyBullet instantiatedDummyBullet = Instantiate(dummyBullet, data.position, data.rotation);
-                instantiatedDummyBullet.CreateBullet(data, transform);
-
-                CmdShootMachineGun(data);
-
-                pilot_gun_next_time_to_fire = tankPilotGunProperties.interval;
+                // Aplica um pequeno resfriamento para começar a esfriar
+                properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
             }
-
-            pilot_gun_overheat_amount += Time.deltaTime;
-
-            if (pilot_gun_overheat_amount >= tankPilotGunProperties.overheat_time)
-                is_pilot_gun_overheated = true;
+        }
+        else
+        {
+            // RESFRIAMENTO: parou de atirar ou soltou o botão
+            CoolDownGun(deltaTime);
         }
     }
 
-    [ServerRpc(RequireOwnership = true)]
-    private void CmdShootMachineGun(Bullet.BulletData data)
+    private void ExecuteFire()
     {
-        Transform bulletObj = Instantiate(tankPilotGunProperties.bullefPref, data.position, data.rotation);
-        Spawn(bulletObj.gameObject, Owner);
+        // Toca o som
+        SoundManager.Play3dSoundLocal(properties.shootSound.clip, properties.shootSound.properties, transform.position);
 
-        Bullet bullet = bulletObj.GetComponent<Bullet>();
-        if (bullet != null)
+        Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPos, _currentSpread);
+
+        _currentSpread = Spread.AddSpread(_currentSpread, properties.spreadValues.spreadIncreaser, properties.spreadValues.maxSpread);
+
+        ApplyMachineGunRecoil();
+
+        Projectile.ProjectileProperties prop = new Projectile.ProjectileProperties
         {
-            bullet.CreateBullet(data);
-        }
+            position = shootPos.position,
+            rotation = finalRotation,
+            ignoredObject = transform.root,
+            root = transform.root.gameObject
+        };
+
+        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(properties.bulletPref, properties.dummyBullet.gameObject, prop, properties.projectileValues);
     }
 
     private void ApplyMachineGunRecoil()
@@ -125,17 +180,15 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         isGunnerGunRecoiling = true;
 
         float recoilDistance = 0.4f;
-        float recoilDuration = tankPilotGunProperties.interval / 2;
-        float returnDuration = tankPilotGunProperties.interval / 2;
 
         Vector3 localRecoilDirection = -Vector3.forward;
         Vector3 recoilPosition = gunnerGunOriginalLocalPosition + (localRecoilDirection * recoilDistance);
 
         float recoilTimer = 0f;
-        while (recoilTimer < recoilDuration)
+        while (recoilTimer < properties.recoilValues.applyRecoilSpeed)
         {
             recoilTimer += Time.deltaTime;
-            float t = recoilTimer / recoilDuration;
+            float t = recoilTimer / properties.recoilValues.applyRecoilSpeed;
             tankGunnerGun.localPosition = Vector3.Lerp(
                 gunnerGunOriginalLocalPosition,
                 recoilPosition,
@@ -145,10 +198,10 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         }
 
         float returnTimer = 0f;
-        while (returnTimer < returnDuration)
+        while (returnTimer < properties.recoilValues.resetRecoilSpeed)
         {
             returnTimer += Time.deltaTime;
-            float t = returnTimer / returnDuration;
+            float t = returnTimer / properties.recoilValues.resetRecoilSpeed;
             tankGunnerGun.localPosition = Vector3.Lerp(
                 recoilPosition,
                 gunnerGunOriginalLocalPosition,
@@ -164,29 +217,47 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
         gunnerGunRecoilCoroutine = null;
     }
 
-    private void CoolDownGun()
+    private void CoolDownGun(float deltaTime)
     {
-        float deltaTime = Time.deltaTime;
-        float coolSpeed = is_pilot_gun_overheated ? (deltaTime / 3f) : deltaTime / 2;
-        pilot_gun_overheat_amount = Mathf.MoveTowards(pilot_gun_overheat_amount, 0f, coolSpeed);
+        // Resfria o spread
+        _currentSpread = Spread.ResetSpread(_currentSpread, properties.spreadValues.baseSpread, properties.spreadValues.spreadRecovery);
 
-        if (pilot_gun_overheat_amount <= 0)
-        {
-            is_pilot_gun_overheated = false;
-        }
+        // Resfria o calor
+        properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
     }
 
     #region IVehicleArmory Implementation
-    public void ActivateArmory() { }
+    public void ActivateArmory()
+    {
+        isActive = true;
+        SetupFiringSystem();
+    }
 
-    public void DeactivateArmory() { }
+    public void DeactivateArmory()
+    {
+        isActive = false;
+    }
 
-    public Sprite GetArmoryIcon() => tankPilotGunProperties.hud_image;
+    public Sprite GetArmoryIcon() => properties.hudIcon;
 
     public string GetCurrentAmmo() => "";
 
-    public float GetHeatingLevel() => pilot_gun_overheat_amount;
+    public float GetHeatingLevel() => properties.heatValues.heatState.currentHeat;
 
-    public float GetMaxOverheat() => tankPilotGunProperties.overheat_time;
+    public float GetMaxOverheat() => properties.heatValues.maxHeat;
+
+    public void SetupFiringSystem()
+    {
+        Firing.ResetState();
+
+        // Garante que o modo de tiro estático atual é válido para este armamento
+        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
+        {
+            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
+            {
+                Firing.SwitchFireMode(properties.firing.fireModes);
+            }
+        }
+    }
     #endregion
 }

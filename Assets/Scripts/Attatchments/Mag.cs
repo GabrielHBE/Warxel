@@ -5,12 +5,13 @@ public class Mag : Attatchment
     public Transform magHandPosition;
 
     [Header("Changes")]
-    public int bullet_counter_change;
-    public float ads_speed_change;
-    public float reload_speed_changer;
+    public ProcessReload.Reload.ReloadValues reloadValues;
+    public int bulletsPerSHotChange;
+    public float adsSpeedChange;
 
     public override void Initialize()
     {
+        base.Initialize();
         GetWeaponHolder();
     }
 
@@ -18,6 +19,11 @@ public class Mag : Attatchment
     {
         WeaponHolder wh = GetComponentInParent<WeaponHolder>();
         if (wh != null) wh.SetWeaponMag(magHandPosition);
+    }
+
+    public override string GetAttatchmentDescription()
+    {
+        throw new System.NotImplementedException();
     }
 
 }

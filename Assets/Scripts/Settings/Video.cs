@@ -4,13 +4,13 @@ using UnityEngine;
 public class Video : MonoBehaviour
 {
     [Header("Graphics")]
-    public List<string> graphic_presets = new List<string> { "Low", "Medium", "Hight" };
+    public GraphicSettings graphic_preset;
     [Range(100f, 4000f)]
     public float render_distance;
     public bool enable_shadows;
-    public List<string> shadows = new List<string> { "Low", "Medium", "Hight" };
-    public List<string> meshes = new List<string> { "Low", "Medium", "Hight" };
-    public List<string> rain_quality = new List<string> { "Low", "Medium", "Hight" };
+    public GraphicSettings shadows;
+    public GraphicSettings meshes;
+    public GraphicSettings rain_quality;
 
     [Header("Screen")]
     public bool limit_fps;
@@ -36,5 +36,18 @@ public class Video : MonoBehaviour
     public bool vignette;
     [Range(0.5f, 2f)]
     public float motion_blur;
+
+    public enum GraphicSettings{
+        Low,
+        Medium,
+        Hight
+    }
+
+    public enum ScreenResolutions
+    {
+        FullScreenWindow,
+        MaximizedWindow,
+        Windowed
+    }
 
 }

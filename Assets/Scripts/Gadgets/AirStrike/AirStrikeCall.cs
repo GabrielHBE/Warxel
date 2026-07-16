@@ -37,19 +37,10 @@ public class AirStrikeCall : Gadget
         if (!is_active) return;
 
         // Calcula o tempo restante de cooldown
-        float remainingCooldown = Mathf.Max(0, nextAvailableTime - Time.time);
+
         
-        if (soldierHudManager != null)
-        {
-            if (remainingCooldown > 0)
-            {
-                soldierHudManager.SetCurrentAmmo("Wait: " + remainingCooldown.ToString("F1"));
-            }
-            else
-            {
-                soldierHudManager.SetCurrentAmmo("Ready!");
-            }
-        }
+        float remainingCooldown = Mathf.Max(0, nextAvailableTime - Time.time);
+        UpdateAmmoHUD(remainingCooldown);
 
         UpdateLaser();
 
@@ -59,7 +50,7 @@ public class AirStrikeCall : Gadget
             {
                 // Define o próximo tempo disponível
                 nextAvailableTime = Time.time + originalCallInDelay;
-                
+
                 print(hit.transform.gameObject.name);
                 playerNetworkObjectSpawner.ServerSpawnAirStrike(airStrikeMissilePrefab, hit.point);
             }
@@ -83,4 +74,22 @@ public class AirStrikeCall : Gadget
         line.SetPosition(0, transform.position);
         line.SetPosition(1, raihitpos);
     }
+
+
+    private void UpdateAmmoHUD(float remainingCooldown)
+    {
+
+        if (soldierHudManager != null)
+        {
+            if (remainingCooldown > 0)
+            {
+                soldierHudManager.SetCurrentAmmo("Wait: " + remainingCooldown.ToString("F1"));
+            }
+            else
+            {
+                soldierHudManager.SetCurrentAmmo("Ready!");
+            }
+        }
+    }
+
 }

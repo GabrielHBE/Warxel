@@ -42,7 +42,7 @@ public class Gadget : MonoBehaviour, UpgradeLevel
     protected virtual void Awake()
     {
         adsBehaviour = GetComponentInParent<AdsBehaviour>();
-        soldierHudManager = GetComponentInParent<SoldierHudManager>();
+        soldierHudManager = GetComponentInParent<PlayerController>().soldierHudManager;
         firstPersonArms = GetComponentInParent<FirstPersonArms>();
         playerNetworkObjectSpawner = GetComponentInParent<PlayerNetworkObjectSpawner>();
 

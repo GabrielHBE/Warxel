@@ -7,11 +7,10 @@ public class Shell : Mag
     [SerializeField] private Transform put_shell_pos;
 
     [Header("Sound")]
-    [SerializeField] private AudioClip put_shell;
-    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents put_shell;
 
     [Header("Instances")]
-    
+
     [SerializeField] private WeaponHolder weaponHolder;
     [SerializeField] private MeshRenderer mesh;
 
@@ -58,8 +57,8 @@ public class Shell : Mag
         if (isMovingToShellPos)
         {
             // Movendo em direção à posição de colocar a munição
-            transform.localPosition = Vector3.MoveTowards(transform.localPosition, put_shell_pos.localPosition, Time.deltaTime * weaponProperties.reload_time * 3);
-            transform.localRotation = Quaternion.Lerp(transform.localRotation, put_shell_pos.localRotation, Time.deltaTime * weaponProperties.reload_time * 3);
+            transform.localPosition = Vector3.MoveTowards(transform.localPosition, put_shell_pos.localPosition, Time.deltaTime * (weaponProperties.reloadValues.reloadTime / 2));
+            transform.localRotation = Quaternion.Lerp(transform.localRotation, put_shell_pos.localRotation, Time.deltaTime * (weaponProperties.reloadValues.reloadTime / 2));
 
             // Verificar se chegou na posição de colocar a munição
             if (Vector3.Distance(transform.localPosition, put_shell_pos.localPosition) < 0.01f)
@@ -69,15 +68,15 @@ public class Shell : Mag
                 {
                     mesh.enabled = false;
 
-                    SoundManager.Play2dSoundLocal(put_shell, soundProperties);
+                    SoundManager.Play2dSoundLocal(put_shell.clip, put_shell.properties);
                     hasPlayedSound = true;
                 }
 
-                weapon.ApplyMagAmmo(weaponProperties.mags[^1] + 1);
+                weapon.ApplyMagAmmo(weaponProperties.reloadValues.mags[^1] + 1);
 
-                for (int i = 0; i < weaponProperties.mag_count; i++)
+                for (int i = 0; i < weaponProperties.reloadValues.magCount; i++)
                 {
-                    if (weaponProperties.mags[i] > 0)
+                    if (weaponProperties.reloadValues.mags[i] > 0)
                     {
                         weapon.RemoveMagAmmo(1, i);
                         break;
@@ -91,8 +90,8 @@ public class Shell : Mag
         else
         {
             // Movendo de volta para a posição original
-            transform.localPosition = Vector3.MoveTowards(transform.localPosition, original_pos, Time.deltaTime * weaponProperties.reload_time * 3);
-            transform.localRotation = Quaternion.Lerp(transform.localRotation, original_rot, Time.deltaTime * weaponProperties.reload_time * 3);
+            transform.localPosition = Vector3.MoveTowards(transform.localPosition, original_pos, Time.deltaTime * (weaponProperties.reloadValues.reloadTime / 2));
+            transform.localRotation = Quaternion.Lerp(transform.localRotation, original_rot, Time.deltaTime * (weaponProperties.reloadValues.reloadTime / 2));
 
             // Verificar se chegou na posição original
             if (Vector3.Distance(transform.localPosition, original_pos) < 0.01f)
@@ -106,7 +105,7 @@ public class Shell : Mag
             }
         }
 
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) || weaponProperties.mags[^1] == weaponProperties.bullets_per_mag)
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) || weaponProperties.reloadValues.mags[^1] == weaponProperties.reloadValues.bulletsPerMag)
         {
             playerProperties.is_reloading = false;
             weapon.weaponAnimation.FinishReloadAnimation();

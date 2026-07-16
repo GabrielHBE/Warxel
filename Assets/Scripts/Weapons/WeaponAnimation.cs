@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class WeaponAnimation : MonoBehaviour
 {
-    public const float LAST_MAG_RELOAD_TIMER_INCREASER = 1;
+
     [HideInInspector] public AnimationClip fireClip;
     private AnimationClip reloadClip;
 
@@ -70,9 +70,9 @@ public class WeaponAnimation : MonoBehaviour
         if (anim != null)
         {
             // Criamos uma variável para definir o tempo alvo que a animação deve durar
-            float targetDuration = weaponProperties.reload_time;
+            float targetDuration = weaponProperties.reloadValues.reloadTime;
 
-            if (weaponProperties.mags[^1] != 0)
+            if (weaponProperties.reloadValues.mags[^1] != 0)
             {
                 foreach (AnimationClip clip in rac.animationClips)
                 {
@@ -92,7 +92,7 @@ public class WeaponAnimation : MonoBehaviour
             else
             {
                 // Se for o último pente vazio, adiciona os 0.2 segundos extras ao tempo alvo
-                targetDuration += LAST_MAG_RELOAD_TIMER_INCREASER;
+                targetDuration += Weapon.LAST_MAG_RELOAD_TIMER_INCREASER;
 
                 foreach (AnimationClip clip in rac.animationClips)
                 {
@@ -130,21 +130,28 @@ public class WeaponAnimation : MonoBehaviour
     {
         if (fireClip == null) return;
 
-        // Calcula o tempo real que a animação tem para tocar (Intervalo total - Atraso)
-        float targetDuration = weaponProperties.interval - weaponProperties.delay_to_shoot_animation;
+        float targetDuration;
+        float speedMultiplier;
 
-        // Prevenção de segurança: garante que o tempo nunca seja 0 ou negativo, 
-        // o que poderia acontecer se você colocar um delay maior que o intervalo do tiro.
-        if (targetDuration <= 0.01f)
+        if (weaponProperties.changeShootAnimationSpeed)
         {
-            targetDuration = 0.01f;
+            targetDuration = weaponProperties.firing.interval - weaponProperties.delay_to_shoot_animation;
+
+            if (targetDuration <= 0.01f)
+            {
+                targetDuration = 0.01f;
+            }
+
+            speedMultiplier = fireClip.length / targetDuration;
+        }
+        else
+        {
+            targetDuration = fireClip.length;
+            speedMultiplier = 1f;
         }
 
-        // Calcula a velocidade do Animator baseada nesse tempo alvo
-        float speedMultiplier = fireClip.length / targetDuration;
         anim.SetFloat("Fire_speed", speedMultiplier);
 
-        // Atualiza a variável que controla o encerramento da animação no Update()
         shoot_animation_timer = targetDuration;
 
         StartCoroutine(ExecuteFireAnimationDelayed());

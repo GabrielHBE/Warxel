@@ -11,9 +11,13 @@ public class Ergonomics : Attatchment
     public float adsSpeedChange;
     public float pickupWeaponSpeedChange;
     public float storeWeaponSpeedChange;
-    public List<WeaponProperties.FireMode> fireModesChange = new List<WeaponProperties.FireMode>();
-    public float rafeOfFireChange;
+    public List<Firing.FireMode> fireModesChange = new List<Firing.FireMode>();
+    public int rafeOfFireChange;
     public int burstBulletsPerTapChange;
     public float burstTimeBetweenBurstsChange;
 
-}
+    public override string GetAttatchmentDescription()
+    {
+        throw new System.NotImplementedException();
+    }
+}   

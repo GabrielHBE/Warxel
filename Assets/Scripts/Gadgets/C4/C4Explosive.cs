@@ -5,8 +5,7 @@ using VoxelDestructionPro.Tools;
 public class C4Explosive : MonoBehaviour
 {
     [Header("Sounds")]
-    [SerializeField] private AudioClip explosionSound;
-    [SerializeField] private SoundManager.SoundProperties soundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents explosionSound;
 
     [Header("Damage")]
     [SerializeField] private float infantary_damage;
@@ -31,8 +30,8 @@ public class C4Explosive : MonoBehaviour
 
         Instantiate(smokeEffect, transform.position, Quaternion.identity);
 
-        SoundManager.Instance.RequestPlay3dSound(explosionSound.name, soundProperties, transform.position, false);
-        SoundManager.Play3dSoundLocal(explosionSound, soundProperties, transform.position);
+        SoundManager.Instance.RequestPlay3dSound(explosionSound.clip.name, explosionSound.properties, transform.position, false);
+        SoundManager.Play3dSoundLocal(explosionSound.clip, explosionSound.properties, transform.position);
 
         Destroy(gameObject);
     }

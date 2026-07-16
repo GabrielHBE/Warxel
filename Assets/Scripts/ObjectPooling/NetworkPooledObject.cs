@@ -1,22 +1,45 @@
+using System.Collections;
 using FishNet.Object;
 using UnityEngine;
 
-public class NetworkPooledObject : NetworkBehaviour
+public abstract class NetworkPooledObject : NetworkBehaviour
 {
     private Transform poolFolder;
-    private bool isDestroying = false;
+    private bool isRegistered = false;
 
-    
     protected virtual void Awake()
     {
-        SetupFolder();
+        StartCoroutine(WaitForServerObjectPooling());
+        if (IsServerInitialized) SetDespawnType(DespawnType.Pool);
+    }
+
+    protected void SetDespawnType(DespawnType despawnType)
+    {
+        ServerManager.Despawn(NetworkObject, despawnType);
+    }
+
+    private IEnumerator WaitForServerObjectPooling()
+    {
+        float timer = 0f;
+
+        while (ServerObjectPooling.Instance == null && timer < 5f)
+        {
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        if (ServerObjectPooling.Instance != null)
+        {
+            SetupFolder();
+        }
+        else
+        {
+            Debug.LogWarning("Timeout: O ServerObjectPooling não foi carregado após 5 segundos.");
+        }
     }
 
     private void SetupFolder()
     {
-        // Garante que o nosso Manager existe na cena
-        if (ServerObjectPooling.Instance == null) return;
-
         string cleanName = gameObject.name.Replace("(Clone)", "").Trim();
         string folderName = $"[Pool Server] {cleanName}";
 
@@ -35,44 +58,44 @@ public class NetworkPooledObject : NetworkBehaviour
         transform.SetParent(poolFolder);
     }
 
-    public override void OnStopServer()
+    // Método chamado quando o objeto é ativado do pool
+    protected virtual void OnEnable()
     {
-        ReturnToFolder();
-    }
-
-    public override void OnStopClient()
-    {
-        if (!IsServerStarted) 
+        if (ServerObjectPooling.Instance != null && !isRegistered)
         {
-            ReturnToFolder();
+            ServerObjectPooling.Instance.RegisterPooledObject(this);
+            isRegistered = true;
         }
     }
 
-    private void ReturnToFolder()
+    // Método chamado quando o objeto é desativado/retornado ao pool
+    protected virtual void OnDisable()
     {
-        // Se a Unity já avisou que vai destruir o objeto ou a pasta sumiu, aborta a operação
-        if (isDestroying || poolFolder == null) return;
-
-        // Tenta reparentar. Se a Unity bloquear (ex: troca de cena imediata), ignoramos o erro silenciosamente
-        try 
+        if (ServerObjectPooling.Instance != null && isRegistered)
         {
-            transform.SetParent(poolFolder);
-        }
-        catch 
-        {
-            isDestroying = true;
+            ServerObjectPooling.Instance.UnregisterPooledObject(this);
+            isRegistered = false;
         }
     }
 
-    // Travas de segurança padrão da Unity para quando o jogo/cena estiver desligando
-    private void OnApplicationQuit()
+    // Método chamado quando o objeto é destruído
+    protected virtual void OnDestroy()
     {
-        isDestroying = true;
+        if (ServerObjectPooling.Instance != null && isRegistered)
+        {
+            ServerObjectPooling.Instance.UnregisterPooledObject(this);
+            isRegistered = false;
+        }
     }
 
-    private void OnDestroy()
+    protected abstract void Enable();
+    protected abstract void Disable();
+    public abstract void LocalUpdate();
+    public abstract void LocalFixedUpdate();
+
+    // Método para verificar se o objeto está registrado
+    public bool IsRegistered()
     {
-        isDestroying = true;
+        return isRegistered;
     }
-    
 }

@@ -1,97 +1,48 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class WeaponProperties : MonoBehaviour, UpgradeLevel
 {
     #region Variables
 
-    #region Progression and Meta
     [Header("Progression & Economy")]
     public string weapon_name;
     public ClassManager.Class[] class_weapon;
     public FactionManager.Faction[] faction;
     public WeaponCategory category;
+    public SwitchWeapon.WeaponSlot weaponSlot;
     public int battle_coins_to_unlock;
     public int weapon_kills;
     public float current_attachment_points;
-    #endregion
-
-    #region Core Weapon Settings
+ 
     [Header("Core Settings")]
     [HideInInspector] public GameObject weapon;
     public GameObject third_person_prefab;
     public Sprite icon_hud;
-    public List<FireMode> fire_modes = new List<FireMode>();
-    public float rate_of_fire;
     public float ads_speed;
     public float speed_change;
     public float zoom = 1;
-    public float switch_weapon_timer;
-    [HideInInspector] public float interval => 60f / rate_of_fire;
-    #endregion
 
     [Header("Handling")]
     public float pick_up_weapon_speed;
     public float store_weapon_speed;
 
-    #region Shooting and Reload mechanics
     [Header("Shooting & Reloading")]
-    public bool single_reload;
     public float delay_to_shoot_animation;
-    public float time_to_transfer_bullets;
-    public float reload_time;
-    public int mag_count;
-    [HideInInspector] public int bullets_per_mag;
-    [HideInInspector] public List<int> mags = new List<int>();
-    #endregion
+    public bool changeShootAnimationSpeed;
+    public ProcessReload.Reload.ReloadValues reloadValues;
 
-    #region Damage and Ballistics
+    [Header("Fring Settings")]
+    public Firing.FiringValues firing;
+
     [Header("Damage & Ballistics")]
-    public bool can_damage_vehicles;
-    public int bullets_per_shot;
-    public float muzzle_velocity;
-    public float bullet_drop;
-    public float infantry_damage;
-    public float vehicle_damage;
-    public float minimum_damage;
-    public float headshot_multiplier;
-    public float damage_dropoff;
-    public float damage_dropoff_timer;
-    public float destruction_force;
-    #endregion
+    public Projectile.ProjectileValues projectileValues;
 
-    #region Burst Mode Settings
-    [Header("Burst Mode")]
-    public int bullets_per_tap;
-    public float time_between_bursts;
-    #endregion
+    [Header("Spread Settings")]
+    public Spread.SpreadValues spreadValues;
 
-    #region Accuracy and Spread
-    [Header("Spread")]
-    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)]
-    public float base_spread;
-    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)]
-    public float spread_increaser;
-    [Range(Spread.MIN_SPREAD_VALUE, Spread.MAX_SPREAD_VALUE)]
-    public float max_spread;
-    public float spread_recovery = 1;
-    #endregion
-
-    #region Recoil Mechanics
     [Header("Recoil Settings")]
-    public bool manual_calculate_recoil;
-    public float weapon_reset_recoil_speed;
-    public float weapon_apply_recoil_speed;
-    public Vector3 visual_recoil;
-    [Range(Recoil.MIN_FIRTSHOTINCREASER_VALUE, Recoil.MAX_FIRTSHOTINCREASER_VALUE)]
-    public float first_shoot_increaser;
-    public Recoil.RecoilPattern[] recoilPattern = new Recoil.RecoilPattern[0];
-    [HideInInspector] public float horizontal_recoil_media;
-    [HideInInspector] public float vertical_recoil_media;
-    #endregion
-
-    #region View Kick, Sway and Bobbing
+    public Recoil.RecoilValues recoilValues;
+  
     [Header("Sway & Bobbing Exaggeration")]
     public float bob_walk_exageration;
     public float bob_sprint_exageration;
@@ -102,7 +53,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public Vector3 walk_multiplier;
     public Vector3 sprint_multiplier;
     public Vector3 aim_multiplier;
-    public Vector3 shoot_multiplier;
     public Vector3 crouch_multiplier;
 
     [Header("Sway Transforms")]
@@ -112,14 +62,10 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public float[] quaternionValues = new float[3];
     #endregion
 
-    #region Weapon References
     [Header("References & Effects")]
     public WeaponSounds weapon_sound;
     public GameObject barrel;
     private BulletExtractor bulletExtractor;
-    #endregion
-
-    #endregion
 
     #region Enums
     public enum WeaponCategory
@@ -134,13 +80,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         Launcher
     }
 
-    [Serializable]
-    public enum FireMode
-    {
-        Auto,
-        Burst,
-        Single
-    }
     #endregion
 
     #region Unity Callbacks
@@ -156,7 +95,7 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         weapon_kills = PlayerPrefs.GetInt($"WeaponProperties_weapon_kills_{weapon_name}");
         SetClassBenefits();
         bulletExtractor = GetComponentInChildren<BulletExtractor>();
-        FillMags();
+        reloadValues.PopulateMags();
         Restart();
     }
 
@@ -164,13 +103,13 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     {
         if (AccountManager.Instance.selected_class == ClassManager.Class.Assault)
         {
-            reload_time *= 1.2f;
-            first_shoot_increaser *= 0.9f;
+            reloadValues.reloadTime *= 1.2f;
+            recoilValues.firstShootRecoilMultiplier *= 0.9f;
 
-            for (int i = 0; i < recoilPattern.Length; i++)
+            for (int i = 0; i < recoilValues.recoilPattern.Length; i++)
             {
-                recoilPattern[i].horizontalRecoil *= 0.9f;
-                recoilPattern[i].verticalRecoil *= 0.9f;
+                recoilValues.recoilPattern[i].horizontalRecoil *= 0.9f;
+                recoilValues.recoilPattern[i].verticalRecoil *= 0.9f;
             }
 
         }
@@ -178,63 +117,12 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
     public void Restart()
     {
-        CalculateMedia();
-
-        if (!manual_calculate_recoil)
-        {
-            weapon_reset_recoil_speed = interval / 2;
-            weapon_apply_recoil_speed = interval / 2;
-        }
-    }
-
-    void FillMags()
-    {
-        for (int i = 0; i < mag_count; i++)
-        {
-            mags.Add(bullets_per_mag);
-        }
+        recoilValues.CalculateRecoilMedia();
+        recoilValues.CalculateRecoilSpeed(firing.interval);
     }
     #endregion
 
     #region Logic & Calculations
-    public void CalculateRecoilSpeed(bool is_burst)
-    {
-        // Espaço reservado para lógica futura de recuo por modo de tiro
-    }
-
-    public void CalculateMedia()
-    {
-        float horizonalMedia = 0;
-        float verticalMedia = 0;
-
-        for (int i = 0; i < recoilPattern.Length; i++)
-        {
-            horizonalMedia = recoilPattern[i].horizontalRecoil;
-            verticalMedia = recoilPattern[i].verticalRecoil;
-        }
-        vertical_recoil_media = verticalMedia / recoilPattern.Length;
-        horizontal_recoil_media = horizonalMedia / recoilPattern.Length;
-        /*
-        float media = 0;
-
-        for (int i = 0; i < vertical_recoil.Length; i++)
-        {
-            media += vertical_recoil[i];
-        }
-        media /= vertical_recoil.Length;
-        vertical_recoil_media = media;
-
-        media = 0;
-
-        for (int i = 0; i < horizontal_recoil.Length; i++)
-        {
-            media += horizontal_recoil[i];
-        }
-        media /= horizontal_recoil.Length;
-        horizontal_recoil_media = media;
-        */
-    }
-
     public void CreateBulletExtractor()
     {
         if (bulletExtractor != null)

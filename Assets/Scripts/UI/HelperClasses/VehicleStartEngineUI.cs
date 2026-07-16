@@ -21,7 +21,7 @@ public class VehicleStartEngineUI : MonoBehaviour
 
     void Update()
     {
-        if (vehicle.start_engine)
+        if (vehicle.startEngine.Value)
         {
             HideStartEnginePrompt();
         }

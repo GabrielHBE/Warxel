@@ -3,180 +3,195 @@ using UnityEngine;
 
 public class JetMainCannon : NetworkBehaviour, IVehicleArmory
 {
-    [SerializeField] private DummyBullet dummyBullet;
-    [SerializeField] private NetworkObject serverBullet;
-
-    [Header("Bullet Config")]
-    public float muzzle_velocity;
-    public float bullet_drop;
-    public float minimum_damage;
-
-    [Header("MainCannon Stats")]
     public Transform shootPosition;
-    public float infantary_damage;
-    public float vehicle_damage;
-    public Sprite hud_icon;
-    public float fire_rate;
-    public float overheat_time;
-    public float damage_dropoff;
-    public float damage_dropoff_timer;
-    public float destruction_force;
+    public JetMainCannonProperties properties;
 
-    [Header("Spread Config")]
-    public float spread_increase_per_shot;
-    public float max_spread;
-    public float spread_recovery_speed = 5f;
-
-    [Header("Audio")]
-    public AudioSource shoot_sound;
-    public AudioSource stop_shooting_sound;
-
-    [Header("Runtime State")]
-    private float _nextFireTime = 0;
-    private float _currentSpread;
-    private float _overheatAmount;
-    private bool _isOverheated;
-    private bool _hasPlayedShootSound;
-    private float _shootDelayTimer;
-    private float _rotationValue;
-    private float _interval;
-
+    // REMOVIDO: private int firingStateId;
+    private float rotationValue;
     private bool isActive = true;
+    private bool wasOverheatedLastFrame = false;
 
-    void Start()
+    void Awake()
     {
-        _interval = 60f / fire_rate;
+        // ATUALIZADO: sem stateId, apenas reseta o estado
+        Firing.ResetState();
+        // Garante que o estado de superaquecimento comece falso
+        properties.heatValues.heatState.isOverheated = false;
     }
 
     void Update()
     {
         if (!IsOwner) return;
 
-        if (!isActive) StopFire(Time.deltaTime);
-    }
+        if (!isActive)
+        {
+            StopFire(Time.deltaTime);
+            return;
+        }
 
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchFireModeKey))
+            SwitchFireMode();
+
+        // Se estiver superaquecido, força o resfriamento no Update também
+        if (Heating.isOverheated(properties.heatValues))
+        {
+            // Se acabou de superaquecer, para o som
+            if (!wasOverheatedLastFrame)
+            {
+                wasOverheatedLastFrame = true;
+            }
+            StopFire(Time.deltaTime);
+        }
+        else
+        {
+            wasOverheatedLastFrame = false;
+        }
+    }
 
     public void Shoot()
     {
         float deltaTime = Time.deltaTime;
-        // Verifica se a tecla está pressionada (usando o sistema de Settings do seu projeto)
-        bool isInputPressed = InputManager.GetKey(Settings.Instance._keybinds.JET_shootVehicleKey);
-        bool canShoot = !_isOverheated && isInputPressed;
 
-        // Timer de segurança para evitar disparos acidentais (cliques ultra rápidos)
-        _shootDelayTimer = canShoot ? _shootDelayTimer + deltaTime : 0;
+        // Obtém inputs
+        bool isInputHeld = InputManager.GetKey(Settings.Instance._keybinds.JET_shootVehicleKey);
+        bool isInputPressed = InputManager.GetKeyDown(Settings.Instance._keybinds.JET_shootVehicleKey);
 
-        if (canShoot && _shootDelayTimer >= 0.05f)
+        // Verifica se está superaquecido (usando o estado persistente)
+        if (Heating.isOverheated(properties.heatValues))
         {
-            ExecuteFire(deltaTime);
+            // Força o resfriamento
+            StopFire(deltaTime);
+
+            // Rotação visual do canhão (para quando superaquecido)
+            rotationValue = Mathf.Lerp(rotationValue, 0f, deltaTime * 3f);
+            transform.Rotate(Vector3.left * rotationValue * deltaTime);
+            return;
+        }
+
+        // ATUALIZADO: sem stateId
+        Firing.UpdateTimeToFire(deltaTime);
+
+        // Processa o tiro usando o sistema Firing (sem stateId)
+        var shootResult = Firing.ProcessShooting(
+            properties.firing,
+            isInputHeld,
+            isInputPressed,
+            isReloading: false,
+            isRolling: false,
+            isDead: false,
+            currentAmmo: 1,
+            deltaTime
+        );
+
+        // Obtém o estado atual de disparo (sem stateId)
+        bool isFiring = Firing.IsFiring();
+        Firing.FireMode currentMode = Firing.GetCurrentFireMode();
+
+        if (shootResult.shouldShoot)
+        {
+            SoundManager.Instance.RequestPlay3dSound(properties.shootSound.clip.name, properties.shootSound.properties, transform.position, false);
+            SoundManager.Play2dSoundLocal(properties.shootSound.clip, properties.shootSound.properties);
+            ExecuteFire();
+        }
+
+        if (Heating.ShouldHeat(currentMode, isInputHeld))
+        {
+            // Aplica aquecimento
+            properties.heatValues.heatState.currentHeat = Heating.HandleHeating(properties.heatValues, deltaTime);
+
+            // Verifica se atingiu o limite de superaquecimento
+            if (properties.heatValues.heatState.currentHeat >= properties.heatValues.maxHeat)
+            {
+                // Marca como superaquecido
+                properties.heatValues.heatState.isOverheated = true;
+
+                // Aplica um pequeno resfriamento para começar a esfriar
+                properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
+            }
         }
         else
         {
+            // RESFRIAMENTO: parou de atirar ou soltou o botão
             StopFire(deltaTime);
         }
 
-        // Rotação visual do canhão (Efeito Gatling) baseado na cadência
-        transform.Rotate(Vector3.left * _rotationValue * deltaTime);
-    }
-
-    private void ExecuteFire(float deltaTime)
-    {
-        ManageAudio(true);
-
-        if (Time.time >= _nextFireTime)
+        if (isFiring)
         {
-
-            Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPosition, _currentSpread);
-
-            _currentSpread = Spread.AddSpread(_currentSpread, spread_increase_per_shot, max_spread);
-
-            Bullet.BulletData data = new Bullet.BulletData
-            {
-                position = shootPosition.position,
-                rotation = finalRotation,
-                direction = finalRotation * Vector3.forward,
-                speed = muzzle_velocity,
-                dropMultiplier = bullet_drop,
-                infantaryDamage = infantary_damage,
-                damageDropoff = damage_dropoff,
-                damageDropoffTimer = damage_dropoff_timer,
-                destructionForce = destruction_force,
-                minimumDamage = minimum_damage,
-                hsMultiplier = 2,
-                canDamageVehicles = true,
-                vehicleDamage = vehicle_damage
-            };
-
-            DummyBullet instantiatedDummyBullet = LocalObjectPooling.Instance.GetPooledItem(dummyBullet.gameObject).GetComponent<DummyBullet>();
-            if (instantiatedDummyBullet != null) instantiatedDummyBullet.CreateBullet(data, transform.root);
-
-            CmdFire(data);
-
-            _nextFireTime = Time.time + _interval;
+            rotationValue = properties.firing.rateOfFire;
         }
 
-        _overheatAmount += deltaTime;
-        _rotationValue = fire_rate;
+        transform.Rotate(Vector3.left * rotationValue * deltaTime);
+    }
 
-        if (_overheatAmount >= overheat_time) _isOverheated = true;
+    private void ExecuteFire()
+    {
+        Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPosition, properties.spreadValues.spreadState.currentSpread);
+
+        properties.spreadValues.spreadState.currentSpread = Spread.AddSpread(
+            properties.spreadValues.spreadState.currentSpread,
+            properties.spreadValues.spreadIncreaser,
+            properties.spreadValues.maxSpread
+        );
+
+        Projectile.ProjectileProperties prop = new Projectile.ProjectileProperties
+        {
+            position = shootPosition.position,
+            rotation = finalRotation,
+            ignoredObject = transform.root,
+            root = gameObject
+        };
+
+        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(properties.bulletPref, properties.dummyBullet.gameObject, prop, properties.projectileValues);
     }
 
     private void StopFire(float deltaTime)
     {
-        _currentSpread = Spread.ResetSpread(_currentSpread, 0f, spread_recovery_speed);
+        properties.spreadValues.spreadState.currentSpread = Spread.ResetSpread(
+            properties.spreadValues.spreadState.currentSpread,
+            properties.spreadValues.baseSpread,
+            properties.spreadValues.spreadRecovery
+        );
 
-        _rotationValue = Mathf.Lerp(_rotationValue, 0f, deltaTime * 3f);
+        rotationValue = Mathf.Lerp(rotationValue, 0f, deltaTime * 3f);
 
-        float coolSpeed = _isOverheated ? (deltaTime / 2f) : deltaTime;
-        _overheatAmount = Mathf.MoveTowards(_overheatAmount, 0f, coolSpeed);
-
-        if (_overheatAmount <= 0) _isOverheated = false;
-
-        ManageAudio(false);
-    }
-
-    private void ManageAudio(bool isShooting)
-    {
-        if (isShooting && !_hasPlayedShootSound)
-        {
-            CmdPlaySound(true);
-            _hasPlayedShootSound = true;
-        }
-        else if (!isShooting && _hasPlayedShootSound)
-        {
-            CmdPlaySound(false);
-            _hasPlayedShootSound = false;
-        }
-    }
-
-    [ServerRpc]
-    private void CmdPlaySound(bool play) => RpcPlaySound(play);
-
-    [ObserversRpc]
-    private void RpcPlaySound(bool play)
-    {
-        if (play) shoot_sound.Play();
-        else
-        {
-            shoot_sound.Stop();
-            if (stop_shooting_sound != null) stop_shooting_sound.PlayOneShot(stop_shooting_sound.clip);
-        }
-    }
-
-    [ServerRpc(RequireOwnership = true)]
-    private void CmdFire(Bullet.BulletData data)
-    {
-        Bullet bullet = NetworkManager.GetPooledInstantiated(serverBullet, IsServerInitialized).GetComponent<Bullet>();
-        Spawn(bullet, Owner);
-        bullet.CreateBullet(data, transform.root, null);
+        // APENAS RESFRIAMENTO
+        properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
     }
 
     // Implementação IVehicleArmory
-    public void ActivateArmory() => isActive = true;
+    public void ActivateArmory()
+    {
+        isActive = true;
+        SetupFiringSystem();
+    }
     public void DeactivateArmory() => isActive = false;
-    public Sprite GetArmoryIcon() => hud_icon;
+    public Sprite GetArmoryIcon() => properties.hudIcon;
     public string GetCurrentAmmo() => null;
-    public float GetHeatingLevel() => _overheatAmount;
+    public float GetHeatingLevel() => properties.heatValues.heatState.currentHeat;
+    public float GetMaxOverheat() => properties.heatValues.maxHeat;
 
-    public float GetMaxOverheat() => overheat_time;
+    // Método para trocar modo de tiro (opcional)
+    public void SwitchFireMode()
+    {
+        if (!IsOwner) return;
+
+        if (!Firing.CanSwitchFireMode(properties.firing.fireModes)) return;
+
+        // ATUALIZADO: sem stateId
+        Firing.SwitchFireMode(properties.firing.fireModes);
+    }
+
+    public void SetupFiringSystem()
+    {
+        Firing.ResetState();
+
+        // Garante que o modo de tiro estático atual é válido para este armamento
+        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
+        {
+            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
+            {
+                Firing.SwitchFireMode(properties.firing.fireModes);
+            }
+        }
+    }
 }

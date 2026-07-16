@@ -3,61 +3,54 @@ using UnityEngine;
 public class WeaponSounds : MonoBehaviour
 {
     [Header("Shoot")]
-    public AudioClip shootSound;
-    public SoundManager.SoundProperties shootSoundProperties = SoundManager.SoundProperties.Default;
+    public SoundManager.SoundComponents shootSound;
 
     [Header("Remove Mag")]
-    [SerializeField] private AudioClip removeMagSound;
-    [SerializeField] private SoundManager.SoundProperties removeMagSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents removeMagSound;
 
     [Header("Put Mag")]
-    [SerializeField] private AudioClip putMagSound;
-    [SerializeField] private SoundManager.SoundProperties putMagSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents putMagSound;
 
     [Header("Pull Extractor")]
-    [SerializeField] private AudioClip pullExtractorSound;
-    [SerializeField] private SoundManager.SoundProperties pullExtractorSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents pullExtractorSound;
 
     [Header("Push Extractor")]
-    [SerializeField] private AudioClip pushExtractorSound;
-    [SerializeField] private SoundManager.SoundProperties pushExtractorSoundProperties = SoundManager.SoundProperties.Default;
+    [SerializeField] private SoundManager.SoundComponents pushExtractorSound;
 
     private CameraShake cameraShake;
-    private float originalPitch;
     void Awake()
     {   
-        originalPitch = shootSoundProperties.pitch;
         cameraShake = GetComponentInParent<CameraShake>();
     }
 
     public void RemoveMag()
     {
         cameraShake.RequestShake(0.5f, 0.5f);
-        SoundManager.Play2dSoundLocal(removeMagSound, removeMagSoundProperties);
+        SoundManager.Play2dSoundLocal(removeMagSound.clip, removeMagSound.properties);
     }
 
     public void PutMag()
     {
         cameraShake.RequestShake(0.5f, 0.5f);
-        SoundManager.Play2dSoundLocal(putMagSound, putMagSoundProperties);
+        SoundManager.Play2dSoundLocal(putMagSound.clip, putMagSound.properties);
     }
 
     public void PushExtractor()
     {
         cameraShake.RequestShake(0.5f, 0.5f);
-        SoundManager.Play2dSoundLocal(pushExtractorSound, pushExtractorSoundProperties);
+        SoundManager.Play2dSoundLocal(pushExtractorSound.clip, pushExtractorSound.properties);
     }
 
     public void PullExtractor()
     {
         cameraShake.RequestShake(0.5f, 0.5f);
-        SoundManager.Play2dSoundLocal(pullExtractorSound, pullExtractorSoundProperties);
+        SoundManager.Play2dSoundLocal(pullExtractorSound.clip, pullExtractorSound.properties);
     }
 
     public void ShootSound()
     {   
-        SoundManager.Instance.RequestPlay3dSound(shootSound.name, shootSoundProperties, transform.position, false);
-        SoundManager.Play2dSoundLocal(shootSound, shootSoundProperties);
-        //SoundManager.Play3dSoundLocal(shootSound, shootSoundProperties, transform.position);
+        SoundManager.Instance.RequestPlay3dSound(shootSound.clip.name, shootSound.properties, transform.position, false);
+        SoundManager.Play2dSoundLocal(shootSound.clip, shootSound.properties);
+        //SoundManager.Play3dSoundLocal(shootSound, shootproperties, transform.position);
     }
 }

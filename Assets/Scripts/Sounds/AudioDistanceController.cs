@@ -33,9 +33,8 @@ public class AudioDistanceController : LocalPooledObject
 
     private float initialGrowth = 0;
 
-    protected override void Awake()
+    protected void Awake()
     {
-        base.Awake();
         // Salva os sons padrão configurados no Inspector do Prefab
         if (distanceSounds != null)
         {
@@ -58,7 +57,7 @@ public class AudioDistanceController : LocalPooledObject
             distanceSounds = null;
     }
 
-    void Update()
+    public override void LocalUpdate()
     {
         if (isGrowing)
         {
@@ -76,31 +75,36 @@ public class AudioDistanceController : LocalPooledObject
         }
     }
 
+    public override void LocalFixedUpdate()
+    {
+        return;
+    }
+
     private System.Collections.IEnumerator DeactivateAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
         Deactivate(); // Método herdado que devolve ao pool
     }
 
-    public void Setup(AudioClip clip, SoundManager.SoundProperties soundProperties)
+    public void Setup(SoundManager.SoundComponents sound)
     {
-        audioSource = SoundManager.CreateConfiguredAudioSource(gameObject, clip, soundProperties, true, false);
+        audioSource = SoundManager.CreateConfiguredAudioSource(gameObject, sound.clip, sound.properties, true, false);
 
         finalGrowth = audioSource.maxDistance;
         
         // NOVO: Lê os sons de distância customizados vindos do SoundManager
-        if (soundProperties.customDistanceSounds != null && soundProperties.customDistanceSounds.Length > 0)
+        if (sound.properties.customDistanceSounds != null && sound.properties.customDistanceSounds.Length > 0)
         {
-            distanceSounds = new DistanceSounds[soundProperties.customDistanceSounds.Length];
-            for (int i = 0; i < soundProperties.customDistanceSounds.Length; i++)
+            distanceSounds = new DistanceSounds[sound.properties.customDistanceSounds.Length];
+            for (int i = 0; i < sound.properties.customDistanceSounds.Length; i++)
             {
-                var customData = soundProperties.customDistanceSounds[i];
+                var customData = sound.properties.customDistanceSounds[i];
 
                 // Tenta pegar o AudioClip direto. Se for nulo (recebido via rede), busca o AudioClip no cache pelo nome.
                 AudioClip resolvedClip = customData.clip;
                 if (resolvedClip == null && !string.IsNullOrEmpty(customData.soundName))
                 {
-                    resolvedClip = SoundManager.Instance.GetClip(customData.soundName);
+                    resolvedClip = SoundManager.GetClip(customData.soundName);
                 }
 
                 distanceSounds[i] = new DistanceSounds
