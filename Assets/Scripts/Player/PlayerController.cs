@@ -71,7 +71,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public PlayerProperties playerProperties;
 
     [Header("Volumes")]
-    [SerializeField] private Volume nightVision_volume;
+    [SerializeField] private NightVisionPostFX nightVisionPostFX;
     [SerializeField] private Volume damageTaken_volume;
     #endregion
 
@@ -80,9 +80,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public Rigidbody rb;
 
     // Volume
-    private Vignette nightVision_vignette;
-    private ColorAdjustments nightVision_Color_adjustments;
-    private FilmGrain nightVision_filmGrain;
+
     private Vignette damageTaken_vignette;
 
     // Movement 
@@ -114,7 +112,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     private float currentRecoilZ;
     private float targetRecoilZ;
     private float recoilZVelocity;
-    private float resetRecoilSpeed;
     private float applyRecoilSpeed;
     private float targetVignetteIntensity;
     private float currentVignetteIntensity;
@@ -127,7 +124,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     // Interaction & Caching
     private int interactivesLayer;
-    private int vehicleLayer;
     private int playerLayer;
 
     // Performance: Array cache para Physics.OverlapSphereNonAlloc
@@ -234,7 +230,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
         // Caching das layers para performance
         interactivesLayer = LayerMask.GetMask("Interactives");
-        vehicleLayer = LayerMask.GetMask("Vehicle");
         playerLayer = LayerMask.GetMask("Player");
 
         playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
@@ -247,12 +242,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void InitializeVolume()
     {
-        if (nightVision_volume != null && nightVision_volume.profile != null)
-        {
-            nightVision_volume.profile.TryGet(out nightVision_vignette);
-            nightVision_volume.profile.TryGet(out nightVision_filmGrain);
-            nightVision_volume.profile.TryGet(out nightVision_Color_adjustments);
-        }
 
         if (damageTaken_volume != null && damageTaken_volume.profile != null)
         {
@@ -290,7 +279,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             UpdateMovementInputManager();
         }
 
-        HandleNightVision();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision)) HandleNightVision();
 
         if (grounded)
         {
@@ -699,14 +688,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void HandleNightVision()
     {
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision))
-        {
-            is_night_vision_active = !is_night_vision_active;
-
-            if (nightVision_filmGrain != null) nightVision_filmGrain.active = is_night_vision_active;
-            if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = is_night_vision_active;
-            if (nightVision_vignette != null) nightVision_vignette.active = is_night_vision_active;
-        }
+        is_night_vision_active = !is_night_vision_active;
+        nightVisionPostFX.SetActive(is_night_vision_active);
     }
 
     private void UpdateDamageVignette()
@@ -867,16 +850,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     #endregion
 
     #region State Management
-    public void DisableNightVison()
-    {
-        if (is_night_vision_active)
-        {
-            is_night_vision_active = false;
-            if (nightVision_filmGrain != null) nightVision_filmGrain.active = false;
-            if (nightVision_Color_adjustments != null) nightVision_Color_adjustments.active = false;
-            if (nightVision_vignette != null) nightVision_vignette.active = false;
-        }
-    }
 
     public void ResetWeaponAnimation()
     {
@@ -1016,17 +989,11 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             AccountManager.Instance.RemoveBattleCoin(10);
             PlayerSpawnController.Instance.Reestart();
 
-            if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
 
             if (IsSpawned) RequestDespawn();
             else Destroy(gameObject);
 
             return;
-        }
-
-        if (nightVision_vignette != null)
-        {
-            nightVision_vignette.intensity.value = deathProgress;
         }
 
         HideOwnerItems(false);
@@ -1104,8 +1071,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
     {
         this.applyRecoilSpeed = applyRecoilSpeed;
-        this.resetRecoilSpeed = resetRecoilSpeed;
-
         walkSpeed = original_walk_speed + speedModifier;
         sprintSpeed = original_sprint_speed + speedModifier;
         crouchSpeed = original_crouch_speed + speedModifier;
@@ -1180,8 +1145,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         CmdUpdateServerHP(100);
         CmdUpdateServerIsDead(false);
         HideOwnerItems(true);
-
-        if (nightVision_vignette != null) nightVision_vignette.intensity.value = 0;
 
         playerProperties.is_dead.Value = false;
         playerProperties.hp.Value = 100;

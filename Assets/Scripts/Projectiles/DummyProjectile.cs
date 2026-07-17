@@ -5,8 +5,8 @@ using VoxelDestructionPro.VoxelObjects; // Necessário para os materiais do voxe
 public class DummyProjectile : LocalPooledObject
 {
     [Header("References")]
-    [SerializeField] private ProjectileHitEffects hitEffects; // Adicionado para efeitos visuais
-    [SerializeField] private ProjectileSoundEffect soundEffects; // Adicionado para efeitos sonoros
+    [SerializeField] protected ProjectileHitEffects hitEffects; // Adicionado para efeitos visuais
+    [SerializeField] protected ProjectileSoundEffect soundEffects; // Adicionado para efeitos sonoros
 
     [Header("Settings")]
     [SerializeField] private MeshRenderer mesh;
@@ -20,6 +20,8 @@ public class DummyProjectile : LocalPooledObject
     private float bulletDropMultiplier;
     private int layerMask;
 
+    protected bool isSetup;
+
     private RaycastHit[] hit_results = new RaycastHit[128];
 
     protected void Awake()
@@ -27,27 +29,31 @@ public class DummyProjectile : LocalPooledObject
         layerMask = ~(1 << LayerMask.NameToLayer("Projectile") | 1 << LayerMask.NameToLayer("Player"));
     }
 
-    public void CreateProjectile(Projectile.ProjectileProperties prop, Projectile.ProjectileValues values)
+    public virtual void CreateProjectile(Projectile.ProjectileProperties prop, Projectile.ProjectileValues values)
     {
-        rb.position = prop.position;
-        rb.rotation = prop.rotation;
-        transform.position = prop.position;
-        transform.rotation = prop.rotation;
+        SetProjectileProperties(prop);
 
         lastPosition = transform.position;
-
         bulletDropMultiplier = values.dropMultiplier;
-        ignoredTransform = prop.ignoredObject;
-
-        // Sincroniza sons e efeitos customizados caso existam
-        if (prop.customHitSound != null && soundEffects != null) soundEffects.SetCustomHitSound(prop.customHitSound, prop.customHitSoundProperties);
-        if (prop.customHitEffect != null && hitEffects != null) hitEffects.SetCustomHitEffect(prop.customHitEffect);
 
         Activate();
 
         StartCoroutine(DelayToEnable(values.delaytoEnableForNonOwner));
 
         SetDirection(prop.direction, values.muzzleVelocity);
+        isSetup = true;
+    }
+
+    protected virtual void SetProjectileProperties(Projectile.ProjectileProperties prop)
+    {
+        rb.position = prop.position;
+        rb.rotation = prop.rotation;
+        transform.position = prop.position;
+        transform.rotation = prop.rotation;
+        ignoredTransform = prop.ignoredObject;
+        // Sincroniza sons e efeitos customizados caso existam
+        if (prop.customHitSound != null && soundEffects != null) soundEffects.SetCustomHitSound(prop.customHitSound, prop.customHitSoundProperties);
+        if (prop.customHitEffect != null && hitEffects != null) hitEffects.SetCustomHitEffect(prop.customHitEffect);
     }
 
     protected IEnumerator DelayToEnable(float delay)
@@ -61,22 +67,19 @@ public class DummyProjectile : LocalPooledObject
         rb.linearVelocity = direction * speed;
     }
 
-    #region Collision Management
     private void HandleBulletHit(GameObject hitObject, Vector3 hitPoint, Vector3 hitNormal)
     {
-        print("HandleBulletHit");
-        
         if (hitEffects != null) hitEffects.CustomHitEffect(hitPoint);
 
         if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
         {
             VoxelObjBase voxelObj = hitObject.GetComponent<VoxelObjBase>();
             if (voxelObj != null)
-            {
+            {}
                 VoxelMaterials.VoxelMaterialType material = voxelObj.material;
                 if (hitEffects != null) hitEffects.VoxelHitEffect(hitPoint, material);
                 if (soundEffects != null) soundEffects.RequestVoxelHitSound(hitPoint, material);
-            }
+            
         }
 
         if (hitObject.layer == LayerMask.NameToLayer("Vehicle"))
@@ -111,10 +114,12 @@ public class DummyProjectile : LocalPooledObject
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero);
     }
 
-    
+
 
     public override void LocalFixedUpdate()
     {
+        if(!isSetup) return;
+
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
         ProcessRaycastHitValidation();
     }
@@ -162,7 +167,6 @@ public class DummyProjectile : LocalPooledObject
 
         lastPosition = currentPosition;
     }
-    #endregion
 
     public override void LocalUpdate()
     {
@@ -171,7 +175,8 @@ public class DummyProjectile : LocalPooledObject
 
     public override void Deactivate()
     {
-        print("Deactivate");
+        isSetup = false;
+
         transform.localPosition = Vector3.zero;
         rb.linearVelocity = Vector3.zero;
         rb.isKinematic = true;
@@ -195,8 +200,8 @@ public class DummyProjectile : LocalPooledObject
 
         if (trailRenderer != null)
         {
-            trailRenderer.enabled = active;
             trailRenderer.Clear();
+            trailRenderer.enabled = active;
         }
 
         if (particle != null)

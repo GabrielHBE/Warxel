@@ -604,7 +604,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private bool HasClassAccessToWeapon(WeaponProperties weaponProperties)
     {
-
         if (weaponProperties.class_weapon.Any(c => c == _selectedClass))
         {
             return true;
@@ -615,7 +614,6 @@ public class PlayerLoadoutCustomization : MonoBehaviour
 
     private bool HasFactionAccessToWeapon(WeaponProperties weaponProperties)
     {
-
         if (AccountManager.Instance == null) return true;
 
         if (weaponProperties.faction.Any(c => c == AccountManager.Instance.faction))

@@ -4,18 +4,17 @@ using FishNet.Object.Synchronizing;
 
 public class MissileController : NetworkBehaviour, IVehicleArmory
 {
-    [SerializeField] private MissileControllerProperties properties;
-    [SerializeField] private Transform[] spawnPoints;
-    [SerializeField] private bool initializeDummyMissiles;
+    [SerializeField] protected MissileControllerProperties properties;
+    [SerializeField] protected Transform[] spawnPoints;
+    [SerializeField] protected bool initializeDummyMissiles;
 
-    private bool isActive;
+    protected bool isActive;
 
     // Sincronização da munição - todos os clients verão os mesmos valores
-    private readonly SyncList<int> syncMags = new SyncList<int>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncList<GameObject> syncDummyMissiles = new SyncList<GameObject>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<int> currentMagIndex = new SyncVar<int>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<int> currentSpawnPointShootIndex = new SyncVar<int>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    private readonly SyncVar<bool> isReloading = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    protected readonly SyncList<int> syncMags = new SyncList<int>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    protected readonly SyncVar<int> currentMagIndex = new SyncVar<int>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    protected readonly SyncVar<int> currentSpawnPointShootIndex = new SyncVar<int>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    protected readonly SyncVar<bool> isReloading = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
     private float reloadTimer = 0f;
 
     #region Unity Lifecycle
@@ -23,9 +22,8 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     {
         base.OnStartServer();
         InitializeMagazines();
-        if (initializeDummyMissiles) CmdInicializeDummyMissiles();
     }
-    private void Update()
+    protected virtual void Update()
     {
         if (!IsOwner) return;
 
@@ -86,7 +84,7 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     #endregion
 
     #region Magazine Management
-    private void InitializeMagazines()
+    protected void InitializeMagazines()
     {
         properties.reloadValues.PopulateMags();
 
@@ -96,7 +94,7 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    private int GetCurrentMagAmmo()
+    protected int GetCurrentMagAmmo()
     {
         if (syncMags.Count == 0 || currentMagIndex.Value >= syncMags.Count) return 0;
         return syncMags[currentMagIndex.Value];
@@ -115,7 +113,9 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     #endregion
 
     #region Firing Logic
-    public void Shoot()
+    public void Shoot() => ProcessShooting();
+
+    protected void ProcessShooting()
     {
         bool holdShoot = InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
         bool pressShoot = InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
@@ -151,13 +151,13 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    private void ResetShotState()
+    protected void ResetShotState()
     {
         Firing.ResetRecoilIndex();
         Firing.ResetState();
     }
 
-    private void ExecuteShot()
+    protected virtual void ExecuteShot()
     {
         // Calcula o spread
         Quaternion finalRotation = Spread.CalculateSpreadRotation(
@@ -191,7 +191,7 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
         UpdateAmmoAfterShot();
     }
 
-    private void UpdateAmmoAfterShot()
+    protected void UpdateAmmoAfterShot()
     {
         int currentAmmo = syncMags[currentMagIndex.Value];
         syncMags[currentMagIndex.Value] = currentAmmo - 1;
@@ -203,7 +203,7 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    private void UpdateCurrentSpawnPointShootIndex()
+    protected void UpdateCurrentSpawnPointShootIndex()
     {
         currentSpawnPointShootIndex.Value += 1;
         if (currentSpawnPointShootIndex.Value >= spawnPoints.Length)
@@ -351,33 +351,8 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     #endregion
 
     #region Dummy missiles
-    [ObserversRpc]
-    private void CmdInicializeDummyMissiles() => InitializeDummyMissiles();
-
-    private void InitializeDummyMissiles()
-    {
-        int currentIndex = 0;
-
-        for (int i = 0; i < properties.reloadValues.bulletsPerMag; i++)
-        {
-            GameObject missile = Instantiate(properties.dummyMissilePrefab, Vector3.zero, Quaternion.identity, spawnPoints[currentIndex]);
-            AddSyncDummyMissiles(missile);
-            currentIndex += 1;
-            if (currentIndex > spawnPoints.Length)
-            {
-                currentIndex = 0;
-            }
-        }
-    }
-
     [ServerRpc]
-    private void AddSyncDummyMissiles(GameObject missile)
-    {
-        syncDummyMissiles.Add(missile);
-    }
-
-    [ServerRpc]
-    private void RequestActivateDummyMissile(bool active) => CmdActivateDummyMissile(active);
+    protected void RequestActivateDummyMissile(bool active) => CmdActivateDummyMissile(active);
 
     [ObserversRpc]
     private void CmdActivateDummyMissile(bool active) => ActivateDummyMissile(active);

@@ -7,8 +7,8 @@ using VoxelDestructionPro.VoxelObjects;
 public class Projectile : LocalPooledObject
 {
     [Header("References")]
-    [SerializeField] private ProjectileHitEffects hitEffects;
-    [SerializeField] private ProjectileSoundEffect soundEffects;
+    [SerializeField] protected ProjectileHitEffects hitEffects;
+    [SerializeField] protected ProjectileSoundEffect soundEffects;
 
     [Header("Settings")]
     [SerializeField] protected Collider projectileCollider;
@@ -51,6 +51,8 @@ public class Projectile : LocalPooledObject
         public string customHitSound = null;
         public SoundManager.SoundProperties customHitSoundProperties = SoundManager.SoundProperties.Default;
         public GameObject customHitEffect;
+
+        public NetworkObject target = null;
     }
 
     [System.Serializable]
@@ -127,7 +129,7 @@ public class Projectile : LocalPooledObject
         bulletDropMultiplier = values.dropMultiplier;
     }
 
-    protected void SetProjectileProperties(ProjectileProperties prop)
+    protected virtual void SetProjectileProperties(ProjectileProperties prop)
     {
         ignoredTransform = prop.ignoredObject;
         shootRoot = prop.root;
@@ -356,9 +358,9 @@ public class Projectile : LocalPooledObject
     #endregion
 
     #region Despawning
-    protected IEnumerator DespawnTimer()
+    protected IEnumerator DespawnTimer(float timer = 10)
     {
-        yield return new WaitForSeconds(10f);
+        yield return new WaitForSeconds(timer);
         Deactivate();
     }
 

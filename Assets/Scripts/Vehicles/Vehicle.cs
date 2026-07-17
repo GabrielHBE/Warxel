@@ -21,6 +21,7 @@ public abstract class Vehicle : NetworkBehaviour,
     public VehicleCategory vehicleCategory;
     public FactionManager.Faction vehicle_faction;
     public VehicleCustomizableParts[] customizableParts;
+    public VehicleType vehicleType;
     public Transform spot_position;
     public int vehicle_kills;
 
@@ -238,19 +239,23 @@ public abstract class Vehicle : NetworkBehaviour,
         currentX = Mathf.Clamp(currentX + mouseY, -80f, 40f);
         currentY = Mathf.Clamp(currentY + mouseX, -90f, 90f);
 
-        currentSeat.activeCamera.transform.localRotation = Quaternion.Euler(currentX, currentY, 0f);
+        Quaternion newRotation = Quaternion.Euler(currentX, currentY, 0f);
+        currentSeat.activeCamera.transform.localRotation = newRotation;
     }
 
     private void ReturnToCenter()
     {
-        currentSeat.activeCamera.transform.localRotation = Quaternion.Lerp(
+        Quaternion targetRotation = Quaternion.Lerp(
             currentSeat.activeCamera.transform.localRotation,
             Quaternion.identity,
             Time.deltaTime * 3
         );
+
+        currentSeat.activeCamera.transform.localRotation = targetRotation;
     }
 
     protected virtual float GetCameraSensitivity() => Settings.Instance._controls.helicopter_sensibility;
+
     #endregion
 
     #region Destruction Sequence
@@ -309,7 +314,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
             // Verifica se o assento já está ocupado
             if (seat.isOccupied) continue;
-            
+
             // Regra de restrição: Se não for Piloto, só pode ocupar assentos do tipo Passenger
             if (props.selectedClass.Value != ClassManager.Class.Pilot)
             {
@@ -336,6 +341,7 @@ public abstract class Vehicle : NetworkBehaviour,
         if (!foundSeat)
         {
             TargetRpx(conn, "All seats are occupied", 2);
+            return;
         }
 
         TargetDisableEnterVehicleUI(conn);
@@ -700,4 +706,5 @@ public abstract class Vehicle : NetworkBehaviour,
     #endregion
 
     public enum VehicleCategory { MBT, IFV, ScoutHelicopter, AttackHelicopter, TransportHelicopter, AttackJet, StealthJet, Gunship }
+    public enum VehicleType { Air, Land }
 }

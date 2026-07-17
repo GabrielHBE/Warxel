@@ -7,10 +7,7 @@ public class EnterVehicle : InteractiveButton
 
     public override void Interact(PlayerController player)
     {
-
         player.ResetWeaponAnimation();
-        player.DisableNightVison();
-
         RequestEnterVehicle(player);
     }
 

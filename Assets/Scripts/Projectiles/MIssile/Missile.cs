@@ -1,12 +1,8 @@
-using UnityEngine;
-
 public class Missile : Projectile
 {
-    private bool hasExploded = false;
-
     public override void CreateProjectile(ProjectileProperties prop, ProjectileValues values)
     {
-        hasExploded = false;
+
         SetVisualsActive(true);
         Activate();
 
@@ -21,7 +17,7 @@ public class Missile : Projectile
 
     public override void LocalUpdate()
     {
-        if (isDespawning || hasExploded) return;
+        if (isDespawning) return;
         ProcessDamageDropoff();
     }
 
