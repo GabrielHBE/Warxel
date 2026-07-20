@@ -89,10 +89,6 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 
         SpawnExplosionEffect(contact_point);
 
-        Mod_DestroyAfterAll mod_DestroyAfterAll = collision.gameObject.GetComponentInParent<Mod_DestroyAfterAll>();
-        mod_DestroyAfterAll?.StartCoroutine(mod_DestroyAfterAll.FallUpperVoxels(voxCollider.destructionRadius, contact_point, true));
-
-
         RequestDespawn();
     }
     

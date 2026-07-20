@@ -1,5 +1,3 @@
-using UnityEngine;
-
 public class VoxelMaterials 
 {
     public enum VoxelMaterialType

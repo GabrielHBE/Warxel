@@ -539,14 +539,7 @@ public abstract class Vehicle : NetworkBehaviour,
         ContactPoint contact = collision.contacts[0];
         voxCollider.destructionRadius = Mathf.Clamp(destruction_force, 0, 30);
         voxCollider.SphereExplosion(contact.point, 0, 0);
-        ApplyFallUpperVoxels(collision, contact, voxCollider.destructionRadius);
         RequestDamage(voxCollider.destructionRadius / 2);
-    }
-
-    protected void ApplyFallUpperVoxels(Collision collision, ContactPoint contact, float explosionForce)
-    {
-        Mod_DestroyAfterAll mod = collision.gameObject.GetComponentInParent<Mod_DestroyAfterAll>();
-        if (mod != null) mod.StartCoroutine(mod.FallUpperVoxels(explosionForce, contact.point, true));
     }
 
     [ServerRpc(RequireOwnership = false)]
