@@ -1,7 +1,7 @@
 using System.Collections;
 using FishNet.Object;
 using UnityEngine;
-using VoxelDestructionPro.Tools;
+
 
 public class AirStrikeMissile : NetworkBehaviour
 {
@@ -10,13 +10,14 @@ public class AirStrikeMissile : NetworkBehaviour
 
     [Header("Settings")]
     [SerializeField] private GameObject trail;
-    [SerializeField] private VoxCollider voxCollider;
-
+ 
     [SerializeField] private GameObject explosion_effect;
 
     private float missileSpeed = 5f;
-    private float infantary_damage = 200;
-    private float vehicle_damage = 100;
+    private float infantryDamage = 200;
+    private float vehicleDamage = 100;
+    private float explosionDamageFalloff = 1;
+    private float destructionRadius = 10;
 
     [ObserversRpc]
     public void EnableMissile(Vector3 pos)
@@ -61,7 +62,8 @@ public class AirStrikeMissile : NetworkBehaviour
 
     private void ShephereExplosion()
     {
-        voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
+        Explosion.SphereExplosion(transform.position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, null);
+        //voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
     }
 
     public void Detonate()

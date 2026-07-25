@@ -27,9 +27,7 @@ public class LockInMissileController : MissileController
         base.Update();
 
         if (!IsOwner || !isActive) return;
-
-        print("Passou da trava de rede! Executando ProcessLockOn...");
-
+        
         ProcessLockOn();
         HandleLockingInSound();
     }
@@ -152,6 +150,7 @@ public class LockInMissileController : MissileController
         UpdateAmmoAfterShot();
     }
 
+    #if UnUNITY_EDITOR
     private void OnDrawGizmos()
     {
         if (lockInFowardReference == null) return;
@@ -216,5 +215,6 @@ public class LockInMissileController : MissileController
             $"Lock Radius: {lockRadius}\nMax Distance: {maxLockDistance}\nCan Shoot: {canShoot}"
         );
     }
+    #endif
 
 }

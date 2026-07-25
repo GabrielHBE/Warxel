@@ -9,7 +9,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public ClassManager.Class[] class_weapon;
     public FactionManager.Faction[] faction;
     public WeaponCategory category;
-    public SwitchWeapon.WeaponSlot weaponSlot;
     public int battle_coins_to_unlock;
     public int weapon_kills;
     public float current_attachment_points;

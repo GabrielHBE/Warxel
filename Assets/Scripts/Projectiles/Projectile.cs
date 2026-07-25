@@ -1,8 +1,6 @@
 using System.Collections;
 using FishNet.Object;
 using UnityEngine;
-using VoxelDestructionPro.Tools;
-using VoxelDestructionPro.VoxelObjects;
 
 public class Projectile : LocalPooledObject
 {
@@ -16,7 +14,6 @@ public class Projectile : LocalPooledObject
     [SerializeField] protected TrailRenderer trail;
     [SerializeField] protected ParticleSystem particle;
     [SerializeField] protected Rigidbody rb;
-    [SerializeField] protected VoxCollider voxCollider;
     [SerializeField] protected Light projectileLight;
 
     //Private variables
@@ -25,11 +22,13 @@ public class Projectile : LocalPooledObject
     protected float damageDropoff;
     protected float damageDropoffTimer;
     protected float minimumDamage;
+    protected float explosionDamageFalloff;
     protected float hsMultiplier;
     protected bool canDamageArmoredVehicles;
     protected float vehicleDamage;
     protected bool didRicochet;
     protected float timer;
+    protected float destructionRadius;
     protected float delaytoEnableForNonOwner;
     protected Vector3 lastPosition;
     protected Transform ignoredTransform;
@@ -59,21 +58,22 @@ public class Projectile : LocalPooledObject
     public class ProjectileValues
     {
         [Header("Damage Model")]
-        [SerializeField] public float infantryDamage;
-        [SerializeField] public float headshotMultiplier;
-        [SerializeField] public float vehicleDamage;
-        [SerializeField] public float damageDropoff;
-        [SerializeField] public float damageDropoffTimer;
-        [SerializeField] public float minimumDamage;
+        public float infantryDamage;
+        public float headshotMultiplier;
+        public float vehicleDamage;
+        public float damageDropoff;
+        public float damageDropoffTimer;
+        public float minimumDamage;
+        public float explosionDamageFalloff;
 
         [Header("Projectile Model")]
-        [SerializeField] public float muzzleVelocity;
-        [SerializeField] public float dropMultiplier;
-        [SerializeField] public bool canDamageVehicles;
-        [SerializeField] public float delaytoEnableForNonOwner;
+        public float muzzleVelocity;
+        public float dropMultiplier;
+        public bool canDamageVehicles;
+        public float delaytoEnableForNonOwner;
 
         [Header("Destruction")]
-        [SerializeField] public float destructionForce;
+        public float destructionRadius;
     }
     #endregion
 
@@ -118,8 +118,8 @@ public class Projectile : LocalPooledObject
     protected void SetProjectileValues(ProjectileValues values)
     {
         delaytoEnableForNonOwner = values.delaytoEnableForNonOwner == 0 ? 0.01f : values.delaytoEnableForNonOwner;
-        voxCollider.destructionRadius = values.destructionForce;
         infantryDamage = values.infantryDamage;
+        destructionRadius = values.destructionRadius;
         damageDropoff = values.damageDropoff;
         damageDropoffTimer = values.damageDropoffTimer;
         minimumDamage = values.minimumDamage;
@@ -127,6 +127,7 @@ public class Projectile : LocalPooledObject
         canDamageArmoredVehicles = values.canDamageVehicles;
         vehicleDamage = values.vehicleDamage;
         bulletDropMultiplier = values.dropMultiplier;
+        explosionDamageFalloff = values.explosionDamageFalloff;
     }
 
     protected virtual void SetProjectileProperties(ProjectileProperties prop)
@@ -188,13 +189,7 @@ public class Projectile : LocalPooledObject
         if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
         {
             ProcessVoxelCollision(collider, hitPoint);
-            VoxelObjBase voxelObj = hitObject.GetComponent<VoxelObjBase>();
-            if (voxelObj != null)
-            {
-                VoxelMaterials.VoxelMaterialType material = voxelObj.material;
-                hitEffects.VoxelHitEffect(hitPoint, material);
-                soundEffects.RequestVoxelHitSound(hitPoint, material);
-            }
+
         }
 
         if (hitObject.layer == LayerMask.NameToLayer("Ground"))
@@ -236,21 +231,29 @@ public class Projectile : LocalPooledObject
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
     }
 
-    private void ProcessVoxelCollision(Collider collision, Vector3 position)
+    private void ProcessVoxelCollision(Collider collider, Vector3 position)
     {
-        if (voxCollider.destructionRadius > 2)
+        
+        VoxelObj voxelObj = collider.gameObject.GetComponent<VoxelObj>();
+        if (voxelObj != null)
         {
-            voxCollider.SphereExplosion(position, infantryDamage, vehicleDamage);
+            VoxelObj.VoxelMaterialType material = voxelObj.voxelMaterialType;
+            hitEffects.VoxelHitEffect(position, material);
+            soundEffects.RequestVoxelHitSound(position, material);
         }
-        else
-        {
-            voxCollider.Collide(collision);
-        }
+        
+
+        VoxelDestruction VoxelPartialCollapse = collider.GetComponent<VoxelDestruction>();
+        if (VoxelPartialCollapse != null) VoxelPartialCollapse.Damage(infantryDamage / 2);
+
+        if (destructionRadius > 2) Explosion.SphereExplosion(position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, shootRoot);
+
     }
 
     private void ProcessGroundCollision(Vector3 pos)
     {
-        voxCollider.SphereExplosion(pos, infantryDamage, vehicleDamage);
+        Explosion.SphereExplosion(pos, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, shootRoot);
+        //voxCollider.SphereExplosion(pos, infantryDamage, vehicleDamage);
     }
     #endregion
 

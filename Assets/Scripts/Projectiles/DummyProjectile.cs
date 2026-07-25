@@ -1,6 +1,5 @@
 using System.Collections;
 using UnityEngine;
-using VoxelDestructionPro.VoxelObjects; // Necessário para os materiais do voxel
 
 public class DummyProjectile : LocalPooledObject
 {
@@ -73,13 +72,16 @@ public class DummyProjectile : LocalPooledObject
 
         if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
         {
+            /*
             VoxelObjBase voxelObj = hitObject.GetComponent<VoxelObjBase>();
             if (voxelObj != null)
-            {}
+            {
                 VoxelMaterials.VoxelMaterialType material = voxelObj.material;
                 if (hitEffects != null) hitEffects.VoxelHitEffect(hitPoint, material);
                 if (soundEffects != null) soundEffects.RequestVoxelHitSound(hitPoint, material);
-            
+            }
+            */
+
         }
 
         if (hitObject.layer == LayerMask.NameToLayer("Vehicle"))
@@ -118,7 +120,7 @@ public class DummyProjectile : LocalPooledObject
 
     public override void LocalFixedUpdate()
     {
-        if(!isSetup) return;
+        if (!isSetup) return;
 
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
         ProcessRaycastHitValidation();

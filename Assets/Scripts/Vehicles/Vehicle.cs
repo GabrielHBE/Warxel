@@ -6,7 +6,6 @@ using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using VoxelDestructionPro.Tools;
 
 public abstract class Vehicle : NetworkBehaviour,
     //Interfaces
@@ -35,7 +34,6 @@ public abstract class Vehicle : NetworkBehaviour,
     public Rigidbody rb;
     public EnterVehicle enterVehicle;
     [SerializeField] protected GameObject fire_effects_parent;
-    [SerializeField] protected VoxCollider voxCollider;
     [SerializeField] protected GameObject crash_explosion;
     [SerializeField] protected GameObject ground_explosion;
     public Countermeasures countermeasures;
@@ -61,6 +59,8 @@ public abstract class Vehicle : NetworkBehaviour,
     [Header("Physics & Collision")]
     [SerializeField] protected LayerMask collisionLayers;
     [HideInInspector] public float speed;
+    protected float destructionRadius = 10;
+
 
     protected bool _isDestructionInitialized = false;
     protected float _destructionTimer = 0f;
@@ -350,7 +350,7 @@ public abstract class Vehicle : NetworkBehaviour,
     [TargetRpc]
     private void TargetRpx(NetworkConnection conn, string message, float duration)
     {
-        GeneralHudAlertMessages.Instance.CreateMessage(message, duration);
+        AlertMessages.Instance.CreateMessage(message, duration);
     }
 
     [TargetRpc] private void TargetDisableEnterVehicleUI(NetworkConnection conn) => enterVehicle.gameObject.SetActive(false);
@@ -537,9 +537,10 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (destruction_force < 10) return;
         ContactPoint contact = collision.contacts[0];
-        voxCollider.destructionRadius = Mathf.Clamp(destruction_force, 0, 30);
-        voxCollider.SphereExplosion(contact.point, 0, 0);
-        RequestDamage(voxCollider.destructionRadius / 2);
+        destructionRadius = Mathf.Clamp(destruction_force, 0, 30);
+        Explosion.SphereExplosion(contact.point, 0, 0, destructionRadius, 0, null, gameObject);
+        //voxCollider.SphereExplosion(contact.point, 0, 0);
+        RequestDamage(destructionRadius / 2);
     }
 
     [ServerRpc(RequireOwnership = false)]

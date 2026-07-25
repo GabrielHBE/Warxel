@@ -1247,7 +1247,7 @@ public class PlayerLoadoutCustomization : MonoBehaviour
         playerSpeedModifierText.text = wp.speed_change.ToString("F0");
         zoomText.text = "x" + wp.zoom.ToString("F1");
         fireModesText.text = string.Join(" / ", wp.firing.fireModes);
-        destructionForceText.text = wp.projectileValues.destructionForce.ToString("F0");
+        destructionForceText.text = wp.projectileValues.destructionRadius.ToString("F0");
         damageText.text = wp.projectileValues.infantryDamage.ToString("F1");
         minimumDamageText.text = wp.projectileValues.minimumDamage.ToString("F1");
         vehicleBaseDamageText.text = wp.projectileValues.vehicleDamage.ToString("F1");

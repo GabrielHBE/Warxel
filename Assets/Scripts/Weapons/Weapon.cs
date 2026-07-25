@@ -197,7 +197,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             reserveAmmo))
         {
             if (reserveAmmo == 0)
-                GeneralHudAlertMessages.Instance.CreateMessage("Cant reload", 2);
+                AlertMessages.Instance.CreateMessage("Cant reload", 2);
             return;
         }
 
@@ -311,7 +311,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         // Check if ammo is empty for alert
         if (pressShoot && weaponProperties.reloadValues.mags[^1] == 0)
         {
-            GeneralHudAlertMessages.Instance.CreateMessage("Not enough ammo", 2);
+            AlertMessages.Instance.CreateMessage("Not enough ammo", 2);
             return;
         }
 

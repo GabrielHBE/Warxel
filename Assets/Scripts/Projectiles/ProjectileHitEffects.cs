@@ -25,29 +25,29 @@ public class ProjectileHitEffects : MonoBehaviour
     }
 
     #region Playe Effect Methods
-    public void VoxelHitEffect(Vector3 position, VoxelMaterials.VoxelMaterialType material)
+    public void VoxelHitEffect(Vector3 position, VoxelObj.VoxelMaterialType material)
     {
         switch (material)
         {
-            case VoxelMaterials.VoxelMaterialType.Glass:
+            case VoxelObj.VoxelMaterialType.Glass:
                 GlassHitEffect(position, Quaternion.identity);
                 break;
-            case VoxelMaterials.VoxelMaterialType.Metal:
+            case VoxelObj.VoxelMaterialType.Metal:
                 MetalHitEffect(position, Quaternion.identity);
                 break;
-            case VoxelMaterials.VoxelMaterialType.Wood:
+            case VoxelObj.VoxelMaterialType.Wood:
                 WoodHitEffect(position, Quaternion.identity);
                 break;
-            case VoxelMaterials.VoxelMaterialType.Concrete:
+            case VoxelObj.VoxelMaterialType.Concrete:
                 ConcreteHitEffect(position, Quaternion.identity);
                 break;
-            case VoxelMaterials.VoxelMaterialType.Sand:
+            case VoxelObj.VoxelMaterialType.Sand:
                 SandHitEffect(position, Quaternion.identity);
                 break;
-            case VoxelMaterials.VoxelMaterialType.Dirt:
+            case VoxelObj.VoxelMaterialType.Dirt:
                 DirtHitEffect(position, Quaternion.identity);
                 break;
-            case VoxelMaterials.VoxelMaterialType.SoftBody:
+            case VoxelObj.VoxelMaterialType.SoftBody:
                 SoftBodyHitEffect(position, Quaternion.identity);
                 break;
         }

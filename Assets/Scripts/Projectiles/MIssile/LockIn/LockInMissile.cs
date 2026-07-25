@@ -91,9 +91,10 @@ public class LockInMissile : Missile
         Debug.Log("Missile exploding after being fooled by flare!");
         
         // Dispara a explosão no local atual do míssil
-        if (voxCollider != null && voxCollider.destructionRadius > 2)
+        if (destructionRadius > 2)
         {
-            voxCollider.SphereExplosion(transform.position, infantryDamage, vehicleDamage);
+            Explosion.SphereExplosion(transform.position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, gameObject);
+            //voxCollider.SphereExplosion(transform.position, infantryDamage, vehicleDamage);
         }
         
         // Toca efeitos de explosão

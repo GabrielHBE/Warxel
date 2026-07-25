@@ -37,11 +37,14 @@ public class CameraFollower : MonoBehaviour
             StartCoroutine(ResetRotation());
         }
 
+        transform.position = neck.transform.position;
+        /*
         transform.position = new Vector3(
                 neck.transform.position.x,
                 neck.transform.position.y + position,
                 neck.transform.position.z + 0.01f
             );
+        */
 
         // Atualiza os estados anteriores
         wasRolling = playerProperties.roll;

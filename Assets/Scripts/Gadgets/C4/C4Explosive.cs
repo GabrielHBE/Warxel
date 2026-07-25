@@ -1,6 +1,4 @@
 using UnityEngine;
-using VoxelDestructionPro.Tools;
-
 
 public class C4Explosive : MonoBehaviour
 {
@@ -8,16 +6,17 @@ public class C4Explosive : MonoBehaviour
     [SerializeField] private SoundManager.SoundComponents explosionSound;
 
     [Header("Damage")]
-    [SerializeField] private float infantary_damage;
-    [SerializeField] private float vehicle_damage;
+    [SerializeField] private float infantryDamage;
+    [SerializeField] private float vehicleDamage;
+    [SerializeField] private float explosionDamageFalloff = 1;
+    [SerializeField] private float destructionRadius = 10;
 
     [Header("References")]
-    [SerializeField] VoxCollider voxCollider;
     [SerializeField] private GameObject smokeEffect;
     [SerializeField] private C4Detonator c4;
     [SerializeField] private GameObject throw_hand;
     [SerializeField] private GameObject throw_hand_original_pos;
-    
+
 
 
     public float explosionRadius = 10f;
@@ -26,7 +25,8 @@ public class C4Explosive : MonoBehaviour
 
     public void Detonate()
     {
-        voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
+        Explosion.SphereExplosion(transform.position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, gameObject);
+        //voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
 
         Instantiate(smokeEffect, transform.position, Quaternion.identity);
 

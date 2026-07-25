@@ -123,7 +123,7 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
         // Check if ammo is empty for alert
         if (pressShoot && GetCurrentMagAmmo() == 0)
         {
-            // Optional: Show alert message
+            AlertMessages.Instance.CreateMessage("Not enought Ammo");
             return;
         }
 
@@ -242,11 +242,8 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     {
         int reserveAmmo = GetTotalReserveAmmo();
 
-        if (reserveAmmo == 0 || !isReloading.Value)
-        {
-            return;
-        }
-
+        if (reserveAmmo == 0 || !isReloading.Value) return;
+        
         if (!properties.reloadValues.isSingleReload)
         {
             HandleStandardReload();

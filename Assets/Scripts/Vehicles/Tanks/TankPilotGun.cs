@@ -21,7 +21,6 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
     private Quaternion gunnerGunOriginalLocalRotation;
     private bool isGunnerGunRecoiling = false;
     private Coroutine gunnerGunRecoilCoroutine;
-    private bool wasFiringThisFrame = false;
 
     void Awake()
     {

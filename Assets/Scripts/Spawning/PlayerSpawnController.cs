@@ -167,7 +167,7 @@ public class PlayerSpawnController : NetworkBehaviour
 
         if (reespawn_delay > 0)
         {
-            GeneralHudAlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
+            AlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
             return;
         }
 
@@ -184,13 +184,13 @@ public class PlayerSpawnController : NetworkBehaviour
 
         if (reespawn_delay > 0)
         {
-            GeneralHudAlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
+            AlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
             return;
         }
 
         if (PlayerLoadoutCustomization.Instance.selected_primary == null)
         {
-            GeneralHudAlertMessages.Instance.CreateMessage("Select a primary gun to deploy");
+            AlertMessages.Instance.CreateMessage("Select a primary gun to deploy");
             return;
         }
 
@@ -338,7 +338,7 @@ public class PlayerSpawnController : NetworkBehaviour
 
         if (reespawn_delay > 0)
         {
-            GeneralHudAlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
+            AlertMessages.Instance.CreateMessage("Spawn delay: " + reespawn_delay.ToString("F1") + "s", 1);
             return;
         }
 

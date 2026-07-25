@@ -47,7 +47,6 @@ public class Shell : Mag
     {
         if (hand_to_shell)
         {
-
             hand_to_weapon = true;
             HandToShell();
             hand_to_shell = false;

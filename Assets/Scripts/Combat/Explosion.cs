@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using VoxelDestructionPro.VoxelObjects;
 
 public static class Explosion
 {
@@ -16,70 +15,117 @@ public static class Explosion
     {
         Collider[] colliders = Physics.OverlapSphere(contactPoint, destructionRadius);
 
-        HashSet<Vehicle> processedVehicles = new HashSet<Vehicle>();
-        HashSet<PlayerController> processedPlayers = new HashSet<PlayerController>();
+        var processedVehicles = new HashSet<Vehicle>();
+        var processedPlayers = new HashSet<PlayerController>();
 
-        for (int i = 0; i < colliders.Length; i++)
+        foreach (Collider collider in colliders)
         {
-            Collider collider = colliders[i];
+            if (ShouldIgnoreCollider(collider, ignoreHitGameobject))
+                continue;
 
-            if (ignoreHitGameobject != null && collider.gameObject == ignoreHitGameobject) continue;
+            ProcessVehicleCollision(collider, contactPoint, shootRoot, destructionRadius, 
+                                    infantryDmg, vehicleDmg, damageFalloff, 
+                                    parentVehicle, processedVehicles);
 
-            if (collider.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
-            {
-                if (parentVehicle != null)
-                {
-                    if (collider.gameObject != parentVehicle.gameObject)
-                    {
-                        // Processar Vehicle
-                        Vehicle vehicle = collider.gameObject.GetComponent<Vehicle>() ?? collider.gameObject.GetComponentInParent<Vehicle>();
-                        if (vehicle != null && !processedVehicles.Contains(vehicle))
-                        {
-                            if (!vehicle.vehicle_destroyed.Value)
-                            {
-                                processedVehicles.Add(vehicle);
-                                ProcessHit.VehicleHit(vehicle, collider, contactPoint, shootRoot, infantryDmg, damageFalloff, destructionRadius);
-                            }
+            ProcessPlayerCollision(collider, contactPoint, shootRoot, destructionRadius, 
+                                   infantryDmg, damageFalloff, processedPlayers);
 
-                        }
-                    }
-                }
-                else
-                {
-                    // Processar Vehicle
-                    Vehicle vehicle = collider.gameObject.GetComponent<Vehicle>() ?? collider.gameObject.GetComponentInParent<Vehicle>();
-                    if (vehicle != null && !processedVehicles.Contains(vehicle))
-                    {
-                        if (!vehicle.vehicle_destroyed.Value)
-                        {
-                            processedVehicles.Add(vehicle);
-                            //ProcessVehicleDamage(vehicle, collider, contact_point, vehicle_dmg);
-                            ProcessHit.VehicleHit(vehicle, collider, contactPoint, shootRoot, vehicleDmg, damageFalloff, destructionRadius);
-                        }
-                    }
-                }
-            }
-
-            // Processar Player
-            if (collider.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
-            {
-                PlayerController player = collider.GetComponent<PlayerController>();
-                if (player != null && !processedPlayers.Contains(player))
-                {
-                    processedPlayers.Add(player);
-                    ProcessHit.PlayerHit(player, collider, contactPoint, shootRoot, infantryDmg, damageFalloff, destructionRadius);
-                }
-            }
-
-            if (collider.gameObject.layer == LayerMask.NameToLayer("Voxel"))
-            {
-                // Processar Voxels
-                DynamicVoxelObj vox = collider.GetComponentInParent<DynamicVoxelObj>();
-                if (vox != null)
-                {
-                    vox.AddDestruction_Sphere(contactPoint, destructionRadius);
-                }
-            }
+            ProcessVoxelCollision(collider, infantryDmg);
         }
+    }
+
+    public static void NoDamageSphereExplosion(
+        Vector3 contactPoint,
+        float infantryDmg,
+        float destructionRadius,
+        GameObject ignoreHitGameobject = null)
+    {
+        Collider[] colliders = Physics.OverlapSphere(contactPoint, destructionRadius);
+
+        foreach (Collider collider in colliders)
+        {
+            if (ShouldIgnoreCollider(collider, ignoreHitGameobject))
+                continue;
+
+            ProcessVoxelCollision(collider, infantryDmg);
+        }
+    }
+
+    private static bool ShouldIgnoreCollider(Collider collider, GameObject ignoreHitGameobject)
+    {
+        return ignoreHitGameobject != null && collider.gameObject == ignoreHitGameobject;
+    }
+
+    private static void ProcessVehicleCollision(
+        Collider collider,
+        Vector3 contactPoint,
+        GameObject shootRoot,
+        float destructionRadius,
+        float infantryDmg,
+        float vehicleDmg,
+        float damageFalloff,
+        GameObject parentVehicle,
+        HashSet<Vehicle> processedVehicles)
+    {
+        if (collider.gameObject.layer != LayerMask.NameToLayer("Vehicle"))
+            return;
+
+        Vehicle vehicle = GetVehicleComponent(collider);
+        if (vehicle == null || processedVehicles.Contains(vehicle) || vehicle.vehicle_destroyed.Value)
+            return;
+
+        processedVehicles.Add(vehicle);
+
+        float damage = ShouldUseVehicleDamage(parentVehicle, collider) ? vehicleDmg : infantryDmg;
+        ProcessHit.VehicleHit(vehicle, collider, contactPoint, shootRoot, damage, damageFalloff, destructionRadius);
+    }
+
+    private static bool ShouldUseVehicleDamage(GameObject parentVehicle, Collider collider)
+    {
+        return parentVehicle != null && collider.gameObject != parentVehicle.gameObject;
+    }
+
+    private static Vehicle GetVehicleComponent(Collider collider)
+    {
+        return collider.gameObject.GetComponent<Vehicle>() ?? collider.gameObject.GetComponentInParent<Vehicle>();
+    }
+
+    private static void ProcessPlayerCollision(
+        Collider collider,
+        Vector3 contactPoint,
+        GameObject shootRoot,
+        float destructionRadius,
+        float infantryDmg,
+        float damageFalloff,
+        HashSet<PlayerController> processedPlayers)
+    {
+        if (collider.gameObject.layer != LayerMask.NameToLayer("PlayerHitBox"))
+            return;
+
+        PlayerController player = collider.GetComponent<PlayerController>();
+        if (player == null || processedPlayers.Contains(player))
+            return;
+
+        processedPlayers.Add(player);
+        ProcessHit.PlayerHit(player, collider, contactPoint, shootRoot, infantryDmg, damageFalloff, destructionRadius);
+    }
+
+    private static void ProcessVoxelCollision(
+        Collider collider,
+        float infantryDmg)
+    {
+        if (collider.gameObject.layer != LayerMask.NameToLayer("Voxel"))
+            return;
+
+        TryApplyVoxelPartialCollapseDamage(collider, infantryDmg);
+    }
+
+
+
+    private static void TryApplyVoxelPartialCollapseDamage(Collider collider, float infantryDmg)
+    {
+        VoxelPartialCollapse collapse = collider.GetComponent<VoxelPartialCollapse>();
+        if (collapse != null)
+            collapse.Damage(infantryDmg / 2);
     }
 }

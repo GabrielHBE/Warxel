@@ -1,6 +1,5 @@
 using FishNet.Object;
 using UnityEngine;
-using VoxelDestructionPro.Tools;
 
 public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 {
@@ -10,7 +9,6 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
     [Header("Properties")]
     [SerializeField] private Collider shell_collider;
     [SerializeField] private Rigidbody rb;
-    [SerializeField] private VoxCollider voxCollider;
     [SerializeField] private GameObject explosion_efect;
     
     [Header("Damage")]
@@ -81,7 +79,7 @@ public class TankMainShell : NetworkBehaviour, IsVehicleCustomizationPart
 
         }
 
-        voxCollider.SphereExplosion(contact_point, infantary_damage, vehicle_damage, ignoreGoInExplosion);
+        //voxCollider.SphereExplosion(contact_point, infantary_damage, vehicle_damage, ignoreGoInExplosion);
 
         shell_collider.enabled = false;
 

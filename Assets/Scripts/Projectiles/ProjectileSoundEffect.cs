@@ -72,19 +72,19 @@ public class ProjectileSoundEffect : MonoBehaviour
         }
     }
 
-    public void RequestVoxelHitSound(Vector3 pos, VoxelMaterials.VoxelMaterialType material)
+    public void RequestVoxelHitSound(Vector3 pos, VoxelObj.VoxelMaterialType material)
     {
         HitSoundType type = HitSoundType.Concrete;
 
         switch (material)
         {
-            case VoxelMaterials.VoxelMaterialType.Glass: type = HitSoundType.Glass; break;
-            case VoxelMaterials.VoxelMaterialType.Metal: type = HitSoundType.Metal; break;
-            case VoxelMaterials.VoxelMaterialType.Wood: type = HitSoundType.Wood; break;
-            case VoxelMaterials.VoxelMaterialType.Concrete: type = HitSoundType.Concrete; break;
-            case VoxelMaterials.VoxelMaterialType.Sand: type = HitSoundType.Sand; break;
-            case VoxelMaterials.VoxelMaterialType.Dirt: type = HitSoundType.Dirt; break;
-            case VoxelMaterials.VoxelMaterialType.SoftBody: type = HitSoundType.SoftBody; break;
+            case VoxelObj.VoxelMaterialType.Glass: type = HitSoundType.Glass; break;
+            case VoxelObj.VoxelMaterialType.Metal: type = HitSoundType.Metal; break;
+            case VoxelObj.VoxelMaterialType.Wood: type = HitSoundType.Wood; break;
+            case VoxelObj.VoxelMaterialType.Concrete: type = HitSoundType.Concrete; break;
+            case VoxelObj.VoxelMaterialType.Sand: type = HitSoundType.Sand; break;
+            case VoxelObj.VoxelMaterialType.Dirt: type = HitSoundType.Dirt; break;
+            case VoxelObj.VoxelMaterialType.SoftBody: type = HitSoundType.SoftBody; break;
         }
 
         PlayHitSound(type, pos);

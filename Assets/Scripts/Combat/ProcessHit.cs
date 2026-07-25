@@ -79,15 +79,11 @@ public static class ProcessHit
 
         CameraShake cameraShake = player.GetComponentInChildren<CameraShake>();
 
-        if (cameraShake != null)
-        {
-            cameraShake.RequestShake(damage / 10, 1f);
-        }
+        if (cameraShake != null)  cameraShake.RequestShake(damage / 10, 1f);
+        
 
-        if (playerProperties.is_dead.Value)
-        {
-            ProcessKill.ProcessInfantryKill(itemUsedToKill, false, playerProperties.player_name.Value);
-        }
+        if (playerProperties.is_dead.Value) ProcessKill.ProcessInfantryKill(itemUsedToKill, false, playerProperties.player_name.Value);
+        
     }
     #endregion
 

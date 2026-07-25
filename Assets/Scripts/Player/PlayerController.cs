@@ -345,7 +345,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             {
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
-                    GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
+                    AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                     return;
                 }
             }
@@ -389,7 +389,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         {
             if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer) && playerProperties.is_proned)
             {
-                GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
+                AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                 return;
             }
 
@@ -443,7 +443,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             {
                 if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
                 {
-                    GeneralHudAlertMessages.Instance.CreateMessage("Not Enough Space", 2);
+                    AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
                     return;
                 }
             }

@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEditor;
 using System.Linq;
 
+#if UNITY_EDITOR
+
 [CustomEditor(typeof(VoxelTerrain))]
 public class VoxelEditor : Editor
 {
@@ -769,3 +771,5 @@ public class VoxelEditor : Editor
         }
     }
 }
+
+#endif
