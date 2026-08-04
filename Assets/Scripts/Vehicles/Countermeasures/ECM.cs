@@ -2,10 +2,8 @@ using UnityEngine;
 
 public class ECM : Countermeasures
 {
-    protected override void  Update()
-    {
-        base.Update();
-        
+    public override void LocalUpdate()
+    {    
         if (reload_countermeasures_duration < 0) return;
 
         if (vehicle.used_locking_countermeasure == false)

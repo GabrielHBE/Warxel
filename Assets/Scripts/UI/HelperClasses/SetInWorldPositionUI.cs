@@ -8,11 +8,13 @@ public class SetInWorldPositionUI : MonoBehaviour
     {
         public RectTransform uiElement;
         public Transform worldPos;
+        public bool fowardPosition;
 
-        public UIWorldMapping(RectTransform uiElement, Transform worldPos)
+        public UIWorldMapping(RectTransform uiElement, Transform worldPos, bool fowardPosition)
         {
             this.uiElement = uiElement;
             this.worldPos = worldPos;
+            this.fowardPosition = fowardPosition;
         }
     }
 
@@ -80,7 +82,11 @@ public class SetInWorldPositionUI : MonoBehaviour
                 continue;
             }
 
-            Vector3 screenPoint = Camera.main.WorldToScreenPoint(map.worldPos.position);
+            Vector3 screenPoint = Camera.main.WorldToScreenPoint(
+                map.fowardPosition ?
+                map.worldPos.position + map.worldPos.forward * 50 :
+                map.worldPos.position
+            );
 
             if (screenPoint.z > 0)
             {
@@ -97,9 +103,9 @@ public class SetInWorldPositionUI : MonoBehaviour
     /// <summary>
     /// Permite que outros scripts (como FlagsUI e InteractiveButtonUI) registrem elementos gerados via código.
     /// </summary>
-    public void AddElement(RectTransform uiElement, Transform posicaoMundo)
+    public void AddElement(RectTransform uiElement, Transform worldPosition, bool fowardPosition)
     {
-        if (uiElement == null || posicaoMundo == null) return;
-        elements.Add(new UIWorldMapping(uiElement, posicaoMundo));
+        if (uiElement == null || worldPosition == null) return;
+        elements.Add(new UIWorldMapping(uiElement, worldPosition, fowardPosition));
     }
 }

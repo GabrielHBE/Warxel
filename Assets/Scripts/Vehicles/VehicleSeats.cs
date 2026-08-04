@@ -45,7 +45,6 @@ public class VehicleSeats
                 currentArmory = vehicleArmory[0].GetComponent<IVehicleArmory>();
                 currentArmory.ActivateArmory();
             }
-
         }
 
         this.playerProperties = playerProperties;
@@ -57,7 +56,7 @@ public class VehicleSeats
         soldierHudManager = playerController.soldierHudManager;
         this.playerProperties.is_in_vehicle = true;
         thirdPersonArms = playerController.GetComponentInChildren<ThirdPersonArms>();
-    
+
         //if (playerAnimation != null) playerAnimation.SetVehicleIKTargets(vehicleLeftHandTarget, vehicleRightHandTarget);
 
         this.playerRigidbody.isKinematic = true;
@@ -87,21 +86,12 @@ public class VehicleSeats
             seatHUD.SetActive(true);
         }
 
-        if (seatCamera != null)
-        {
-            activeCamera = seatCamera;
-            seatCamera.enabled = true;
-            seatCamera.GetComponent<AudioListener>().enabled = true;
+        activeCamera = seatCamera;
+        seatCamera.enabled = true;
+        seatCamera.GetComponent<AudioListener>().enabled = true;
 
-            playerController.playerCamera.enabled = false;
-            playerController.playerCamera.GetComponent<AudioListener>().enabled = false;
-        }
-        else
-        {
-            activeCamera = playerCamera;
-            playerController.playerCamera.enabled = true;
-            playerController.playerCamera.GetComponent<AudioListener>().enabled = true;
-        }
+        playerController.playerCamera.enabled = false;
+        playerController.playerCamera.GetComponent<AudioListener>().enabled = false;
 
         isOccupied = true;
 

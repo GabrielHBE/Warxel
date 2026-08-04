@@ -199,20 +199,13 @@ public class AttatchmentManager : MonoBehaviour
         for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
 
-            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value += grip.vertical_recoil_change;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
-
-            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value += grip.horizontal_recoil_change;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         wp.current_attachment_points += grip.points;
@@ -230,20 +223,13 @@ public class AttatchmentManager : MonoBehaviour
         for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
-
-            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value += barrel.vertical_recoil_change;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value += barrel.horizontal_recoil_change;
 
-            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         wp.current_attachment_points += barrel.points;
@@ -344,20 +330,12 @@ public class AttatchmentManager : MonoBehaviour
         for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].verticalRecoil += grip.vertical_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].verticalRecoil -= grip.vertical_recoil_change;
-
-            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value -= grip.vertical_recoil_change;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].horizontalRecoil += grip.horizontal_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].horizontalRecoil -= grip.horizontal_recoil_change;
-
-            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value -= grip.horizontal_recoil_change;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         wp.current_attachment_points -= grip.points;
@@ -377,20 +355,13 @@ public class AttatchmentManager : MonoBehaviour
         for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            if (wp.recoilValues.recoilPattern[i].verticalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].verticalRecoil += barrel.vertical_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].verticalRecoil -= barrel.vertical_recoil_change;
-
-            wp.recoilValues.recoilPattern[i].verticalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value -= barrel.vertical_recoil_change;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            if (wp.recoilValues.recoilPattern[i].horizontalRecoil < 0)
-                wp.recoilValues.recoilPattern[i].horizontalRecoil += barrel.horizontal_recoil_change;
-            else
-                wp.recoilValues.recoilPattern[i].horizontalRecoil -= barrel.horizontal_recoil_change;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value -= barrel.horizontal_recoil_change;
 
-            wp.recoilValues.recoilPattern[i].horizontalRecoil = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
         wp.current_attachment_points -= barrel.points;

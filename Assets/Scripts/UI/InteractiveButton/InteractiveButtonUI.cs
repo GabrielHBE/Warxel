@@ -48,7 +48,7 @@ public class InteractiveButtonUI : MonoBehaviour
 
         uiObject.SetInteractiDesciption(interactiveButton.GetInteractionButtonText());
 
-        setInWorldPositionUI.AddElement(element.Rect, element.InteractiveButton.transform);
+        setInWorldPositionUI.AddElement(element.Rect, element.InteractiveButton.transform, false);
     }
 
 }

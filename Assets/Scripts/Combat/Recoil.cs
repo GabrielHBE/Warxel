@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class Recoil
 {
-    public const float MIN_RECOIL_VALUE = -10;
+    public const float MIN_RECOIL_VALUE = 0;
     public const float MAX_RECOIL_VALUE = 10;
 
     public const float MIN_FIRTSHOTINCREASER_VALUE = 0;
@@ -30,8 +30,6 @@ public static class Recoil
             finalVertical *= finalfirstShotMultiplier;
             finalHorizontal *= finalfirstShotMultiplier;
         }
-        finalVertical = System.Math.Clamp(finalVertical, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
-        finalHorizontal = System.Math.Clamp(finalHorizontal, MIN_RECOIL_VALUE, MAX_RECOIL_VALUE);
 
         return (finalVertical, finalHorizontal);
     }
@@ -68,11 +66,25 @@ public static class Recoil
         return ((horizontal + vertical) / 5) * (Random.value > 0.5f ? 1f : -1f);
     }
 
+    public static float GetHorizontalRecoilDirection(HorizontalRecoil horizontalRecoil)
+    {
+        if(horizontalRecoil.type == HorizontalRecoilType.Left) return horizontalRecoil.value * -1;
+        
+        return horizontalRecoil.value;
+    }
+
+    public static float GetVerticalRecoilDirection(VerticalRecoil verticalRecoil)
+    {
+        if(verticalRecoil.type == VerticalRecoilType.Down) return verticalRecoil.value * -1;
+        
+        return verticalRecoil.value;
+    }
+
     [System.Serializable]
     public struct RecoilPattern
     {
-        [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float verticalRecoil;
-        [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float horizontalRecoil;
+        public HorizontalRecoil horizontalRecoil;
+        public VerticalRecoil verticalRecoil;
     }
 
     [System.Serializable]
@@ -82,12 +94,8 @@ public static class Recoil
         public float resetRecoilSpeed;
         public float applyRecoilSpeed;
         public Vector3 visual_recoil;
-        [Range(MIN_FIRTSHOTINCREASER_VALUE, MAX_FIRTSHOTINCREASER_VALUE)]
-        public float firstShootRecoilMultiplier = 1;
+        [Range(MIN_FIRTSHOTINCREASER_VALUE, MAX_FIRTSHOTINCREASER_VALUE)] public float firstShootRecoilMultiplier = 1;
         public RecoilPattern[] recoilPattern = new RecoilPattern[1];
-        [HideInInspector] public float horizontalRecoilMedia;
-        [HideInInspector] public float verticalRecoilMedia;
-
         public void CalculateRecoilSpeed(float interval)
         {
             if (manualCalculateRecoil) return;
@@ -96,19 +104,22 @@ public static class Recoil
             applyRecoilSpeed = interval / 2;
 
         }
-
-        float horizonalMedia = 0;
-        float verticalMedia = 0;
-        public void CalculateRecoilMedia()
-        {
-
-            for (int i = 0; i < recoilPattern.Length; i++)
-            {
-                horizonalMedia = recoilPattern[i].horizontalRecoil;
-                verticalMedia = recoilPattern[i].verticalRecoil;
-            }
-            verticalRecoilMedia = verticalMedia / recoilPattern.Length;
-            horizontalRecoilMedia = horizonalMedia / recoilPattern.Length;
-        }
     }
+
+    [System.Serializable]
+    public struct HorizontalRecoil
+    {
+        [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float value;
+        public HorizontalRecoilType type;
+    }
+
+    [System.Serializable]
+    public struct VerticalRecoil
+    {
+        [Range(MIN_RECOIL_VALUE, MAX_RECOIL_VALUE)] public float value;
+        public VerticalRecoilType type;
+    }
+
+    public enum HorizontalRecoilType { Left, Right }
+    public enum VerticalRecoilType { Up, Down }
 }

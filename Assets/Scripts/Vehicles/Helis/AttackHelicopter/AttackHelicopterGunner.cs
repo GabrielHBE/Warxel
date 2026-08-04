@@ -1,6 +1,7 @@
 using UnityEngine;
 using FishNet.Object;
 
+[RequireComponent(typeof(AttackHelicopterGunnerProperties))]
 public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 {
     [SerializeField] private AttackHelicopter helicopter;
@@ -14,7 +15,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     // Estado Interno - Visual
     private float current_spread;
     private Vector3 shakeOffset;
-    private float current_camera = 1;
+    private bool usingGunCamera = false;
     private bool isActive = true;
 
     // Rotação acumulada (Para espelhar o PlayerController e evitar bugs com shakeOffset)
@@ -45,6 +46,8 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     void Update()
     {
         if (!IsOwner) return;
+
+        print(IsOwner);
 
         if (!isActive)
         {
@@ -89,20 +92,16 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.HELICOPTER_switch_camera_key))
         {
-            current_camera += 1;
-            if (current_camera > 2)
-            {
-                current_camera = 1;
-            }
+            usingGunCamera = !usingGunCamera;
 
-            if (current_camera == 1)
+            if (usingGunCamera)
             {
-                helicopter.currentSeat.playerController.playerCamera.enabled = true;
+                helicopter.currentSeat.seatCamera.enabled = true;
                 gunnerGunCamera.enabled = false;
             }
             else
             {
-                helicopter.currentSeat.playerController.playerCamera.enabled = false;
+                helicopter.currentSeat.seatCamera.enabled = false;
                 gunnerGunCamera.enabled = true;
             }
         }
@@ -169,8 +168,8 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
             recoil_position_in_array = 0;
         }
 
-        float vr = properties.recoilValues.recoilPattern[recoil_position_in_array].verticalRecoil;
-        float hr = properties.recoilValues.recoilPattern[recoil_position_in_array].horizontalRecoil;
+        float vr = Recoil.GetVerticalRecoilDirection(properties.recoilValues.recoilPattern[recoil_position_in_array].verticalRecoil);
+        float hr = Recoil.GetHorizontalRecoilDirection(properties.recoilValues.recoilPattern[recoil_position_in_array].horizontalRecoil);
 
         var recoil = Recoil.CalculateCameraRecoil(
             vr,
@@ -311,7 +310,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     public void DeactivateArmory()
     {
-        current_camera = 2;
+        usingGunCamera = false;
         gunnerGunCamera.enabled = false;
         isActive = false;
         helicopter.currentSeat.playerController.playerCamera.enabled = true;

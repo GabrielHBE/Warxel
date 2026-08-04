@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FishNet.Component.Transforming;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[RequireComponent(typeof(Rigidbody)), RequireComponent(typeof(NetworkTransform))]
 public abstract class Vehicle : NetworkBehaviour,
     //Interfaces
     ISspottable, ICurrentHpUIValues, ICountermeasuresStatusUIValues, IGunHeatLevelUIValues,
@@ -19,7 +21,6 @@ public abstract class Vehicle : NetworkBehaviour,
     [Header("General Settings")]
     public VehicleCategory vehicleCategory;
     public FactionManager.Faction vehicle_faction;
-    public VehicleCustomizableParts[] customizableParts;
     public VehicleType vehicleType;
     public Transform spot_position;
     public int vehicle_kills;
@@ -34,8 +35,7 @@ public abstract class Vehicle : NetworkBehaviour,
     public Rigidbody rb;
     public EnterVehicle enterVehicle;
     [SerializeField] protected GameObject fire_effects_parent;
-    [SerializeField] protected GameObject crash_explosion;
-    [SerializeField] protected GameObject ground_explosion;
+    [SerializeField] protected GameObject crashExplosion;
     public Countermeasures countermeasures;
 
     [Header("Crash Sound Properties")]
@@ -60,31 +60,29 @@ public abstract class Vehicle : NetworkBehaviour,
     [SerializeField] protected LayerMask collisionLayers;
     [HideInInspector] public float speed;
     protected float destructionRadius = 10;
-
-
     protected bool _isDestructionInitialized = false;
     protected float _destructionTimer = 0f;
-
-
     protected float _lastSentThrottle = -1f;
     protected float _throttleUpdateTimer = 0f;
     protected const float THROTTLE_THRESHOLD = 0.05f;
     protected const float THROTTLE_UPDATE_INTERVAL = 0.1f;
 
     #region Unity Lifecycle
+    void Awake()
+    {
+        countermeasures?.SetVehicle(this);
+        SetupRigidBody();
+    }
     protected virtual void Update()
     {
+        CountermeasuresUpdate();
         // Roda animação de destruição no servidor caso o dono tenha caído
-        if (!Owner.IsValid && vehicle_destroyed.Value && IsServerInitialized)
-        {
-            HandleDestructionSequence();
-        }
+        if (!Owner.IsValid && vehicle_destroyed.Value && IsServerInitialized) HandleDestructionSequence();
 
         speed = rb.linearVelocity.magnitude;
 
         if (is_in_vehicle)
         {
-
             // Validação de jogador
             if (currentSeat == null || currentSeat.playerGameObject == null || (currentSeat.playerProperties != null && currentSeat.playerProperties.is_dead.Value))
             {
@@ -98,7 +96,6 @@ public abstract class Vehicle : NetworkBehaviour,
             HandleShooting();
         }
     }
-
     protected virtual void FixedUpdate()
     {
         if (!Owner.IsValid && IsServerInitialized)
@@ -116,14 +113,13 @@ public abstract class Vehicle : NetworkBehaviour,
             return;
         }
 
-        if (!is_in_vehicle)
-            HandleEmptyVehicle();
-        else if (!startEngine.Value)
+        //if (!is_in_vehicle)
+        //    HandleEmptyVehicle();
+        if (!startEngine.Value)
             HandleEngineOff();
         else
             HandleEngineOn();
     }
-
     protected virtual void OnCollisionEnter(Collision collision)
     {
         PlayerDamage(collision.gameObject);
@@ -143,7 +139,6 @@ public abstract class Vehicle : NetworkBehaviour,
             HandleCollision(collision, rb.linearVelocity.magnitude);
         }
     }
-
     protected void OnCollisionStay(Collision collision)
     {
         if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers))
@@ -175,7 +170,6 @@ public abstract class Vehicle : NetworkBehaviour,
 
         if (InputManager.GetKeyDown(KeyCode.P)) RequestDamage(100);
     }
-
     protected virtual void HandleShooting()
     {
         if (vehicle_destroyed.Value) return;
@@ -185,24 +179,17 @@ public abstract class Vehicle : NetworkBehaviour,
             currentSeat.currentArmory.Shoot();
         }
     }
-
     protected virtual void HandleEmptyVehicle()
     {
         throttle.Value = 0;
         AddForceDown();
     }
-
     protected virtual void HandleEngineOff()
     {
         throttle.Value = 0;
         AddForceDown();
     }
-
-    protected void AddForceDown(float multiplier = 1)
-    {
-        rb.AddForce(Vector3.down * rb.mass * multiplier, ForceMode.Force);
-    }
-
+    protected void AddForceDown(float multiplier = 1) => rb.AddForce(Vector3.down * rb.mass * multiplier, ForceMode.Force);
     protected abstract void HandleEngineOn();
     protected abstract void OnDestructionPhysicsTick(float timer);
     protected abstract void StartStopEngine();
@@ -371,9 +358,6 @@ public abstract class Vehicle : NetworkBehaviour,
             _player.GetComponent<Rigidbody>(),
             _player
         );
-
-        if (countermeasures != null && Settings.Instance != null)
-            countermeasures.SetUseCountermeasureKey(Settings.Instance._keybinds.VEHICLE_countermeasureKey);
     }
 
     protected virtual void ExitVehicle()
@@ -523,7 +507,6 @@ public abstract class Vehicle : NetworkBehaviour,
             gameObject.GetComponent<PlayerController>()?.RequestDamage(rb.linearVelocity.magnitude * 10);
         }
     }
-
     [ServerRpc(RequireOwnership = false)]
     public void RequestDamage(float damage)
     {
@@ -532,7 +515,6 @@ public abstract class Vehicle : NetworkBehaviour,
         hp.Value -= effectiveDamage;
         if (hp.Value <= 0) vehicle_destroyed.Value = true;
     }
-
     protected void HandleCollision(Collision collision, float destruction_force)
     {
         if (destruction_force < 10) return;
@@ -542,9 +524,8 @@ public abstract class Vehicle : NetworkBehaviour,
         //voxCollider.SphereExplosion(contact.point, 0, 0);
         RequestDamage(destructionRadius / 2);
     }
-
     [ServerRpc(RequireOwnership = false)]
-    protected void RequestToExplode(Vector3 contact_point, Vector3 contact_normal, LayerMask layer, float explosionForce)
+    protected void RequestToExplode(Vector3 contact_point)
     {
         foreach (VehicleSeats seat in vehicleSeats)
         {
@@ -554,9 +535,8 @@ public abstract class Vehicle : NetworkBehaviour,
                 TargetForceExitAndDamage(conn);
             }
         }
-        CmdExplode(contact_point, contact_normal, layer, explosionForce);
+        CmdExplode(contact_point);
     }
-
     [TargetRpc]
     private void TargetForceExitAndDamage(NetworkConnection conn)
     {
@@ -564,30 +544,25 @@ public abstract class Vehicle : NetworkBehaviour,
             currentSeat.playerController.RequestDamage(100);
         ExitVehicle();
     }
-
     [ObserversRpc]
-    private void CmdExplode(Vector3 contact_point, Vector3 contact_normal, LayerMask layer, float explosionForce)
+    private void CmdExplode(Vector3 contact_point)
     {
         if (did_explode) return;
         did_explode = true;
         SoundManager.Play3dSoundLocal(crashSound.clip, crashSound.properties, contact_point);
-        GameObject prefabToSpawn = layer == LayerMask.NameToLayer("Ground") ? ground_explosion : crash_explosion;
-        Instantiate(prefabToSpawn, contact_point, Quaternion.identity);
+        Instantiate(crashExplosion, contact_point, Quaternion.identity);
         RequestDespawn();
     }
-
     public virtual void Explode(Vector3 contact_point, Vector3 contact_normal, LayerMask layer, float explosionForce)
     {
         if (!IsOwner && !IsServerInitialized) return;
-        RequestToExplode(contact_point, contact_normal, layer, explosionForce);
+        RequestToExplode(contact_point);
     }
-
     [ServerRpc(RequireOwnership = false)]
     private void RequestDespawn()
     {
         if (gameObject != null && gameObject.activeInHierarchy) Despawn(gameObject);
     }
-
     protected void SetHpProperties(float hp, float resistance)
     {
         original_hp = hp;
@@ -597,12 +572,22 @@ public abstract class Vehicle : NetworkBehaviour,
     #endregion
 
     #region Utilities & Weapons
-    protected virtual void UseCountermeasure() => countermeasures?.UseCountermeasure();
-    public Vector3 GetLinearVelocity() => rb.linearVelocity;
+    private void CountermeasuresUpdate()
+    {
+        countermeasures?.LocalUpdate();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_countermeasureKey) && is_in_vehicle && countermeasures.IsCooldownFinished() && currentSeat.seatType == VehicleSeats.SeatType.Pilot) countermeasures.UseCountermeasure();
+    }
+    protected void SetupRigidBody()
+    {
+        rb.mass = 2000;
+        rb.linearDamping = 1;
+        rb.angularDamping = 1;
+        rb.isKinematic = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+    }
     public string[] GetOccupantNames() => occupantsNames.ToArray();
     public void AddKill() => vehicle_kills++;
     public abstract float GetMinFov();
-
     protected virtual void SwitchWeapon()
     {
         if (currentSeat.vehicleArmory == null || currentSeat.vehicleArmory.Length == 0) return;
@@ -634,13 +619,11 @@ public abstract class Vehicle : NetworkBehaviour,
             }
         }
     }
-
     private int GetCurrentArmoryIndex()
     {
         int index = Array.FindIndex(currentSeat.vehicleArmory, item => item?.GetComponent<IVehicleArmory>() == currentSeat.currentArmory);
         return index == -1 ? 0 : index;
     }
-
     private void ChangeArmory(int index)
     {
         if (currentSeat.vehicleArmory[index] == null) return;
@@ -648,7 +631,6 @@ public abstract class Vehicle : NetworkBehaviour,
         currentSeat.currentArmory = currentSeat.vehicleArmory[index].GetComponent<IVehicleArmory>();
         currentSeat.currentArmory?.ActivateArmory();
     }
-
     protected bool IsInLayerMask(int layer, LayerMask layerMask) => layerMask == (layerMask | (1 << layer));
     public float GetHp() => hp.Value;
     public float GetResistance() => resistance.Value;
@@ -659,7 +641,6 @@ public abstract class Vehicle : NetworkBehaviour,
     public Transform GetSpotPosition() => spot_position;
     public float GetCurrentHp() => hp.Value;
     public float GetMaxHp() => original_hp;
-
     public virtual CountermeasuresStatusUI.CountermeasuresStatus GetCountermeasuresStatus()
     {
         if (countermeasures == null) return CountermeasuresStatusUI.CountermeasuresStatus.Ready;
@@ -667,7 +648,6 @@ public abstract class Vehicle : NetworkBehaviour,
         if (countermeasures.is_reloading) return CountermeasuresStatusUI.CountermeasuresStatus.Reloading;
         return CountermeasuresStatusUI.CountermeasuresStatus.Ready;
     }
-
     public virtual string GetCountermeasuresStatusText()
     {
         if (countermeasures == null) return "Ready";
@@ -675,7 +655,6 @@ public abstract class Vehicle : NetworkBehaviour,
         if (countermeasures.is_reloading) return $"Reloading... [{countermeasures.reload_countermeasures_duration:F0}]";
         return "Ready";
     }
-
     public virtual float GetMaxHeat() => currentSeat?.currentArmory?.GetMaxOverheat() ?? 0;
     public virtual float GetCurrentHeat() => currentSeat?.currentArmory?.GetHeatingLevel() ?? 0;
     public virtual string GetCurrentAmmo() => currentSeat?.currentArmory?.GetCurrentAmmo() ?? "";
@@ -691,7 +670,6 @@ public abstract class Vehicle : NetworkBehaviour,
             .Where(icon => icon != null)
             .ToList();
     }
-
     public virtual float GetCurrentSpeed() => rb.linearVelocity.magnitude;
     public virtual float GetMaxSpeed() => float.MaxValue;
     public virtual float GetCurrentThrottle() => throttle.Value;
@@ -699,6 +677,8 @@ public abstract class Vehicle : NetworkBehaviour,
     public int GetUpgradeLevel() => 1;
     #endregion
 
+    #region Enums
     public enum VehicleCategory { MBT, IFV, ScoutHelicopter, AttackHelicopter, TransportHelicopter, AttackJet, StealthJet, Gunship }
     public enum VehicleType { Air, Land }
+    #endregion
 }

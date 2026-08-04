@@ -38,7 +38,7 @@ public class SoundManager : NetworkBehaviour
 
     [Header("Configurações de Áudio (Atualizado Automatically)")]
     [SerializeField] private List<AudioClip> internalAudioList = new List<AudioClip>();
-    [SerializeField] private string rootFolder = "Assets/Sounds";
+    private string rootFolder = "Assets/Sounds";
 
     private readonly static Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
     private static readonly List<LoopAudio> loopAudioList = new List<LoopAudio>();

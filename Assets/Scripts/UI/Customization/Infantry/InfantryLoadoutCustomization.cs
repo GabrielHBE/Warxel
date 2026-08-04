@@ -1,0 +1,322 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+public class InfantryLoadoutCustomization : MonoBehaviour
+{
+    public static InfantryLoadoutCustomization Instance { get; private set; }
+
+    [Header("Prefabs")]
+    public ClassManager classManager;
+    [SerializeField] private GameObject playerPrefab;
+    public GameObject buttonPrefab;
+    public GameObject removeItemButtonPrefab;
+    public GameObject classButtonPrefab;
+    public GameObject loadoutOptionButtonPrefab;
+
+    [Header("UI Parents")]
+    [SerializeField] public GameObject customization_buttons_parent;
+    [SerializeField] public GameObject weaponStatusParent;
+    [SerializeField] public Transform classesParent;
+    [SerializeField] public Transform loadoutOptionsParent;
+    [SerializeField] public Transform weaponsGadgetsParent;
+    [SerializeField] public Transform currentItemParent;
+
+    [Header("UI Elements")]
+    [SerializeField] public TextMeshProUGUI class_description_text;
+    [SerializeField] public TextMeshProUGUI current_battle_coins_indicator;
+    [SerializeField] public Button buy_weapon_button;
+    [SerializeField] public Image class_selection_image;
+    [SerializeField] public Sprite lockedItemImage;
+    [SerializeField] public GameObject backButton;
+    [SerializeField] public GameObject updateLoadoutButton;
+    [SerializeField] public TextMeshProUGUI currentSelectionText;
+    [SerializeField] public Slider weaponsGadgetsSlider;
+
+    [Header("Selection Outline")]
+    [SerializeField] public Color selectedOutlineColor = Color.white;
+    [SerializeField] public float outlineWidth = 5f;
+
+    [Header("Weapon Customization Buttons")]
+    [SerializeField] public GameObject customizeWeaponButton;
+    [SerializeField] public GameObject customizeWeaponButtonBarrel;
+    [SerializeField] public GameObject customizeWeaponButtonSight;
+    [SerializeField] public GameObject customizeWeaponButtonMag;
+    [SerializeField] public GameObject customizeWeaponButtonGrip;
+    [SerializeField] public GameObject customizeWeaponButtonSideGrip;
+    [SerializeField] public GameObject customizeWeaponButtonErgonomics;
+
+    [Header("Layout Settings")]
+    [SerializeField] public float classButtonSpacingX = 150f;
+    [SerializeField] public float classButtonStartX = -300f;
+    [SerializeField] public float classButtonY = 0f;
+    [SerializeField] public float itemButtonSpacingY = -130f;
+    [SerializeField] public float itemButtonStartY = 0;
+    [SerializeField] public float itemButtonX = 0f;
+    [SerializeField] public float loadoutOptionSpacingY = -80f;
+    [SerializeField] public float loadoutOptionStartY = 100f;
+
+    [Header("Slider Settings")]
+    [SerializeField] public float sliderMinValue = 0f;
+    [SerializeField] public float sliderMaxValue = 1f;
+    [SerializeField] public float minScrollY = -200f;
+    [SerializeField] public float maxScrollYIncreaser = 100f;
+
+    [Header("Sound Effects")]
+    [SerializeField] public SoundManager.SoundComponents purchaseItemSfx;
+    [SerializeField] public SoundManager.SoundComponents purchaseDenialItemSfx;
+    [SerializeField] public SoundManager.SoundComponents selectItemSfx;
+
+    [Header("Current selection")]
+    public GameObject selected_primary;
+    public GameObject selected_secondary;
+    public GameObject selected_gadget1;
+    public GameObject selected_gadget2;
+
+    // Statics
+    public static SoundManager.SoundComponents reference_purchase_item_sfx { get; private set; }
+    public static SoundManager.SoundComponents reference_purchase_denial_item_sfx { get; private set; }
+    public static Sprite locked_item_image { get; private set; }
+    public static Button BuyWeaponButton { get; private set; }
+
+    public enum SelectionStage
+    {
+        ClassSelection,
+        LoadoutOptionSelection,
+        ItemSelection,
+        WeaponCustomization,
+        SkinSelection
+    }
+
+    private SelectionStage _currentStage = SelectionStage.ClassSelection;
+    public ClassManager.Class _selectedClass;
+    public GameObject _currentItemSelected;
+    public GameObject _weaponBeingCustomized;
+
+    private string primaryWeaponsFolder = "Assets/Prefabs/Weapons/First Person/Primary";
+    private string secondaryWeaponsFolder = "Assets/Prefabs/Weapons/First Person/Secondary";
+    private string gadgetsFolder = "Assets/Prefabs/Gadgets/First Person";
+    public GameObject[] primaryWeapons { get; private set; }
+    public GameObject[] secondaryWeapons { get; private set; }
+    public GameObject[] gadgets { get; private set; }
+
+    // Referências para os módulos
+    public ClassSelectionManager classSelectionManager { get; private set; }
+    public LoadoutOptionManager loadoutOptionManager { get; private set; }
+    public ItemSelectionManager itemSelectionManager { get; private set; }
+    public WeaponCustomizationManager weaponCustomizationManager { get; private set; }
+    public LoadoutSaverManager loadoutSaverManager { get; private set; }
+    public UIUpdateManager uIUpdateManager { get; private set; }
+    // Adicione esta referência
+    public SkinSelectionManager skinSelectionManager { get; private set; }
+
+    private void Awake()
+    {
+        Instance = this;
+        InitializeManagers();
+        UpdateLoadoutLists();
+    }
+
+    private void OnValidate()
+    {
+#if UNITY_EDITOR
+        if (BuildPipeline.isBuildingPlayer || EditorApplication.isCompiling) return;
+        UpdateLoadoutLists();
+#endif
+    }
+
+    [ContextMenu("Update Loadout Lists")]
+    public void UpdateLoadoutLists()
+    {
+#if UNITY_EDITOR
+        primaryWeapons = LoadPrefabsFromFolder(primaryWeaponsFolder);
+        secondaryWeapons = LoadPrefabsFromFolder(secondaryWeaponsFolder);
+        gadgets = LoadPrefabsFromFolder(gadgetsFolder);
+
+        EditorUtility.SetDirty(this);
+#endif
+    }
+
+#if UNITY_EDITOR
+    private GameObject[] LoadPrefabsFromFolder(string folderPath)
+    {
+        if (!AssetDatabase.IsValidFolder(folderPath))
+        {
+            Debug.LogWarning($"[InfantryLoadoutCustomization] Pasta '{folderPath}' não foi encontrada!");
+            return new GameObject[0];
+        }
+
+        List<GameObject> foundPrefabs = new List<GameObject>();
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { folderPath });
+
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+
+            if (prefab != null && !foundPrefabs.Contains(prefab))
+            {
+                foundPrefabs.Add(prefab);
+            }
+        }
+
+        return foundPrefabs.ToArray();
+    }
+#endif
+
+    private void InitializeManagers()
+    {
+        classSelectionManager = gameObject.GetComponent<ClassSelectionManager>();
+        loadoutOptionManager = gameObject.GetComponent<LoadoutOptionManager>();
+        itemSelectionManager = gameObject.GetComponent<ItemSelectionManager>();
+        weaponCustomizationManager = gameObject.GetComponent<WeaponCustomizationManager>();
+        loadoutSaverManager = gameObject.GetComponent<LoadoutSaverManager>();
+        uIUpdateManager = gameObject.GetComponent<UIUpdateManager>();
+        skinSelectionManager = gameObject.GetComponent<SkinSelectionManager>(); // NOVO
+
+        classSelectionManager.Initialize(this);
+        loadoutOptionManager.Initialize(this);
+        itemSelectionManager.Initialize(this);
+        weaponCustomizationManager.Initialize(this);
+        loadoutSaverManager.Initialize(this);
+        uIUpdateManager.Initialize(this);
+        skinSelectionManager.Initialize(this); // NOVO
+    }
+
+    private void Start()
+    {
+        locked_item_image = lockedItemImage;
+        BuyWeaponButton = buy_weapon_button;
+        reference_purchase_item_sfx = purchaseItemSfx;
+        reference_purchase_denial_item_sfx = purchaseDenialItemSfx;
+
+        _selectedClass = AccountManager.Instance.selected_class;
+
+        classSelectionManager.InitializeUI();
+        classSelectionManager.ShowClassSelection();
+    }
+
+    private void Update()
+    {
+        uIUpdateManager.UpdateUI();
+    }
+
+    public void SaveCurrentLoadout() => loadoutSaverManager.SaveCurrentLoadout(_selectedClass);
+
+    public void OnBackButtonClicked()
+    {
+        switch (_currentStage)
+        {
+            case SelectionStage.WeaponCustomization:
+                weaponCustomizationManager.OnBackFromCustomization();
+                break;
+            case SelectionStage.ItemSelection:
+                loadoutOptionManager.OnBackToLoadoutOptions();
+                break;
+            case SelectionStage.LoadoutOptionSelection:
+                classSelectionManager.OnBackToClassSelection();
+                break;
+            case SelectionStage.SkinSelection: // NOVO
+                loadoutOptionManager.OnBackToLoadoutOptions();
+                break;
+        }
+    }
+    public void UpdateWeaponStats(WeaponProperties wp)
+    {
+        StringBuilder allText = new StringBuilder();
+
+        allText.AppendLine("Rate of Fire: " + wp.firing.rateOfFire.ToString("F0") + " RPM");
+        allText.AppendLine("ADS Speed: " + wp.ads_speed.ToString("F2") + "s");
+        allText.AppendLine("Player Speed Modifier: " + wp.speed_change.ToString("F0"));
+        allText.AppendLine("Zoom: x" + wp.zoom.ToString("F1"));
+        allText.AppendLine("Fire Modes: " + string.Join(" / ", wp.firing.fireModes));
+        allText.AppendLine("Destruction Force: " + wp.projectileValues.destructionRadius.ToString("F0"));
+        allText.AppendLine("Damage: " + wp.projectileValues.infantryDamage.ToString("F1"));
+        allText.AppendLine("Minimum Damage: " + wp.projectileValues.minimumDamage.ToString("F1"));
+        allText.AppendLine("Vehicle Base Damage: " + wp.projectileValues.vehicleDamage.ToString("F1"));
+        allText.AppendLine("Headshot Multiplier: " + wp.projectileValues.headshotMultiplier.ToString("F1"));
+        allText.AppendLine("Damage Dropoff: " + wp.projectileValues.damageDropoff.ToString("F0") + "%");
+        allText.AppendLine("Damage Dropoff Timer: " + wp.projectileValues.damageDropoffTimer.ToString("F2") + "s");
+        allText.AppendLine("Spread Increaser: " + wp.spreadValues.spreadIncreaser.ToString("F2"));
+        allText.AppendLine("Max Spread: " + wp.spreadValues.maxSpread.ToString("F2"));
+        allText.AppendLine("Horizontal Recoil: " + wp.recoilValues.recoilPattern.Average(v => v.horizontalRecoil.value).ToString("F2"));
+        allText.AppendLine("Vertical Recoil: " + wp.recoilValues.recoilPattern.Average(v => v.verticalRecoil.value).ToString("F2"));
+        allText.AppendLine("First Shot Recoil Increaser: x" + wp.recoilValues.firstShootRecoilMultiplier.ToString("F1"));
+        allText.AppendLine("Mag Count: " + wp.reloadValues.magCount.ToString());
+        allText.AppendLine("Bullets Per Mag: " + wp.reloadValues.bulletsPerMag.ToString());
+        allText.Append("Reload Speed: " + wp.reloadValues.reloadTime.ToString("F2") + "s");
+
+        uIUpdateManager.UpdateItemStatusText(allText.ToString());
+    }
+
+    public GameObject GetCurrentPrimaryWeapon()
+    {
+        if (selected_primary != null) return selected_primary;
+
+        foreach (GameObject weapon in primaryWeapons)
+        {
+            if (weapon == null) continue;
+
+            WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
+            if (wp == null) continue;
+
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battle_coins_to_unlock == 0)
+            {
+                selected_primary = weapon;
+                return weapon;
+            }
+        }
+
+        return null;
+    }
+
+    public GameObject GetCurrentSecondaryWeapon()
+    {
+        if (selected_secondary != null) return selected_secondary;
+
+        foreach (GameObject weapon in secondaryWeapons)
+        {
+            if (weapon == null) continue;
+
+            WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
+            if (wp == null) continue;
+
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battle_coins_to_unlock == 0)
+            {
+                selected_secondary = weapon;
+                return weapon;
+            }
+        }
+
+        return null;
+    }
+
+    public GameObject GetCurrentGadget1() => selected_gadget1;
+    public GameObject GetCurrentGadget2() => selected_gadget2;
+
+    private bool HasClassAccessToWeapon(WeaponProperties weaponProperties)
+    {
+        if (weaponProperties.class_weapon.Any(c => c == _selectedClass)) return true;
+
+        return false;
+    }
+
+    private bool HasFactionAccessToWeapon(WeaponProperties weaponProperties)
+    {
+        if (AccountManager.Instance == null) return true;
+
+        if (weaponProperties.faction.Any(c => c == AccountManager.Instance.faction)) return true;
+
+        return false;
+    }
+
+    public void SetCurrentStage(SelectionStage stage) => _currentStage = stage;
+    public SelectionStage GetCurrentStage() => _currentStage;
+}

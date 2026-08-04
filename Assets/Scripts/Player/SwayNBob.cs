@@ -70,9 +70,9 @@ public class SwayNBobScript : MonoBehaviour
     private Vector3 crouchMultiplier;
     private Vector3 currentMultiplier;
 
-    private const int YRotationMultiplier = 4;
-    private const int ZRotationMultiplier = 4;
-    private const int XRotationMultiplier = 4;
+    private const int YRotationMultiplier = 1;
+    private const int ZRotationMultiplier = 1;
+    private const int XRotationMultiplier = 1;
 
     #region Unity Lifecycle
 

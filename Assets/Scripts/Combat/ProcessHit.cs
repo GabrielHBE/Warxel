@@ -57,10 +57,8 @@ public static class ProcessHit
     {
         PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
 
-        Vector3 closestPoint = collider.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox")
-            ? collider.ClosestPoint(contact_point)
-            : collider.transform.position;
-
+        Vector3 closestPoint = collider.ClosestPoint(contact_point);
+  
         float distance = Vector3.Distance(contact_point, closestPoint);
 
         // Calcula a porcentagem da distância (1 = colado na explosão, 0 = no limite do destructionRadius)
@@ -120,9 +118,7 @@ public static class ProcessHit
     /// </summary>
     public static void VehicleHit(Vehicle vehicle, Collider collider, Vector3 contact_point, GameObject itemUsedToKill, float dmg, float destructionRadius, float damageFalloff)
     {
-        Vector3 closestPoint = collider.gameObject.layer == LayerMask.NameToLayer("Vehicle")
-            ? collider.ClosestPoint(contact_point)
-            : collider.transform.position;
+        Vector3 closestPoint = collider.ClosestPoint(contact_point);
 
         float distance = Vector3.Distance(contact_point, closestPoint);
 

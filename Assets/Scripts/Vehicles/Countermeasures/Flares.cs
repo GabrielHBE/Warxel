@@ -9,9 +9,8 @@ public class Flares : Countermeasures
     private Coroutine flareCoroutine;
     private float force_multiplier = 15;
 
-    protected override void Update()
+    public override void LocalUpdate()
     {
-        base.Update();
         if (reload_countermeasures_duration <= 0)
         {
             is_reloading = false;

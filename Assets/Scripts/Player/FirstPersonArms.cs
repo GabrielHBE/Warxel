@@ -10,16 +10,9 @@ public class FirstPersonArms : MonoBehaviour
     private Coroutine rightHandCoroutine;
     private Coroutine leftHandCoroutine;
 
-    public void Enable()
-    {
-        first_person_player_components.SetActive(true);
-    }
-
-    public void Disable()
-    {
-        first_person_player_components.SetActive(false);
-    }
-
+    public void Enable() => first_person_player_components.SetActive(true);
+    public void Disable() => first_person_player_components.SetActive(false);
+    
     public void MoveRightHand(Transform destiny, float duracao)
     {
         if (destiny == null)
@@ -27,11 +20,8 @@ public class FirstPersonArms : MonoBehaviour
             Debug.LogWarning("O transform de destino é nulo!");
             return;
         }
-
-        if (rightHandCoroutine != null)
-        {
-            StopCoroutine(rightHandCoroutine);
-        }
+        if (rightHandCoroutine != null) StopCoroutine(rightHandCoroutine);
+        
         rightHandCoroutine = StartCoroutine(Interpolate(rightHand, destiny, duracao));
     }
 
@@ -43,10 +33,8 @@ public class FirstPersonArms : MonoBehaviour
             return;
         }
 
-        if (leftHandCoroutine != null)
-        {
-            StopCoroutine(leftHandCoroutine);
-        }
+        if (leftHandCoroutine != null) StopCoroutine(leftHandCoroutine);
+        
         leftHandCoroutine = StartCoroutine(Interpolate(leftHand, destiny, duracao));
     }
 

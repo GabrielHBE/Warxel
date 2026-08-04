@@ -107,18 +107,14 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
             for (int i = 0; i < recoilValues.recoilPattern.Length; i++)
             {
-                recoilValues.recoilPattern[i].horizontalRecoil *= 0.9f;
-                recoilValues.recoilPattern[i].verticalRecoil *= 0.9f;
+                recoilValues.recoilPattern[i].horizontalRecoil.value *= 0.9f;
+                recoilValues.recoilPattern[i].verticalRecoil.value *= 0.9f;
             }
 
         }
     }
 
-    public void Restart()
-    {
-        recoilValues.CalculateRecoilMedia();
-        recoilValues.CalculateRecoilSpeed(firing.interval);
-    }
+    public void Restart() => recoilValues.CalculateRecoilSpeed(firing.interval);
     #endregion
 
     #region Logic & Calculations

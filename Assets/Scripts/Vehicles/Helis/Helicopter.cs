@@ -2,6 +2,7 @@ using System;
 using FishNet.Object;
 using UnityEngine;
 
+[RequireComponent(typeof(HeliProperties))]
 public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 {
     [Header("----------------------------HELICOPTER SETTINGS----------------------------")]
@@ -41,7 +42,6 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
     protected override void HandleEngineOn()
     {
         float deltaTime = Time.fixedDeltaTime;
-        PropellerRotation();
 
         if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
         {
@@ -50,27 +50,13 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
             ApplyRotationTorque();
             rb.AddForce(liftDirection * throttle.Value * rb.mass);
         }
-        else
-        {
-            throttle.Value = 0;
-            gravity_force = 0.2f;
-            AddForceDown(gravity_force);
-        }
+        
     }
-
     protected override void HandleEngineOff()
     {
         base.HandleEngineOff();
         localThrottle = 0f;
-        PropellerRotation();
     }
-
-    protected override void HandleEmptyVehicle()
-    {
-        base.HandleEmptyVehicle();
-        PropellerRotation();
-    }
-
     protected override void OnDestructionPhysicsTick(float timer)
     {
         float rotate_value = Math.Clamp(Mathf.Pow(timer * 15, 2f), 0, 900);
@@ -91,6 +77,12 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
     #endregion
 
     #region Movement Physics
+
+    protected override void HandleEmptyVehicle()
+    {
+        throttle.Value = 0;
+        base.HandleEmptyVehicle();
+    }
     protected void HandleThrottleInput(float deltaTime)
     {
         move_upwards = 0;
@@ -137,9 +129,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
         if (IsOwner)
         {
-            throttle.Value = localThrottle; // <--- ADICIONE ESTA LINHA: Garante resposta imediata da física
-
-            // Envia para o servidor apenas quando necessário
+            throttle.Value = localThrottle;
             _throttleUpdateTimer += deltaTime;
             float throttleDiff = Mathf.Abs(localThrottle - _lastSentThrottle);
 
@@ -152,7 +142,6 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         }
 
         AddForceDown(gravity_force);
-
     }
 
     protected void CalculateRotationInput(float deltaTime)
@@ -181,6 +170,12 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (lean_value != 0) rb.AddTorque(transform.up * lean_value * rb.mass);
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestPropellerRotation() => CmdPropellerRotation();
+
+    [ObserversRpc()]
+    private void CmdPropellerRotation() => PropellerRotation();
+
     protected void PropellerRotation()
     {
         float targetSpeed = startEngine.Value && !vehicle_destroyed.Value ? heliProperties.max_lift_force / 4 : 0f;
@@ -196,6 +191,11 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
     #endregion
 
     #region Engine Audio & System
+    protected override void FixedUpdate()
+    {
+        base.FixedUpdate();
+        PropellerRotation();
+    }
     protected override void Update()
     {
         base.Update();

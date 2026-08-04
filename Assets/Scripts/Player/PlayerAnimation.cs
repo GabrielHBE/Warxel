@@ -64,10 +64,7 @@ public class PlayerAnimation : NetworkBehaviour
     private void OnIsDeadChanded(bool prev, bool next, bool asServer)
     {
         anim.SetBool("Dead", next);
-        if (next)
-        {
-            SetDeathAnimationIndex();
-        }
+        if (next) SetDeathAnimationIndex();
     }
 
     public void SetDeathAnimationIndex()

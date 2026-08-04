@@ -67,7 +67,7 @@ public class FlagsUI : MonoBehaviour
 
         flagElements.Add(element);
 
-        setInWorldPositionUI.AddElement(element.Rect, flag.InWorldUIPosition);
+        setInWorldPositionUI.AddElement(element.Rect, flag.InWorldUIPosition, false);
     }
 
     void LateUpdate()

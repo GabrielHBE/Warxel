@@ -2,9 +2,8 @@ using UnityEngine;
 
 public class APS : Countermeasures
 {
-    protected override void  Update()
+    public override void LocalUpdate()
     {
-        base.Update();
         if (reload_countermeasures_duration < 0) return;
 
         if (vehicle.ignore_damage == false)

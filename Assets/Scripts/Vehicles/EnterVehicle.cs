@@ -1,10 +1,13 @@
 using FishNet.Object;
 using UnityEngine;
 
+[RequireComponent(typeof(BoxCollider))]
 public class EnterVehicle : InteractiveButton
 {
     [SerializeField] private Vehicle vehicle;
 
+    void Start() => GetComponent<BoxCollider>().isTrigger = true;
+    
     public override void Interact(PlayerController player)
     {
         player.ResetWeaponAnimation();

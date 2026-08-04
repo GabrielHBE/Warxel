@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using FishNet.Connection;
@@ -15,8 +16,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     [Header("Multiplayer / Player")]
     [SerializeField] private AudioListener camera_audio;
     public GameObject first_person_player_components;
-    [SerializeField] private MeshRenderer[] hideToOwnerItems;
-    public GameObject[] body_parts;
+    [SerializeField] private GameObject[] hideToOwnerItems;
     [SerializeField] private GameObject fist_person;
 
     [Header("Body")]
@@ -84,7 +84,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     private Vignette damageTaken_vignette;
 
     // Movement 
-    public float currentMoveSpeed;
+    [HideInInspector] public float currentMoveSpeed;
     private float original_sprint_speed;
     private float original_walk_speed;
     private float original_crouch_speed;
@@ -202,12 +202,13 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         ApplyCustomGravity();
         ApplyWindPhysics();
     }
-
     #endregion
 
     #region Initialization
     public void ConfigureOwner()
     {
+        GetComponent<SkinApplier>().ApplySkin();
+
         soldierHudManager.ActivateStandardHUD();
 
         Instance = this;
@@ -232,7 +233,14 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         interactivesLayer = LayerMask.GetMask("Interactives");
         playerLayer = LayerMask.GetMask("Player");
 
-        playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+        try
+        {
+            playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+        }catch(Exception)
+        {
+            
+        }
+        
         InitializeVolume();
 
         readyToJump = true;
@@ -242,29 +250,20 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void InitializeVolume()
     {
-
-        if (damageTaken_volume != null && damageTaken_volume.profile != null)
-        {
-            damageTaken_volume.profile.TryGet(out damageTaken_vignette);
-        }
+        if (damageTaken_volume != null && damageTaken_volume.profile != null) damageTaken_volume.profile.TryGet(out damageTaken_vignette);
     }
-
     #endregion
 
     #region InputManager Handling
-
     private void HandleDebugInputManager()
     {
-        if (InputManager.GetKeyDown(KeyCode.K)) Revive();
+        if (InputManager.GetKeyDown(KeyCode.K)) Revive(100);
         if (InputManager.GetKeyDown(KeyCode.G)) RequestDamage(100);
     }
 
     private void HandleInteractionInputManager()
     {
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey))
-        {
-            Interact();
-        }
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey)) Interact();
     }
 
     private void HandlePlayerInputManager()
@@ -275,10 +274,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             moveHorizontal = 0;
         }
         else
-        {
             UpdateMovementInputManager();
-        }
-
+        
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision)) HandleNightVision();
 
         if (grounded)
@@ -480,11 +477,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     private void HandleRoll()
     {
         timeBetweenRolls -= Time.deltaTime;
-
-        if (CanRoll() && InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey))
-        {
-            ExecuteRoll();
-        }
+        if (CanRoll() && InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey)) ExecuteRoll();
     }
 
     private bool CanRoll()
@@ -617,11 +610,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         playerProperties.isGrounded = false;
     }
 
-    private void ResetJump()
-    {
-        readyToJump = true;
-    }
-
+    private void ResetJump() =>  readyToJump = true;
+    
     private void UpdateGroundCheck()
     {
         bool is_holding_roll = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
@@ -681,11 +671,9 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     {
         return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
     }
-
     #endregion
 
     #region Camera & Recoil
-
     private void HandleNightVision()
     {
         is_night_vision_active = !is_night_vision_active;
@@ -759,7 +747,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void ApplyCameraRotation()
     {
-        // Aplica o recuo Z de forma suave
         currentRecoilZ = Mathf.SmoothDamp(
             currentRecoilZ,
             targetRecoilZ,
@@ -771,26 +758,15 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         UpdateHeadRotation();
     }
 
-    private void UpdateHeadRotation()
-    {
-        Quaternion offset = Quaternion.Euler(-90, 0, 0);
-        playerHead.transform.rotation = playerCamera.transform.rotation * offset;
-    }
-
+    private void UpdateHeadRotation() => playerHead.transform.rotation = playerCamera.transform.rotation;
+    
     private void UpdateRecoil()
     {
-        // Velocidade de reset do recuo Z (mais lenta para ser suave)
-        float resetSpeed = 4f; // Ajuste este valor para controlar a suavidade
-
-        // Se houver recuo Z, reduz gradualmente
+        float resetSpeed = 4f;
         if (Mathf.Abs(targetRecoilZ) > 0.01f)
         {
-            // Decaimento exponencial suave
             targetRecoilZ = Mathf.Lerp(targetRecoilZ, 0f, resetSpeed * Time.deltaTime);
-
-            // Se estiver muito próximo de zero, zera completamente para evitar vibração
-            if (Mathf.Abs(targetRecoilZ) < 0.001f)
-                targetRecoilZ = 0f;
+            if (Mathf.Abs(targetRecoilZ) < 0.001f) targetRecoilZ = 0f;
         }
     }
 
@@ -799,11 +775,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         if (!playerProperties.is_aiming)
         {
             float targetFov = Settings.Instance._video.infantary_fov;
-            // Só interpola se houver diferença considerável para economizar cálculos do renderizador
-            if (Mathf.Abs(playerCamera.fieldOfView - targetFov) > 0.1f)
-            {
-                playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFov, 10f * Time.deltaTime);
-            }
+            if (Mathf.Abs(playerCamera.fieldOfView - targetFov) > 0.1f) playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFov, 10f * Time.deltaTime);
         }
     }
 
@@ -832,11 +804,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         Vector3 origin = playerCamera.transform.position;
         Vector3 direction = playerCamera.transform.forward;
 
-        if (!playerProperties.is_in_vehicle)
-        {
-            TryInteractWithButton(origin, direction);
-        }
-
+        if (!playerProperties.is_in_vehicle) TryInteractWithButton(origin, direction);
     }
 
     private void TryInteractWithButton(Vector3 origin, Vector3 direction)
@@ -864,7 +832,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     private void UpdateColliderStateLocal()
     {
-        // 1. Define qual deve ser a postura (estado) alvo neste frame
         PlayerStance targetStance;
 
         if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle)
@@ -876,10 +843,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         else
             targetStance = PlayerStance.Stand;
 
-        // 2. Só executa a troca e o RPC se o estado alvo for diferente do atual
         if (targetStance != currentStance)
         {
-            // Aplica as mudanças locais baseadas no novo estado
             if (targetStance == PlayerStance.Disabled)
                 DisableColliders();
             else if (targetStance == PlayerStance.Prone)
@@ -889,20 +854,14 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             else
                 EnableStandCollider();
 
-            // Salva o novo estado para o próximo frame
             currentStance = targetStance;
-
-            // Envia para a rede APENAS no frame em que ocorreu a transição!
             CmdUpdateColliderStateRemote(targetStance);
         }
     }
 
     [ServerRpc(RequireOwnership = true)]
-    private void CmdUpdateColliderStateRemote(PlayerStance playerStance)
-    {
-        RpcUpdateColliderStateRemote(playerStance);
-    }
-
+    private void CmdUpdateColliderStateRemote(PlayerStance playerStance) => RpcUpdateColliderStateRemote(playerStance);
+    
     [ObserversRpc(ExcludeOwner = true)]
     private void RpcUpdateColliderStateRemote(PlayerStance playerStance)
     {
@@ -921,7 +880,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
                 EnableStandCollider();
                 break;
         }
-
     }
 
     private void EnableStandCollider()
@@ -969,11 +927,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         if (stand_collider != null) stand_collider.enabled = enabled;
         if (crouch_collider != null) crouch_collider.enabled = enabled;
         if (prone_collider != null) prone_collider.enabled = enabled;
-
-        if (deah_collider != null && !enabled)
-        {
-            deah_collider.enabled = false;
-        }
+        if (deah_collider != null && !enabled) deah_collider.enabled = false;
     }
 
     private void HandleDeathState()
@@ -989,7 +943,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             AccountManager.Instance.RemoveBattleCoin(10);
             PlayerSpawnController.Instance.Reestart();
 
-
             if (IsSpawned) RequestDespawn();
             else Destroy(gameObject);
 
@@ -1003,11 +956,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     }
 
     [ServerRpc(RequireOwnership = true)]
-    private void RequestDespawn()
-    {
-        Despawn(gameObject);
-    }
-
+    private void RequestDespawn() => Despawn(gameObject);
+    
     private void HandleMecidProximity()
     {
         // Otimização: Uso de NonAlloc para evitar geração excessiva de lixo no GC a cada frame
@@ -1050,24 +1000,15 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     }
 
     [ServerRpc(RequireOwnership = true)]
-    private void CmdUpdateServerHP(float hp)
-    {
-        playerProperties.hp.Value = hp;
-    }
-
+    private void CmdUpdateServerHP(float hp) => playerProperties.hp.Value = hp;
+    
     [ServerRpc(RequireOwnership = true)]
-    private void CmdUpdateServerIsDead(bool is_dead)
-    {
-        playerProperties.is_dead.Value = is_dead;
-    }
+    private void CmdUpdateServerIsDead(bool is_dead) => playerProperties.is_dead.Value = is_dead;
     #endregion
 
     #region Damage / Kill and Revive
-    public float GetDamageDealt()
-    {
-        return damage_dealt;
-    }
-
+    public float GetDamageDealt() => damage_dealt;
+    
     public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
     {
         this.applyRecoilSpeed = applyRecoilSpeed;
@@ -1084,11 +1025,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void CmdApplyDamage(float rawDamage)
-    {
-        TargetReceiveDamage(Owner, rawDamage);
-    }
-
+    private void CmdApplyDamage(float rawDamage) => TargetReceiveDamage(Owner, rawDamage);
+    
     [TargetRpc]
     private void TargetReceiveDamage(NetworkConnection conn, float dmg)
     {
@@ -1140,14 +1078,14 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         current_DealDamageOverTime = null;
     }
 
-    public void Revive()
+    public void Revive(float hp)
     {
-        CmdUpdateServerHP(100);
+        CmdUpdateServerHP(hp);
         CmdUpdateServerIsDead(false);
         HideOwnerItems(true);
 
         playerProperties.is_dead.Value = false;
-        playerProperties.hp.Value = 100;
+        playerProperties.hp.Value = hp;
 
         transform.rotation = new Quaternion(transform.rotation.z, transform.rotation.y, 0, transform.rotation.w);
         DisableDeathCollier();
@@ -1156,15 +1094,11 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public void Regenerate(float hp)
     {
         playerProperties.hp.Value += hp;
-        if (playerProperties.hp.Value > playerProperties.max_hp)
-        {
-            playerProperties.hp.Value = playerProperties.max_hp;
-        }
+        if (playerProperties.hp.Value > playerProperties.max_hp) playerProperties.hp.Value = playerProperties.max_hp;
     }
     #endregion
 
     #region Utility
-    [Client]
     public void HideOwnerItems(bool hide)
     {
         if (!IsOwner)
@@ -1173,12 +1107,12 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             return;
         }
 
-        foreach (MeshRenderer item in hideToOwnerItems)
+        foreach (GameObject item in hideToOwnerItems)
         {
-            if (item != null)
-            {
-                item.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
-            }
+            if (item == null) continue;
+
+            MeshRenderer mesh = item.GetComponentInChildren<MeshRenderer>();
+            if (mesh != null) mesh.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
         }
 
         if (!hide) thirdPersonWeapon.ShowWeapon();
@@ -1188,5 +1122,4 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     public FactionManager.Faction GetFaction() => playerProperties.faction.Value;
     public Transform GetSpotPosition() => spot_position;
     #endregion
-
 }

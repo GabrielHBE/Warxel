@@ -64,8 +64,6 @@ public class PlayerSpawnController : NetworkBehaviour
         }
     }
 
-
-
     private void InitializeForOwner()
     {
         Instance = this;
@@ -95,8 +93,8 @@ public class PlayerSpawnController : NetworkBehaviour
             if (reespawn_delay > 0)
             {
                 reespawn_delay -= Time.deltaTime;
-                if (PlayerLoadoutCustomization.Instance != null &&
-                    PlayerLoadoutCustomization.Instance._currentStage == PlayerLoadoutCustomization.SelectionStage.ClassSelection)
+                if (InfantryLoadoutCustomization.Instance != null &&
+                    InfantryLoadoutCustomization.Instance.GetCurrentStage() == InfantryLoadoutCustomization.SelectionStage.ClassSelection)
                 {
                     reespawn_delay_text.text = "Spawn delay: " + reespawn_delay.ToString("F1");
                 }
@@ -111,7 +109,7 @@ public class PlayerSpawnController : NetworkBehaviour
             }
 
             // Só processa drag se a câmera estiver ativa
-            if (spawn_camera != null && spawn_camera.enabled)
+            if (spawn_camera != null && spawn_camera.enabled && InfantryLoadoutCustomization.Instance.GetCurrentStage() == InfantryLoadoutCustomization.SelectionStage.ClassSelection)
             {
                 HandleCameraDrag();
             }
@@ -188,7 +186,7 @@ public class PlayerSpawnController : NetworkBehaviour
             return;
         }
 
-        if (PlayerLoadoutCustomization.Instance.selected_primary == null)
+        if (InfantryLoadoutCustomization.Instance.selected_primary == null)
         {
             AlertMessages.Instance.CreateMessage("Select a primary gun to deploy");
             return;
@@ -299,12 +297,12 @@ public class PlayerSpawnController : NetworkBehaviour
 
         // Configurações locais do cliente
         SwitchWeapon switchWeapon = player_instantiated.GetComponentInChildren<SwitchWeapon>(true);
-        if (switchWeapon != null && PlayerLoadoutCustomization.Instance != null)
+        if (switchWeapon != null && InfantryLoadoutCustomization.Instance != null)
         {
-            switchWeapon.primary = PlayerLoadoutCustomization.Instance.GetCurrentPrimaryWeapon();
-            switchWeapon.secondary = PlayerLoadoutCustomization.Instance.GetCurrentSecondaryWeapon();
-            switchWeapon.gadget1 = PlayerLoadoutCustomization.Instance.GetCurrentGadget1();
-            switchWeapon.gadget2 = PlayerLoadoutCustomization.Instance.GetCurrentGadget2();
+            switchWeapon.primary = InfantryLoadoutCustomization.Instance.GetCurrentPrimaryWeapon();
+            switchWeapon.secondary = InfantryLoadoutCustomization.Instance.GetCurrentSecondaryWeapon();
+            switchWeapon.gadget1 = InfantryLoadoutCustomization.Instance.GetCurrentGadget1();
+            switchWeapon.gadget2 = InfantryLoadoutCustomization.Instance.GetCurrentGadget2();
             switchWeapon.Initialize();
         }
 
@@ -342,9 +340,9 @@ public class PlayerSpawnController : NetworkBehaviour
             return;
         }
 
-        if (PlayerLoadoutCustomization.Instance != null)
+        if (InfantryLoadoutCustomization.Instance != null)
         {
-            PlayerLoadoutCustomization.Instance.gameObject.SetActive(false);
+            InfantryLoadoutCustomization.Instance.gameObject.SetActive(false);
         }
 
         if (VehicleLoadoutCustomization.Instance != null)
@@ -375,9 +373,9 @@ public class PlayerSpawnController : NetworkBehaviour
             spawn_camera.GetComponent<AudioListener>().enabled = true;
         }
 
-        if (PlayerLoadoutCustomization.Instance != null)
+        if (InfantryLoadoutCustomization.Instance != null)
         {
-            PlayerLoadoutCustomization.Instance.gameObject.SetActive(true);
+            InfantryLoadoutCustomization.Instance.gameObject.SetActive(true);
         }
 
         if (canvas != null)
@@ -393,7 +391,7 @@ public class PlayerSpawnController : NetworkBehaviour
         ToggleFlagsVisibility(vehicle_spawn_flags, false);
         ToggleFlagsVisibility(infantary_spawn_flags, true);
 
-        PlayerLoadoutCustomization.Instance.gameObject.SetActive(true);
+        InfantryLoadoutCustomization.Instance.gameObject.SetActive(true);
         VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
 
         if (fov_transition_coroutine != null) StopCoroutine(fov_transition_coroutine);
@@ -408,7 +406,7 @@ public class PlayerSpawnController : NetworkBehaviour
         ToggleFlagsVisibility(vehicle_spawn_flags, true);
         ToggleFlagsVisibility(infantary_spawn_flags, false);
 
-        PlayerLoadoutCustomization.Instance.gameObject.SetActive(false);
+        InfantryLoadoutCustomization.Instance.gameObject.SetActive(false);
         VehicleLoadoutCustomization.Instance.gameObject.SetActive(true);
 
         if (fov_transition_coroutine != null) StopCoroutine(fov_transition_coroutine);

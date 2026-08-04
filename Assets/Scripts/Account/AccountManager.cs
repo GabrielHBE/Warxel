@@ -1,10 +1,9 @@
-using FishNet.Object;
 using TMPro;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class AccountManager : PersistentLocalSingleton<AccountManager>
 {
-    //public static AccountManager Instance { get; private set; }
     public AccountStatus status;
     public string account_name;
     public string id;
@@ -23,17 +22,13 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
     {
         base.Awake();
         LoadData();
-
     }
 
+    //Debug
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.B))
-        {
-            AddBattleCoin(100);
-        }
+        if (Input.GetKeyDown(KeyCode.B)) AddBattleCoin(100);
     }
-
 
     public void SetClass(ClassManager.Class @class)
     {
@@ -57,10 +52,7 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
     public void RemoveBattleCoin(int qnt)
     {
         battle_coins -= qnt;
-        if (battle_coins < 0)
-        {
-            battle_coins = 0;
-        }
+        if (battle_coins < 0) battle_coins = 0;
         SaveData();
     }
 
@@ -76,7 +68,6 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
         account_name = name;
         SaveData();
     }
-
 
     public void AddPointsToLevelUp(int points)
     {
@@ -96,7 +87,7 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
         SaveData();
     }
 
-    // Método para salvar todos os dados
+
     public void SaveData()
     {
         PlayerPrefs.SetString("AccountManager_account_name", account_name);
@@ -107,49 +98,41 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
         PlayerPrefs.SetInt("AccountManager_faction", (int)faction);
         PlayerPrefs.SetInt("AccountManager_current_level_progression", current_level_progression);
         PlayerPrefs.Save();
-
     }
 
     // Método para carregar todos os dados
     public void LoadData()
     {
-        // Verificar se existe pelo menos uma chave (usando account_name como referência)
         if (PlayerPrefs.HasKey("AccountManager_account_name"))
         {
             account_name = PlayerPrefs.GetString("AccountManager_account_name");
             id = PlayerPrefs.GetString("AccountManager_id");
-            level = PlayerPrefs.GetInt("AccountManager_level", 1); // Começa no nível 1 por padrão
+            level = PlayerPrefs.GetInt("AccountManager_level", 1);
             battle_coins = PlayerPrefs.GetInt("AccountManager_battle_coins", 0);
             faction = (FactionManager.Faction)PlayerPrefs.GetInt("AccountManager_faction", 0);
             current_level_progression = PlayerPrefs.GetInt("AccountManager_current_level_progression", 0);
 
-            // Carregar a classe selecionada
             string className = PlayerPrefs.GetString("AccountManager_selected_class", "None");
 
-            // Tentar converter a string de volta para enum ClassManager.Class
             if (System.Enum.TryParse(className, out ClassManager.Class loadedClass))
             {
                 selected_class = loadedClass;
             }
             else
             {
-                // Se falhar, definir um valor padrão (Assault, por exemplo)
-                selected_class = ClassManager.Class.Assault; // Ajuste conforme seu enum
+                selected_class = ClassManager.Class.Assault;
                 Debug.LogWarning($"Classe '{className}' não encontrada. Usando padrão: {selected_class}");
             }
-
         }
         else
         {
             Debug.Log("Nenhum dado salvo encontrado. Usando valores padrão.");
 
-            // Definir valores padrão para um novo jogador
             account_name = "Jogador";
             id = System.Guid.NewGuid().ToString();
             level = 0;
             battle_coins = 0;
-            //faction = FactionManager.Faction.None; // Ajuste conforme seu enum
-            selected_class = ClassManager.Class.Assault; // Ajuste conforme seu enum
+            selected_class = ClassManager.Class.Assault;
             current_level_progression = 0;
         }
     }
@@ -165,9 +148,8 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
         PlayerPrefs.DeleteKey("AccountManager_current_level_progression");
         PlayerPrefs.DeleteKey("AccountManager_selected_class");
 
+        foreach (ClassManager.Class classEnum in System.Enum.GetValues(typeof(ClassManager.Class))) PlayerPrefs.DeleteKey($"AccountManager_Skin_{classEnum}");
         Debug.Log("Dados do AccountManager resetados com sucesso!");
-
-        // Recarregar com valores padrão
         LoadData();
     }
 }

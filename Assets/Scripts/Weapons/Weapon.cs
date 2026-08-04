@@ -454,8 +454,8 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         }
 
         ApplyRecoilToCamera(
-            weaponProperties.recoilValues.recoilPattern[recoilIndex].verticalRecoil,
-            weaponProperties.recoilValues.recoilPattern[recoilIndex].horizontalRecoil,
+            Recoil.GetVerticalRecoilDirection(weaponProperties.recoilValues.recoilPattern[recoilIndex].verticalRecoil),
+            Recoil.GetHorizontalRecoilDirection(weaponProperties.recoilValues.recoilPattern[recoilIndex].horizontalRecoil),
             isFirstShot
         );
 
