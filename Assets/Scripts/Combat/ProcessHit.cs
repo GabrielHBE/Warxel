@@ -1,51 +1,51 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public static class ProcessHit
 {
+    private static Dictionary<ProcessInfantryDamage.LimbMultiplier, float> limbMultiplierValues =
+    new Dictionary<ProcessInfantryDamage.LimbMultiplier, float>
+    {
+        { ProcessInfantryDamage.LimbMultiplier.Torso, 1 },
+        { ProcessInfantryDamage.LimbMultiplier.Leg, 0.8f },
+        { ProcessInfantryDamage.LimbMultiplier.Arm, 0.8f },
+        { ProcessInfantryDamage.LimbMultiplier.Hand, 0.7f },
+        { ProcessInfantryDamage.LimbMultiplier.Foot, 0.7f }
+    };
+
     #region Player
     /// <summary>
     /// Direct hit
     /// </summary>
     public static void PlayerHit(GameObject collisionGo, float damage, float hs_multiplier, GameObject shoot_root)
     {
-        bool hs_hit = false;
-        PlayerController player = collisionGo.GetComponentInParent<PlayerController>();
-        PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
+        ProcessInfantryDamage processInfantryDamage = collisionGo.GetComponent<ProcessInfantryDamage>();
 
-        if (playerProperties.is_dead.Value) return;
+        if (processInfantryDamage.IsPlayerDead()) return;
 
-        float start_hp = playerProperties.hp.Value;
-        float base_damage;
+        float start_hp = processInfantryDamage.GetHP();
 
-        if (collisionGo.gameObject.CompareTag("PlayerHead"))
-        {
-            base_damage = damage * hs_multiplier;
-            hs_hit = true;
-        }
-        else if (collisionGo.gameObject.CompareTag("Arms and Legs"))
-        {
-            base_damage = damage * 0.8f;
-        }
-        else if (collisionGo.gameObject.CompareTag("Feet and Hands"))
-        {
-            base_damage = damage * 0.7f;
-        }
-        else
-        {
-            base_damage = damage;
-        }
+        // Obtém o multiplicador do membro usando o dicionário
+        ProcessInfantryDamage.LimbMultiplier limb = processInfantryDamage.GetLimbMultiplier();
+        float limbMultiplier = limbMultiplierValues.TryGetValue(limb, out float multiplier) ? multiplier : 1;
 
-        player.RequestDamage(base_damage);
+        // Verifica se é headshot (opcional, se quiser diferenciar)
+        bool isHeadShot = limb == ProcessInfantryDamage.LimbMultiplier.Head;
 
-        float target_resistance = player.GetResistance();
+        // Aplica o multiplicador do membro E o multiplicador de headshot (se for cabeça)
+        float base_damage = damage * limbMultiplier;
+        if (isHeadShot) base_damage *= hs_multiplier; // Aplica o multiplicador extra de headshot
+
+
+        processInfantryDamage.Damage(base_damage);
+
+        float target_resistance = processInfantryDamage.GetResistance();
         float dano_real_esperado = base_damage * ((100f - target_resistance) / 100f);
         float post_hp = start_hp - dano_real_esperado;
         bool is_lethal_shot = post_hp <= 0;
 
         if (is_lethal_shot)
-        {
-            ProcessKill.ProcessInfantryKill(shoot_root, hs_hit, playerProperties.player_name.Value);
-        }
+            ProcessKill.ProcessInfantryKill(shoot_root, isHeadShot, processInfantryDamage.GetPlayerName());
 
         DamageMarker.Instance.UpdateDamage(dano_real_esperado);
     }
@@ -56,9 +56,15 @@ public static class ProcessHit
     public static void PlayerHit(PlayerController player, Collider collider, Vector3 contact_point, GameObject itemUsedToKill, float dmg, float damageFalloff, float destructionRadius)
     {
         PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
+        
+        if (playerProperties.is_dead.Value) return;
+
+        ProcessInfantryDamage processInfantryDamage = player.GetComponent<ProcessInfantryDamage>();
+        
+        if (processInfantryDamage.IsPlayerDead()) return;
 
         Vector3 closestPoint = collider.ClosestPoint(contact_point);
-  
+
         float distance = Vector3.Distance(contact_point, closestPoint);
 
         // Calcula a porcentagem da distância (1 = colado na explosão, 0 = no limite do destructionRadius)
@@ -67,21 +73,35 @@ public static class ProcessHit
         // Aplica a variável de controle usando potência (Pow)
         float damageMultiplier = Mathf.Pow(distanceRatio, damageFalloff);
 
-        float damage = dmg * damageMultiplier;
-        player.RequestDamage(damage);
+        float baseDamage = dmg * damageMultiplier;
 
-        float target_resistance = player.GetResistance();
-        float final_actual_damage = damage * ((100f - target_resistance) / 100f);
+        // Obtém o multiplicador do membro usando o dicionário
+        ProcessInfantryDamage.LimbMultiplier limb = processInfantryDamage.GetLimbMultiplier();
+        float limbMultiplier = limbMultiplierValues.TryGetValue(limb, out float multiplier) ? multiplier : 1;
+
+        // Verifica se é headshot (explosões geralmente não fazem headshot, mas mantemos para consistência)
+        bool isHeadShot = limb == ProcessInfantryDamage.LimbMultiplier.Head;
+
+        // Aplica o multiplicador do membro (explosões não têm multiplicador de headshot extra)
+        float finalDamage = baseDamage * limbMultiplier;
+        
+        // Aplica o dano ao jogador
+        processInfantryDamage.Damage(finalDamage);
+
+        float target_resistance = processInfantryDamage.GetResistance();
+        float final_actual_damage = finalDamage * ((100f - target_resistance) / 100f);
 
         DamageMarker.Instance.UpdateDamage(final_actual_damage);
 
         CameraShake cameraShake = player.GetComponentInChildren<CameraShake>();
 
-        if (cameraShake != null)  cameraShake.RequestShake(damage / 10, 1f);
-        
+        if (cameraShake != null) cameraShake.RequestShake(finalDamage / 10, 1f);
 
-        if (playerProperties.is_dead.Value) ProcessKill.ProcessInfantryKill(itemUsedToKill, false, playerProperties.player_name.Value);
-        
+        // Verifica se o jogador morreu após o dano
+        if (playerProperties.is_dead.Value) 
+        {
+            ProcessKill.ProcessInfantryKill(itemUsedToKill, isHeadShot, playerProperties.player_name.Value);
+        }
     }
     #endregion
 
@@ -91,15 +111,15 @@ public static class ProcessHit
     /// </summary>
     public static void VehicleHit(GameObject collisionGo, float damage, GameObject shoot_root)
     {
-        Vehicle hit_vehicle = collisionGo.gameObject.GetComponent<Vehicle>() ?? collisionGo.gameObject.GetComponentInParent<Vehicle>();
+        ProcessVehicleDamage hit_vehicle = collisionGo.gameObject.GetComponent<ProcessVehicleDamage>();
 
         if (hit_vehicle != null)
         {
             string[] occupantNames = hit_vehicle.GetOccupantNames();
 
-            if (!hit_vehicle.vehicle_destroyed.Value)
+            if (!hit_vehicle.IsVehicleDestroyed())
             {
-                hit_vehicle.RequestDamage(damage);
+                hit_vehicle.Damage(damage);
 
                 float target_resistance = hit_vehicle.GetResistance();
                 float final_actual_damage = damage * ((100f - target_resistance) / 100f);
@@ -116,7 +136,7 @@ public static class ProcessHit
     /// <summary>
     /// Indirect hit from explosion
     /// </summary>
-    public static void VehicleHit(Vehicle vehicle, Collider collider, Vector3 contact_point, GameObject itemUsedToKill, float dmg, float destructionRadius, float damageFalloff)
+    public static void VehicleHit(ProcessVehicleDamage vehicle, Collider collider, Vector3 contact_point, GameObject itemUsedToKill, float dmg, float destructionRadius, float damageFalloff)
     {
         Vector3 closestPoint = collider.ClosestPoint(contact_point);
 
@@ -133,14 +153,12 @@ public static class ProcessHit
 
         DamageMarker.Instance.UpdateDamage(final_actual_damage);
 
-        vehicle.RequestDamage(damage);
+        vehicle.Damage(damage);
 
         string[] occupantNames = vehicle.GetOccupantNames();
 
-        if (vehicle.vehicle_destroyed.Value)
-        {
-            ProcessKill.ProcessVehicleKill(itemUsedToKill, occupantNames);
-        }
+        if (vehicle.IsVehicleDestroyed()) ProcessKill.ProcessVehicleKill(itemUsedToKill, occupantNames);
+        
     }
     #endregion
 }

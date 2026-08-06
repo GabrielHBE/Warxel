@@ -15,7 +15,7 @@ public static class Explosion
     {
         Collider[] colliders = Physics.OverlapSphere(contactPoint, destructionRadius);
 
-        var processedVehicles = new HashSet<Vehicle>();
+        var processedVehicles = new HashSet<ProcessVehicleDamage>();
         var processedPlayers = new HashSet<PlayerController>();
 
         foreach (Collider collider in colliders)
@@ -65,13 +65,13 @@ public static class Explosion
         float vehicleDmg,
         float damageFalloff,
         GameObject parentVehicle,
-        HashSet<Vehicle> processedVehicles)
+        HashSet<ProcessVehicleDamage> processedVehicles)
     {
         if (collider.gameObject.layer != LayerMask.NameToLayer("Vehicle"))
             return;
 
-        Vehicle vehicle = GetVehicleComponent(collider);
-        if (vehicle == null || processedVehicles.Contains(vehicle) || vehicle.vehicle_destroyed.Value)
+        ProcessVehicleDamage vehicle = GetVehicleComponent(collider);
+        if (vehicle == null || processedVehicles.Contains(vehicle) || vehicle.IsVehicleDestroyed())
             return;
 
         processedVehicles.Add(vehicle);
@@ -85,9 +85,9 @@ public static class Explosion
         return parentVehicle != null && collider.gameObject != parentVehicle.gameObject;
     }
 
-    private static Vehicle GetVehicleComponent(Collider collider)
+    private static ProcessVehicleDamage GetVehicleComponent(Collider collider)
     {
-        return collider.gameObject.GetComponent<Vehicle>() ?? collider.gameObject.GetComponentInParent<Vehicle>();
+        return collider.gameObject.GetComponent<ProcessVehicleDamage>();
     }
 
     private static void ProcessPlayerCollision(

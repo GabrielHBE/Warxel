@@ -120,8 +120,8 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         playerProperties.is_reloading = false;
         restarted = true;
 
-        weaponProperties.weapon.transform.localPosition = weaponProperties.initial_potiion;
-        weaponProperties.weapon.transform.localRotation = weaponProperties.initial_rotation;
+        weaponProperties.transform.localPosition = weaponProperties.initial_potiion;
+        weaponProperties.transform.localRotation = weaponProperties.initial_rotation;
 
         if (sight_attatchment != null)
         {
@@ -494,7 +494,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         while (elapsed < weaponProperties.recoilValues.applyRecoilSpeed)
         {
             elapsed += Time.deltaTime;
-            weaponProperties.weapon.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
+            weaponProperties.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
             playerController.playerCamera.fieldOfView = Mathf.Lerp(playerController.playerCamera.fieldOfView, playerController.playerCamera.fieldOfView + 0.3f, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
             yield return null;
         }
@@ -504,8 +504,8 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         while (elapsed < weaponProperties.recoilValues.resetRecoilSpeed)
         {
             elapsed += Time.deltaTime;
-            weaponProperties.weapon.transform.localPosition = Vector3.Lerp(
-                weaponProperties.weapon.transform.localPosition,
+            weaponProperties.transform.localPosition = Vector3.Lerp(
+                weaponProperties.transform.localPosition,
                 start,
                 elapsed / weaponProperties.recoilValues.applyRecoilSpeed
             );

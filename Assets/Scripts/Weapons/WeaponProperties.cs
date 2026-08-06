@@ -14,7 +14,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public float current_attachment_points;
  
     [Header("Core Settings")]
-    [HideInInspector] public GameObject weapon;
     public GameObject third_person_prefab;
     public Sprite icon_hud;
     public float ads_speed;
@@ -79,13 +78,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         Launcher
     }
 
-    #endregion
-
-    #region Unity Callbacks
-    void Awake()
-    {
-        weapon = gameObject;
-    }
     #endregion
 
     #region Initialization & Setup

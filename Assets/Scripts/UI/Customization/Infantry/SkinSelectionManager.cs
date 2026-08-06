@@ -50,21 +50,14 @@ public class SkinSelectionManager : MonoBehaviour
     {
         List<Skin> skinsForClass = new List<Skin>();
 
-        // Obtém todas as skins do SkinsManager
-        var allSkins = SkinsManager.Instance?.GetAllSkins() ?? new List<Skin>();
+        var allSkins = SkinsManager.Instance.GetAllSkins();
 
         foreach (Skin skin in allSkins)
         {
             if (skin.skinClass == classType)
             {
-                // Verifica se a skin está desbloqueada
-                bool isUnlocked = skin.battleCoinsToUnlock == 0 ||
-                                 PlayerPrefs.GetInt($"Skin_Unlocked_{skin.skingName}_{classType}", 0) == 1;
-
-                if (isUnlocked)
-                {
-                    skinsForClass.Add(skin);
-                }
+                bool isUnlocked = skin.battleCoinsToUnlock == 0 || PlayerPrefs.GetInt($"Skin_Unlocked_{skin.skingName}_{classType}", 0) == 1;
+                if (isUnlocked) skinsForClass.Add(skin);
             }
         }
 

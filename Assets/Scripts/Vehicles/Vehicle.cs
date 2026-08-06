@@ -13,7 +13,8 @@ public abstract class Vehicle : NetworkBehaviour,
     //Interfaces
     ISspottable, ICurrentHpUIValues, ICountermeasuresStatusUIValues, IGunHeatLevelUIValues,
     ICurrentAmmoUIValues, IAltitudeLevelUIValues, IItemIconsUIValues, ICurrentSpeedUIValues,
-    ICurrentThrottleUIValues, EntityFaction, UpgradeLevel
+    ICurrentThrottleUIValues, EntityFaction, UpgradeLevel,
+    IDamageable
 {
     [Header("--------------------------GENERAL VEHICLE SETTINGS--------------------------")]
     [Space(5)]
@@ -168,7 +169,7 @@ public abstract class Vehicle : NetworkBehaviour,
             ExitVehicle();
         }
 
-        if (InputManager.GetKeyDown(KeyCode.P)) RequestDamage(100);
+        if (InputManager.GetKeyDown(KeyCode.P)) TakeDamage(100);
     }
     protected virtual void HandleShooting()
     {
@@ -259,7 +260,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
         if (currentSeat != null && currentSeat.playerController != null)
         {
-            currentSeat.playerController.RequestDamage(_destructionTimer);
+            currentSeat.playerController.TakeDamage(_destructionTimer);
         }
 
         OnDestructionPhysicsTick(_destructionTimer);
@@ -504,11 +505,11 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (gameObject.layer == LayerMask.NameToLayer("Player") && rb.linearVelocity.magnitude > 0)
         {
-            gameObject.GetComponent<PlayerController>()?.RequestDamage(rb.linearVelocity.magnitude * 10);
+            gameObject.GetComponent<PlayerController>()?.TakeDamage(rb.linearVelocity.magnitude * 10);
         }
     }
     [ServerRpc(RequireOwnership = false)]
-    public void RequestDamage(float damage)
+    public void TakeDamage(float damage)
     {
         if (ignore_damage) return;
         float effectiveDamage = damage * ((100f - resistance.Value) / 100f);
@@ -522,7 +523,7 @@ public abstract class Vehicle : NetworkBehaviour,
         destructionRadius = Mathf.Clamp(destruction_force, 0, 30);
         Explosion.SphereExplosion(contact.point, 0, 0, destructionRadius, 0, null, gameObject);
         //voxCollider.SphereExplosion(contact.point, 0, 0);
-        RequestDamage(destructionRadius / 2);
+        TakeDamage(destructionRadius / 2);
     }
     [ServerRpc(RequireOwnership = false)]
     protected void RequestToExplode(Vector3 contact_point)
@@ -541,7 +542,7 @@ public abstract class Vehicle : NetworkBehaviour,
     private void TargetForceExitAndDamage(NetworkConnection conn)
     {
         if (is_in_vehicle && currentSeat?.playerController != null)
-            currentSeat.playerController.RequestDamage(100);
+            currentSeat.playerController.TakeDamage(100);
         ExitVehicle();
     }
     [ObserversRpc]

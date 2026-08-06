@@ -5,10 +5,8 @@ using FishNet.Object;
 using FishNet.Connection;
 using UnityEngine.Audio;
 using FishNet.Serializing;
-
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
+using UnityEngine.AddressableAssets;
+using System.Linq;
 
 public class SoundManager : NetworkBehaviour
 {
@@ -28,6 +26,9 @@ public class SoundManager : NetworkBehaviour
     [SerializeField] private AudioMixerGroup enviromentAudioMixerGroup;
     [SerializeField] private AudioMixerGroup hitAudioMixerGroup;
 
+    [Header("Asset Label")]
+    [SerializeField] private AssetLabelReference soundAssetLabelReference;
+
     public static AudioMixerGroup staticInWorldVoipAudioMixerGroup;
     public static AudioMixerGroup staticRadioVoipAudioMixerGroup;
     public static AudioMixerGroup staticMusicAudioMixerGroup;
@@ -36,9 +37,7 @@ public class SoundManager : NetworkBehaviour
     public static AudioMixerGroup staticHitAudioMixerGroup;
     public static AudioMixer staticMainMixer;
 
-    [Header("Configurações de Áudio (Atualizado Automatically)")]
-    [SerializeField] private List<AudioClip> internalAudioList = new List<AudioClip>();
-    private string rootFolder = "Assets/Sounds";
+    private AudioClip[] internalAudioList;
 
     private readonly static Dictionary<string, AudioClip> audioCache = new Dictionary<string, AudioClip>();
     private static readonly List<LoopAudio> loopAudioList = new List<LoopAudio>();
@@ -47,12 +46,11 @@ public class SoundManager : NetworkBehaviour
     private static AudioDistanceController staticAudioDistanceController;
     private static GameObject staticAudio2DPrefab;
 
-    void Start()
+    void Awake()
     {
         DefineStatics();
-
         Instance = this;
-        InitializeAudioCache();
+        WaitForLoadAllAddressables();
     }
 
     private void DefineStatics()
@@ -67,6 +65,8 @@ public class SoundManager : NetworkBehaviour
         staticAudioDistanceController = audioDistanceControllerPrefab;
         staticAudio2DPrefab = audio2DPrefab;
     }
+
+    private async void WaitForLoadAllAddressables() => await InitializeAudioCache();
 
     void Update()
     {
@@ -96,62 +96,25 @@ public class SoundManager : NetworkBehaviour
         }
     }
 
-    private void InitializeAudioCache()
+    private async System.Threading.Tasks.Task  InitializeAudioCache()
     {
-        audioCache.Clear();
+        var soundsHandle = Addressables.LoadAssetsAsync<AudioClip>(soundAssetLabelReference, null);
+
+        internalAudioList = (await soundsHandle.Task).ToArray();
+
         foreach (var clip in internalAudioList)
         {
             if (clip == null) continue;
             if (audioCache.TryAdd(clip.name, clip)) continue;
-            Debug.LogWarning($"[SoundManager] Áudio duplicado detectado e ignorado: '{clip.name}'");
         }
-    }
-
-    protected override void OnValidate()
-    {
-#if UNITY_EDITOR
-        base.OnValidate();
-        if (BuildPipeline.isBuildingPlayer || EditorApplication.isCompiling) return;
-        UpdateSoundsButton();
-#endif
-    }
-
-    [ContextMenu("Update Sounds Button")]
-    public void UpdateSoundsButton()
-    {
-#if UNITY_EDITOR
-        if (!AssetDatabase.IsValidFolder(rootFolder))
-        {
-            Debug.LogWarning($"[SoundManager] A pasta '{rootFolder}' não foi encontrada!");
-            return;
-        }
-
-        internalAudioList.Clear();
-        string[] guids = AssetDatabase.FindAssets("t:AudioClip", new[] { rootFolder });
-
-        foreach (string guid in guids)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
-
-            if (clip != null && !internalAudioList.Contains(clip))
-            {
-                internalAudioList.Add(clip);
-            }
-        }
-
-        EditorUtility.SetDirty(this);
-#endif
     }
 
     #region Helpers de Criação de Áudio
     public static AudioSource CreateConfiguredAudioSource(GameObject go, AudioClip clip, SoundProperties props, bool is3D, bool loop)
     {
         // Se vier do Pool, usa o componente existente para não adicionar múltiplos AudioSources
-        if (!go.TryGetComponent(out AudioSource audioSource))
-        {
-            audioSource = go.AddComponent<AudioSource>();
-        }
+        if (!go.TryGetComponent(out AudioSource audioSource)) audioSource = go.AddComponent<AudioSource>();
+        
 
         if (audioSource == null) return null;
 
@@ -248,10 +211,8 @@ public class SoundManager : NetworkBehaviour
     {
         foreach (var loopAudio in loopAudioList)
         {
-            if (loopAudio.target == target && loopAudio.audioSource != null && loopAudio.audioSource.clip == clip)
-            {
-                action(loopAudio.audioSource);
-            }
+            if (loopAudio.target == target && loopAudio.audioSource != null && loopAudio.audioSource.clip == clip) action(loopAudio.audioSource);
+            
         }
     }
 

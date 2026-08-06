@@ -81,20 +81,35 @@ public class LoadoutSaverManager : MonoBehaviour
         ClassLoadoutData loadoutData = GetLoadoutDataForClass(targetClass);
         if (loadoutData == null) return;
 
+        // VERIFICAÇÕES DE SEGURANÇA
+        if (infantryLoadoutCustomization == null)
+        {
+            Debug.LogWarning("[Loadout] InfantryLoadoutCustomization é nulo!");
+            return;
+        }
+
         if (!string.IsNullOrEmpty(loadoutData.primaryWeaponName))
         {
             GameObject weapon = FindWeaponByName(loadoutData.primaryWeaponName, true);
-            if (weapon != null) infantryLoadoutCustomization.selected_primary = weapon;
+            if (weapon != null)
+                infantryLoadoutCustomization.selected_primary = weapon;
+            else
+                Debug.LogWarning($"[Loadout] Arma primária '{loadoutData.primaryWeaponName}' não encontrada!");
         }
 
         if (!string.IsNullOrEmpty(loadoutData.secondaryWeaponName))
         {
             GameObject weapon = FindWeaponByName(loadoutData.secondaryWeaponName, false);
-            if (weapon != null) infantryLoadoutCustomization.selected_secondary = weapon;
+            if (weapon != null)
+                infantryLoadoutCustomization.selected_secondary = weapon;
+            else
+                Debug.LogWarning($"[Loadout] Arma secundária '{loadoutData.secondaryWeaponName}' não encontrada!");
         }
 
         if (!string.IsNullOrEmpty(loadoutData.gadget1Name))
+        {
             infantryLoadoutCustomization.selected_gadget1 = FindGadgetByName(loadoutData.gadget1Name);
+        }
 
         // Carrega a skin
         if (!string.IsNullOrEmpty(loadoutData.skinName))
@@ -110,6 +125,13 @@ public class LoadoutSaverManager : MonoBehaviour
 
         GameObject[] weaponArray = primary ? infantryLoadoutCustomization.primaryWeapons : infantryLoadoutCustomization.secondaryWeapons;
 
+        // VERIFICAÇÃO: Se o array for nulo ou vazio, retorna null
+        if (weaponArray == null || weaponArray.Length == 0)
+        {
+            Debug.LogWarning($"[Loadout] Array de {(primary ? "primárias" : "secundárias")} está vazio ou nulo!");
+            return null;
+        }
+
         foreach (GameObject weapon in weaponArray)
         {
             if (weapon == null) continue;
@@ -121,6 +143,8 @@ public class LoadoutSaverManager : MonoBehaviour
             if (weapon.name == weaponName)
                 return weapon;
         }
+
+        Debug.LogWarning($"[Loadout] Arma '{weaponName}' não encontrada no array!");
         return null;
     }
 
@@ -128,11 +152,20 @@ public class LoadoutSaverManager : MonoBehaviour
     {
         if (infantryLoadoutCustomization == null) return null;
 
-        foreach (GameObject gadget in infantryLoadoutCustomization.gadgets)
+        var gadgets = infantryLoadoutCustomization.gadgets;
+        if (gadgets == null || gadgets.Length == 0)
+        {
+            Debug.LogWarning("[Loadout] Array de gadgets está vazio ou nulo!");
+            return null;
+        }
+
+        foreach (GameObject gadget in gadgets)
         {
             if (gadget == null) continue;
             if (gadget.name == gadgetName) return gadget;
         }
+
+        Debug.LogWarning($"[Loadout] Gadget '{gadgetName}' não encontrado!");
         return null;
     }
 

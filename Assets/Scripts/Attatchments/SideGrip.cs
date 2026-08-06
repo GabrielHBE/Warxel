@@ -26,7 +26,7 @@ public class SideGrip : Attatchment
 
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_activateSideGrip))
         {
-            if (weaponProperties != null) StartCoroutine(Shake(weaponProperties.weapon.transform));
+            if (weaponProperties != null) StartCoroutine(Shake(weaponProperties.transform));
             if (cameraShake != null) cameraShake.RequestShake(0.5f);
             state = !state;
 
@@ -38,7 +38,7 @@ public class SideGrip : Attatchment
 
     public IEnumerator Shake(Transform weapon)
     {
-        Quaternion originalRot = weapon.transform.localRotation;
+        Quaternion originalRot = weapon.localRotation;
 
         Quaternion upRot = originalRot * Quaternion.Euler(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f));
 
@@ -47,22 +47,22 @@ public class SideGrip : Attatchment
 
         while (elapsed < duration)
         {
-            weapon.transform.localRotation = Quaternion.Lerp(originalRot, upRot, elapsed / duration);
+            weapon.localRotation = Quaternion.Lerp(originalRot, upRot, elapsed / duration);
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        weapon.transform.localRotation = upRot;
+        weapon.localRotation = upRot;
 
         elapsed = 0f;
         while (elapsed < duration)
         {
-            weapon.transform.localRotation = Quaternion.Lerp(upRot, originalRot, elapsed / duration);
+            weapon.localRotation = Quaternion.Lerp(upRot, originalRot, elapsed / duration);
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        weapon.transform.localRotation = originalRot;
+        weapon.localRotation = originalRot;
     }
 
     public override string GetAttatchmentDescription()

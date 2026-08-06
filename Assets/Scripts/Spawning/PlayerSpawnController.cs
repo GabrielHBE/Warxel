@@ -40,14 +40,47 @@ public class PlayerSpawnController : NetworkBehaviour
         Infantary,
         Vehicle,
     }
+
+    void Start()
+    {
+        StartCoroutine(FindSpawnCameraPosition());
+    }
+
+    private IEnumerator FindSpawnCameraPosition()
+    {
+        // Tenta encontrar o GameObject por alguns frames
+        float timeout = 2f;
+        float elapsed = 0f;
+
+        while (map_spawn_camera_pos == null && elapsed < timeout)
+        {
+            map_spawn_camera_pos = GameObject.FindWithTag("SpawnCameraPos")?.transform;
+
+            if (map_spawn_camera_pos == null)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        if (map_spawn_camera_pos != null)
+        {
+            transform.position = map_spawn_camera_pos.position;
+            transform.rotation = map_spawn_camera_pos.rotation;
+            Debug.Log("[PlayerSpawnController] SpawnCameraPos encontrado!");
+        }
+        else
+        {
+            Debug.LogError("[PlayerSpawnController] SpawnCameraPos NÃO encontrado! Verifique se o GameObject existe na cena com a tag correta.");
+            // Posição fallback
+            transform.position = new Vector3(0, 50, 0);
+            transform.rotation = Quaternion.identity;
+        }
+    }
+
     public override void OnStartClient()
     {
         base.OnStartClient();
-
-        map_spawn_camera_pos = GameObject.FindWithTag("SpawnCameraPos").transform;
-        transform.position = map_spawn_camera_pos.position;
-        transform.rotation = map_spawn_camera_pos.rotation;
-
         if (IsOwner)
         {
             infantary_spawn_flags = GameObject.FindGameObjectsWithTag("InfantarySpawnFlags");

@@ -37,7 +37,7 @@ public class ClassSelectionManager : MonoBehaviour
             CreateClassButton(classType, classIndex);
             classIndex++;
         }
-        
+
         SelectClass(infantryLoadoutCustomization._selectedClass);
     }
 
@@ -73,6 +73,7 @@ public class ClassSelectionManager : MonoBehaviour
         _buttonsList.Add(classButton);
     }
 
+
     public void SelectClass(ClassManager.Class @class)
     {
         infantryLoadoutCustomization.selected_primary = null;
@@ -85,12 +86,20 @@ public class ClassSelectionManager : MonoBehaviour
         Gadget gadget2_class = infantryLoadoutCustomization.classManager.GetClassGadget(@class);
         if (gadget2_class != null) infantryLoadoutCustomization.selected_gadget2 = gadget2_class.gameObject;
 
-        if (infantryLoadoutCustomization.loadoutSaverManager != null)
+        // VERIFICAÇÃO: Só carrega o loadout se os dados já estiverem carregados
+        if (infantryLoadoutCustomization.loadoutSaverManager != null &&
+            infantryLoadoutCustomization.primaryWeapons != null &&
+            infantryLoadoutCustomization.primaryWeapons.Length > 0)
         {
             infantryLoadoutCustomization.loadoutSaverManager.LoadLoadoutForClass(@class);
         }
+        else
+        {
+            Debug.LogWarning("[Loadout] Dados ainda não carregados, pulando LoadLoadoutForClass");
+        }
 
-        infantryLoadoutCustomization.class_description_text.text = "Class attributes:\n" + infantryLoadoutCustomization.classManager.GetClassDescription(@class);
+        infantryLoadoutCustomization.class_description_text.text = "Class attributes:\n" +
+            infantryLoadoutCustomization.classManager.GetClassDescription(@class);
         UpdateClassButtonColors();
         UpdateSelectionText($"Classe: {@class}");
     }

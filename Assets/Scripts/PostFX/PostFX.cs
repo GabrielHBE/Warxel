@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
+[RequireComponent(typeof(BoxCollider))]
 public abstract class PostFX : MonoBehaviour
 {
     [SerializeField] protected Volume volume;
@@ -11,6 +12,7 @@ public abstract class PostFX : MonoBehaviour
     
     protected virtual void Awake()
     {
+        GetComponent<BoxCollider>().isTrigger = true;
         InitializeVolume();
     }
 

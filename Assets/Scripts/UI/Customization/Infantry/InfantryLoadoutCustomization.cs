@@ -1,13 +1,10 @@
-using System.Collections.Generic;
+
 using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
+using UnityEngine.AddressableAssets;
 
 public class InfantryLoadoutCustomization : MonoBehaviour
 {
@@ -69,6 +66,11 @@ public class InfantryLoadoutCustomization : MonoBehaviour
     [SerializeField] public float minScrollY = -200f;
     [SerializeField] public float maxScrollYIncreaser = 100f;
 
+    [Header("Addressables")]
+    [SerializeField] private AssetLabelReference primaryAssetLabelReference;
+    [SerializeField] private AssetLabelReference secondaryAssetLabelReference;
+    [SerializeField] private AssetLabelReference gadgetAssetLabelReference;
+
     [Header("Sound Effects")]
     [SerializeField] public SoundManager.SoundComponents purchaseItemSfx;
     [SerializeField] public SoundManager.SoundComponents purchaseDenialItemSfx;
@@ -100,9 +102,6 @@ public class InfantryLoadoutCustomization : MonoBehaviour
     public GameObject _currentItemSelected;
     public GameObject _weaponBeingCustomized;
 
-    private string primaryWeaponsFolder = "Assets/Prefabs/Weapons/First Person/Primary";
-    private string secondaryWeaponsFolder = "Assets/Prefabs/Weapons/First Person/Secondary";
-    private string gadgetsFolder = "Assets/Prefabs/Gadgets/First Person";
     public GameObject[] primaryWeapons { get; private set; }
     public GameObject[] secondaryWeapons { get; private set; }
     public GameObject[] gadgets { get; private set; }
@@ -121,55 +120,38 @@ public class InfantryLoadoutCustomization : MonoBehaviour
     {
         Instance = this;
         InitializeManagers();
-        UpdateLoadoutLists();
+        WaitForLoadAllAddressables();
     }
 
-    private void OnValidate()
+    private async void WaitForLoadAllAddressables()
     {
-#if UNITY_EDITOR
-        if (BuildPipeline.isBuildingPlayer || EditorApplication.isCompiling) return;
-        UpdateLoadoutLists();
-#endif
+        await LoadAllAddressables();
+        InitializeUIAfterDataLoad();
     }
 
-    [ContextMenu("Update Loadout Lists")]
-    public void UpdateLoadoutLists()
+    private async System.Threading.Tasks.Task LoadAllAddressables()
     {
-#if UNITY_EDITOR
-        primaryWeapons = LoadPrefabsFromFolder(primaryWeaponsFolder);
-        secondaryWeapons = LoadPrefabsFromFolder(secondaryWeaponsFolder);
-        gadgets = LoadPrefabsFromFolder(gadgetsFolder);
-
-        EditorUtility.SetDirty(this);
-#endif
-    }
-
-#if UNITY_EDITOR
-    private GameObject[] LoadPrefabsFromFolder(string folderPath)
-    {
-        if (!AssetDatabase.IsValidFolder(folderPath))
+        try
         {
-            Debug.LogWarning($"[InfantryLoadoutCustomization] Pasta '{folderPath}' não foi encontrada!");
-            return new GameObject[0];
+            var primaryHandle = Addressables.LoadAssetsAsync<GameObject>(primaryAssetLabelReference, null);
+            var secondaryHandle = Addressables.LoadAssetsAsync<GameObject>(secondaryAssetLabelReference, null);
+            var gadgetsHandle = Addressables.LoadAssetsAsync<GameObject>(gadgetAssetLabelReference, null);
+
+            primaryWeapons = (await primaryHandle.Task).ToArray();
+            secondaryWeapons = (await secondaryHandle.Task).ToArray();
+            gadgets = (await gadgetsHandle.Task).ToArray();
+
+            Debug.Log($"[Loadout] Carregadas {primaryWeapons.Length} primárias, {secondaryWeapons.Length} secundárias, {gadgets.Length} gadgets");
         }
-
-        List<GameObject> foundPrefabs = new List<GameObject>();
-        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { folderPath });
-
-        foreach (string guid in guids)
+        catch (System.Exception ex)
         {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-
-            if (prefab != null && !foundPrefabs.Contains(prefab))
-            {
-                foundPrefabs.Add(prefab);
-            }
+            Debug.LogError($"[Loadout] Erro ao carregar Addressables: {ex.Message}");
+            primaryWeapons = new GameObject[0];
+            secondaryWeapons = new GameObject[0];
+            gadgets = new GameObject[0];
         }
-
-        return foundPrefabs.ToArray();
     }
-#endif
+
 
     private void InitializeManagers()
     {
@@ -190,6 +172,15 @@ public class InfantryLoadoutCustomization : MonoBehaviour
         skinSelectionManager.Initialize(this); // NOVO
     }
 
+    private void InitializeUIAfterDataLoad()
+    {
+        // Agora os dados estão carregados, podemos iniciar a UI
+        _selectedClass = AccountManager.Instance.selected_class;
+
+        classSelectionManager.InitializeUI();
+        classSelectionManager.ShowClassSelection();
+    }
+
     private void Start()
     {
         locked_item_image = lockedItemImage;
@@ -197,10 +188,6 @@ public class InfantryLoadoutCustomization : MonoBehaviour
         reference_purchase_item_sfx = purchaseItemSfx;
         reference_purchase_denial_item_sfx = purchaseDenialItemSfx;
 
-        _selectedClass = AccountManager.Instance.selected_class;
-
-        classSelectionManager.InitializeUI();
-        classSelectionManager.ShowClassSelection();
     }
 
     private void Update()

@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
+public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, IDamageable
 {
     public static PlayerController Instance { get; private set; }
 
@@ -62,7 +62,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     [SerializeField] private SwitchWeapon switchWeapon;
     [SerializeField] private WeaponIcon weaponIcon;
     [SerializeField] private float footstepSound_interval = 0.45f;
-    [SerializeField] private CameraShake cameraShake;
+    public CameraShake cameraShake;
     [SerializeField] private FootstepSound footstepSound;
     [SerializeField] private Weapon weapon;
     public SoldierHudManager soldierHudManager;
@@ -128,7 +128,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     // Performance: Array cache para Physics.OverlapSphereNonAlloc
     private Collider[] medicCollidersCache = new Collider[6];
-    private Coroutine current_DealDamageOverTime;
 
     private enum PlayerStance { Stand, Crouch, Prone, Disabled }
     private PlayerStance currentStance = PlayerStance.Stand;
@@ -207,7 +206,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     #region Initialization
     public void ConfigureOwner()
     {
-        GetComponent<SkinApplier>().ApplySkin();
+        GetComponent<SkinApplier>().ApplySkin(this);
 
         soldierHudManager.ActivateStandardHUD();
 
@@ -233,14 +232,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         interactivesLayer = LayerMask.GetMask("Interactives");
         playerLayer = LayerMask.GetMask("Player");
 
-        try
-        {
-            playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-        }catch(Exception)
-        {
-            
-        }
-        
+        playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+
         InitializeVolume();
 
         readyToJump = true;
@@ -258,7 +251,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     private void HandleDebugInputManager()
     {
         if (InputManager.GetKeyDown(KeyCode.K)) Revive(100);
-        if (InputManager.GetKeyDown(KeyCode.G)) RequestDamage(100);
+        if (InputManager.GetKeyDown(KeyCode.G)) TakeDamage(100);
     }
 
     private void HandleInteractionInputManager()
@@ -275,7 +268,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         }
         else
             UpdateMovementInputManager();
-        
+
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision)) HandleNightVision();
 
         if (grounded)
@@ -574,7 +567,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
             if (cold_damage_timer > 5)
             {
                 cold_damage_timer = 0;
-                RequestDamage(5);
+                TakeDamage(5);
             }
         }
 
@@ -610,8 +603,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         playerProperties.isGrounded = false;
     }
 
-    private void ResetJump() =>  readyToJump = true;
-    
+    private void ResetJump() => readyToJump = true;
+
     private void UpdateGroundCheck()
     {
         bool is_holding_roll = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
@@ -644,7 +637,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
                 ExecuteRoll();
             }
 
-            if (fall_damage != 0) RequestDamage(fall_damage);
+            if (fall_damage != 0) TakeDamage(fall_damage);
             cameraShake.RequestShake(3, 0.15f);
         }
 
@@ -759,7 +752,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
     }
 
     private void UpdateHeadRotation() => playerHead.transform.rotation = playerCamera.transform.rotation;
-    
+
     private void UpdateRecoil()
     {
         float resetSpeed = 4f;
@@ -824,8 +817,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         if (weapon.weaponProperties != null)
         {
             weapon.can_shoot = true;
-            weapon.weaponProperties.weapon.transform.localPosition = weapon.weaponProperties.initial_potiion;
-            weapon.weaponProperties.weapon.transform.localRotation = weapon.weaponProperties.initial_rotation;
+            weapon.weaponProperties.transform.localPosition = weapon.weaponProperties.initial_potiion;
+            weapon.weaponProperties.transform.localRotation = weapon.weaponProperties.initial_rotation;
             weapon.weaponAnimation.FinishReloadAnimation();
         }
     }
@@ -861,7 +854,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     [ServerRpc(RequireOwnership = true)]
     private void CmdUpdateColliderStateRemote(PlayerStance playerStance) => RpcUpdateColliderStateRemote(playerStance);
-    
+
     [ObserversRpc(ExcludeOwner = true)]
     private void RpcUpdateColliderStateRemote(PlayerStance playerStance)
     {
@@ -957,7 +950,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     [ServerRpc(RequireOwnership = true)]
     private void RequestDespawn() => Despawn(gameObject);
-    
+
     private void HandleMecidProximity()
     {
         // Otimização: Uso de NonAlloc para evitar geração excessiva de lixo no GC a cada frame
@@ -999,16 +992,14 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         Gizmos.DrawWireSphere(transform.position, 50);
     }
 
-    [ServerRpc(RequireOwnership = true)]
-    private void CmdUpdateServerHP(float hp) => playerProperties.hp.Value = hp;
-    
-    [ServerRpc(RequireOwnership = true)]
+    [ServerRpc]
+    public void RequestUpdateServerHP(float hp) => playerProperties.hp.Value = hp;
+
+    [ServerRpc]
     private void CmdUpdateServerIsDead(bool is_dead) => playerProperties.is_dead.Value = is_dead;
     #endregion
 
     #region Damage / Kill and Revive
-    public float GetDamageDealt() => damage_dealt;
-    
     public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
     {
         this.applyRecoilSpeed = applyRecoilSpeed;
@@ -1018,7 +1009,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
         UpdateMovementSpeed();
     }
 
-    public void RequestDamage(float rawDamage, string player_who_dealt_damage = null)
+    public void TakeDamage(float rawDamage)
     {
         if (playerProperties.is_dead.Value) return;
         CmdApplyDamage(rawDamage);
@@ -1026,61 +1017,32 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction
 
     [ServerRpc(RequireOwnership = false)]
     private void CmdApplyDamage(float rawDamage) => TargetReceiveDamage(Owner, rawDamage);
-    
+
     [TargetRpc]
     private void TargetReceiveDamage(NetworkConnection conn, float dmg)
     {
         damage_dealt = dmg * ((100f - playerProperties.resistance.Value) / 100f);
         playerProperties.hp.Value -= damage_dealt;
 
-        CmdUpdateServerHP(playerProperties.hp.Value);
+        RequestUpdateServerHP(playerProperties.hp.Value);
 
         cameraShake.RequestShake(damage_dealt / 2, 0.1f);
         if (damage_dealt > 40) soldierHudManager.screenBlood.TriggerBlood();
-        if (playerProperties.hp.Value <= 0)
-        {
-            if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
-            playerProperties.hp.Value = 0;
-            playerProperties.is_dead.Value = true;
-
-            soldierHudManager.ActivateDeadHUD();
-
-            CmdUpdateServerHP(0);
-            CmdUpdateServerIsDead(true);
-            EnableDeathCollier();
-        }
+        if (playerProperties.hp.Value <= 0) ProcessDeadPlayer();
     }
 
-    public void DamageOverTime(float damage, float duration, float damage_rate)
+    public void ProcessDeadPlayer()
     {
-        if (current_DealDamageOverTime != null) return;
-        current_DealDamageOverTime = StartCoroutine(DealDamageOverTime(damage, duration, damage_rate));
-    }
-
-    private IEnumerator DealDamageOverTime(float damage, float duration, float damage_rate)
-    {
-        float elapsedTime = 0f;
-        float damage_timer = 0;
-
-        while (elapsedTime < duration)
-        {
-            elapsedTime += Time.deltaTime;
-            damage_timer += Time.deltaTime;
-
-            if (damage_timer >= damage_rate)
-            {
-                RequestDamage(damage);
-                damage_timer = 0;
-            }
-
-            yield return null;
-        }
-        current_DealDamageOverTime = null;
+        if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
+        if (playerProperties.hp.Value != 0) RequestUpdateServerHP(0);
+        if (!playerProperties.is_dead.Value) CmdUpdateServerIsDead(true);
+        soldierHudManager.ActivateDeadHUD();
+        EnableDeathCollier();
     }
 
     public void Revive(float hp)
     {
-        CmdUpdateServerHP(hp);
+        RequestUpdateServerHP(hp);
         CmdUpdateServerIsDead(false);
         HideOwnerItems(true);
 

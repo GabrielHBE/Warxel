@@ -88,19 +88,14 @@ public class StromManager : NetworkBehaviour
     private void DamagePlayer(RaycastHit hit)
     {
         PlayerController player = hit.transform.GetComponent<PlayerController>();
-        if (player != null)
-        {
-            player.RequestDamage(100);
-        }
+        if (player != null)player.TakeDamage(100);
     }
 
     private void DamageVehicle(RaycastHit hit)
     {
         Vehicle vehicle = hit.transform.GetComponent<Vehicle>();
-        if (vehicle != null)
-        {
-            vehicle.RequestDamage(100);
-        }
+        if (vehicle != null) vehicle.TakeDamage(100);
+        
     }
 
     private System.Collections.IEnumerator DestroyAfterDelay(GameObject obj, float delay)
