@@ -8,9 +8,8 @@ using FishNet.Serializing;
 using UnityEngine.AddressableAssets;
 using System.Linq;
 
-public class SoundManager : NetworkBehaviour
+public class SoundManager : ServerSingleton<SoundManager>
 {
-    public static SoundManager Instance { get; private set; }
 
     [Header("Audio Pool")]
     [SerializeField] private AudioDistanceController audioDistanceControllerPrefab;
@@ -46,10 +45,10 @@ public class SoundManager : NetworkBehaviour
     private static AudioDistanceController staticAudioDistanceController;
     private static GameObject staticAudio2DPrefab;
 
-    void Awake()
+    protected override void Awake()
     {
+        base.Awake();
         DefineStatics();
-        Instance = this;
         WaitForLoadAllAddressables();
     }
 

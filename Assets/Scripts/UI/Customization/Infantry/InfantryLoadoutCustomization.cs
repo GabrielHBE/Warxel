@@ -6,9 +6,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.AddressableAssets;
 
-public class InfantryLoadoutCustomization : MonoBehaviour
+public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoadoutCustomization>
 {
-    public static InfantryLoadoutCustomization Instance { get; private set; }
 
     [Header("Prefabs")]
     public ClassManager classManager;
@@ -116,9 +115,9 @@ public class InfantryLoadoutCustomization : MonoBehaviour
     // Adicione esta referência
     public SkinSelectionManager skinSelectionManager { get; private set; }
 
-    private void Awake()
+    protected override void Awake()
     {
-        Instance = this;
+        base.Awake();
         InitializeManagers();
         WaitForLoadAllAddressables();
     }
@@ -126,9 +125,17 @@ public class InfantryLoadoutCustomization : MonoBehaviour
     private async void WaitForLoadAllAddressables()
     {
         await LoadAllAddressables();
+
+        // Verifica se os dados foram carregados corretamente
+        if (primaryWeapons == null || primaryWeapons.Length == 0)
+        {
+            Debug.LogError("[Loadout] Falha ao carregar Addressables no build!");
+            // Tenta carregar novamente ou usa fallback
+            await LoadAllAddressables();
+        }
+
         InitializeUIAfterDataLoad();
     }
-
     private async System.Threading.Tasks.Task LoadAllAddressables()
     {
         try
@@ -193,6 +200,16 @@ public class InfantryLoadoutCustomization : MonoBehaviour
     private void Update()
     {
         uIUpdateManager.UpdateUI();
+        if (SquadSelecionUI.Instance == null) return;
+
+        if (_currentStage == SelectionStage.ClassSelection)
+        {
+            if (!SquadSelecionUI.Instance.gameObject.activeSelf) SquadSelecionUI.Instance.gameObject.SetActive(true);
+        }
+        else
+        {
+            if (SquadSelecionUI.Instance.gameObject.activeSelf) SquadSelecionUI.Instance.gameObject.SetActive(false);
+        }
     }
 
     public void SaveCurrentLoadout() => loadoutSaverManager.SaveCurrentLoadout(_selectedClass);

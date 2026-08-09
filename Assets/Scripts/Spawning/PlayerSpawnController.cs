@@ -2,14 +2,10 @@ using FishNet.Object;
 using UnityEngine;
 using TMPro;
 using System.Collections;
-using FishNet;
-using FishNet.Managing;
 using FishNet.Connection;
 
-public class PlayerSpawnController : NetworkBehaviour
+public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
 {
-    public static PlayerSpawnController Instance { get; private set; }
-
     [SerializeField] private UI_SpawnMenuController infantaryVehicleSwitch;
     [SerializeField] private float reespawn_delay;
     [SerializeField] private TextMeshProUGUI reespawn_delay_text;
@@ -40,12 +36,7 @@ public class PlayerSpawnController : NetworkBehaviour
         Infantary,
         Vehicle,
     }
-
-    void Start()
-    {
-        StartCoroutine(FindSpawnCameraPosition());
-    }
-
+    protected override void Awake() => StartCoroutine(FindSpawnCameraPosition());
     private IEnumerator FindSpawnCameraPosition()
     {
         // Tenta encontrar o GameObject por alguns frames
@@ -99,7 +90,7 @@ public class PlayerSpawnController : NetworkBehaviour
 
     private void InitializeForOwner()
     {
-        Instance = this;
+        SetInstance();
         original_spawn_delay = reespawn_delay;
         reespawn_delay = 0;
         // Guarda posição inicial da câmera
@@ -248,6 +239,13 @@ public class PlayerSpawnController : NetworkBehaviour
         {
             SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle, playerClass, playerFaction);
         }
+
+        OnSpawnFinished();
+    }
+
+    private void OnSpawnFinished()
+    {
+        AccountManager.Instance.accountStatus.IncreaseClassSelecion();
     }
 
     private IEnumerator TransitionCameraToSpawnPoint(Transform spawn_point)
@@ -373,24 +371,10 @@ public class PlayerSpawnController : NetworkBehaviour
             return;
         }
 
-        if (InfantryLoadoutCustomization.Instance != null)
-        {
-            InfantryLoadoutCustomization.Instance.gameObject.SetActive(false);
-        }
-
-        if (VehicleLoadoutCustomization.Instance != null)
-        {
-            VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
-        }
-
-        if (canvas != null)
-        {
-            canvas.SetActive(false);
-        }
-        else
-        {
-            Debug.LogError("Falha crítica: Canvas não encontrado no Cliente!");
-        }
+        if (InfantryLoadoutCustomization.Instance != null) InfantryLoadoutCustomization.Instance.gameObject.SetActive(false);
+        if (VehicleLoadoutCustomization.Instance != null) VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
+        if(SquadSelecionUI.Instance!=null) SquadSelecionUI.Instance.gameObject.SetActive(false);
+        if (canvas != null) canvas.SetActive(false);
     }
 
     public void Reestart()
@@ -406,15 +390,10 @@ public class PlayerSpawnController : NetworkBehaviour
             spawn_camera.GetComponent<AudioListener>().enabled = true;
         }
 
-        if (InfantryLoadoutCustomization.Instance != null)
-        {
-            InfantryLoadoutCustomization.Instance.gameObject.SetActive(true);
-        }
-
-        if (canvas != null)
-        {
-            canvas.SetActive(true);
-        }
+        if(SquadSelecionUI.Instance!=null) SquadSelecionUI.Instance.gameObject.SetActive(true);
+        if (InfantryLoadoutCustomization.Instance != null)InfantryLoadoutCustomization.Instance.gameObject.SetActive(true);
+        if (canvas != null) canvas.SetActive(true);
+        
     }
     private Coroutine fov_transition_coroutine;
     public void EnablePlayerCustomization()

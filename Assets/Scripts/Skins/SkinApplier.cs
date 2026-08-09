@@ -1,3 +1,4 @@
+using System;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
@@ -39,7 +40,7 @@ public class SkinApplier : NetworkBehaviour
         SpawnSkinParts(skin, pc);
         RequestCreateSkin(GetSelectedSkinNameForClass(AccountManager.Instance.selected_class), AccountManager.Instance.selected_class, pc);
     }
-    
+
     [ServerRpc]
     private void SetPlayerController(PlayerController pc) => playerController.Value = pc;
 
@@ -51,38 +52,42 @@ public class SkinApplier : NetworkBehaviour
     {
         Skin skin = SkinsManager.GetSkin(skinName, skinClass);
         if (skin == null) return;
-        
+
         SpawnSkinParts(skin, pc);
     }
 
     private void SpawnSkinParts(Skin skin, PlayerController pc)
     {
-        // Core
-        ProcessInfantryDamage head = InstantiatePart(skin.head, headParent).GetComponent<ProcessInfantryDamage>();
-        head.SetPlayerController(pc);
-        if(IsOwner) head.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+        try
+        {
+            // Core
+            ProcessInfantryDamage head = InstantiatePart(skin.head, headParent).GetComponent<ProcessInfantryDamage>();
+            head.SetPlayerController(pc);
+            if (IsOwner) head.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
 
-        InstantiatePart(skin.torso, torsoParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.torso, torsoParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
-        // Left Arm
-        InstantiatePart(skin.leftUpperArm, leftUpperArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.leftLowerArm, leftLowerArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.leftHand, leftHandParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            // Left Arm
+            InstantiatePart(skin.leftUpperArm, leftUpperArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.leftLowerArm, leftLowerArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.leftHand, leftHandParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
-        // Right Arm
-        InstantiatePart(skin.rightUpperArm, rightUpperArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.rightLowerArm, rightLowerArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.rightHand, rightHandParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            // Right Arm
+            InstantiatePart(skin.rightUpperArm, rightUpperArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.rightLowerArm, rightLowerArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.rightHand, rightHandParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
-        // Left Leg
-        InstantiatePart(skin.leftUpperLeg, leftUpperLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.leftLowerLeg, leftLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.leftFoot, leftFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            // Left Leg
+            InstantiatePart(skin.leftUpperLeg, leftUpperLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.leftLowerLeg, leftLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.leftFoot, leftFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
-        // Right Leg
-        InstantiatePart(skin.rightUpperLeg, rightUpperLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.rightLowerLeg, rightLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-        InstantiatePart(skin.rightFoot, rightFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            // Right Leg
+            InstantiatePart(skin.rightUpperLeg, rightUpperLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.rightLowerLeg, rightLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            InstantiatePart(skin.rightFoot, rightFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+        }catch(Exception){}
     }
 
     private GameObject InstantiatePart(GameObject prefab, Transform parent)

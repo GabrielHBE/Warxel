@@ -74,35 +74,6 @@ public class UIUpdateManager : MonoBehaviour
     }
 
     private void UpdateClassParentVisibility() => infantryLoadoutCustomization.classesParent.gameObject.SetActive(infantryLoadoutCustomization.GetCurrentStage() == InfantryLoadoutCustomization.SelectionStage.ClassSelection);
-
-
     public void UpdateItemStatusText(string text) => itemStatusText.text = text;
 
-    /*
-    public void UpdateWeaponStats(WeaponProperties wp)
-    {
-        if (wp == null) return;
-
-        infantryLoadoutCustomization.rateOfFireText.text = wp.firing.rateOfFire.ToString("F0") + " RPM";
-        infantryLoadoutCustomization.adsSpeedText.text = wp.ads_speed.ToString("F2") + "s";
-        infantryLoadoutCustomization.playerSpeedModifierText.text = wp.speed_change.ToString("F0");
-        infantryLoadoutCustomization.zoomText.text = "x" + wp.zoom.ToString("F1");
-        infantryLoadoutCustomization.fireModesText.text = string.Join(" / ", wp.firing.fireModes);
-        infantryLoadoutCustomization.destructionForceText.text = wp.projectileValues.destructionRadius.ToString("F0");
-        infantryLoadoutCustomization.damageText.text = wp.projectileValues.infantryDamage.ToString("F1");
-        infantryLoadoutCustomization.minimumDamageText.text = wp.projectileValues.minimumDamage.ToString("F1");
-        infantryLoadoutCustomization.vehicleBaseDamageText.text = wp.projectileValues.vehicleDamage.ToString("F1");
-        infantryLoadoutCustomization.headshotMultiplierText.text = wp.projectileValues.headshotMultiplier.ToString("F1");
-        infantryLoadoutCustomization.damageDropoffText.text = wp.projectileValues.damageDropoff.ToString("F0") + "%";
-        infantryLoadoutCustomization.damageDropoffTimerText.text = wp.projectileValues.damageDropoffTimer.ToString("F2") + "s";
-        infantryLoadoutCustomization.spreadIncreaserText.text = wp.spreadValues.spreadIncreaser.ToString("F2");
-        infantryLoadoutCustomization.maxSpreadText.text = wp.spreadValues.maxSpread.ToString("F2");
-        infantryLoadoutCustomization.horizontalRecoilText.text = wp.recoilValues.recoilPattern.Average(v => v.horizontalRecoil.value).ToString("F2");
-        infantryLoadoutCustomization.verticalRecoilText.text = wp.recoilValues.recoilPattern.Average(v => v.verticalRecoil.value).ToString("F2");
-        infantryLoadoutCustomization.firstShotRecoilIncreaserText.text = "x" + wp.recoilValues.firstShootRecoilMultiplier.ToString("F1");
-        infantryLoadoutCustomization.magCountText.text = wp.reloadValues.magCount.ToString();
-        infantryLoadoutCustomization.bulletsPerMagText.text = wp.reloadValues.bulletsPerMag.ToString();
-        infantryLoadoutCustomization.reloadSpeedText.text = wp.reloadValues.reloadTime.ToString("F2") + "s";
-    }
-    */
 }

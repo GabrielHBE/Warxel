@@ -2,15 +2,8 @@ using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
 
-public class ProjectileSpawner : NetworkBehaviour
+public class ProjectileSpawner : ServerSingleton<ProjectileSpawner>
 {
-    public static ProjectileSpawner Instance { get; private set; }
-
-    void Awake()
-    {
-        Instance = this;
-    }
-
     public void CreateProjectile(GameObject projectile, GameObject dummyProjectile, Projectile.ProjectileProperties projectileProperties, Projectile.ProjectileValues projectileValues)
     {
         InstantiateLocalPooledProjectile(projectile, projectileProperties, projectileValues);

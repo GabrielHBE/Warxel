@@ -4,9 +4,8 @@ using UnityEngine;
 using System.Text;
 using TMPro;
 
-public class KillFeedDisplay : NetworkBehaviour
+public class KillFeedDisplay : ServerSingleton<KillFeedDisplay>
 {
-    public static KillFeedDisplay Instance { get; private set; }
     [SerializeField] private TextMeshProUGUI kill_feed_container_text;
     private List<string> killfeed_list = new List<string>();
 
@@ -15,10 +14,6 @@ public class KillFeedDisplay : NetworkBehaviour
     private StringBuilder sb = new StringBuilder();
 
     private int max_kills = 12;
-    void Awake()
-    {
-        Instance = this;
-    }
 
     void Update()
     {

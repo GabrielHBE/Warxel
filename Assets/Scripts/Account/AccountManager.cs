@@ -1,10 +1,8 @@
 using TMPro;
 using UnityEngine;
-using System.Collections.Generic;
 
 public class AccountManager : PersistentLocalSingleton<AccountManager>
 {
-    public AccountStatus status;
     public string account_name;
     public string id;
     public int level;
@@ -17,11 +15,13 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
 
     //Testing
     public UnityEngine.UI.Button switch_faction_button;
+    public AccountStatus accountStatus = new AccountStatus();
 
     protected override void Awake()
     {
         base.Awake();
         LoadData();
+        accountStatus.Initialize();
     }
 
     //Debug

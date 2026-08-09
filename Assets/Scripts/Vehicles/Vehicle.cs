@@ -679,7 +679,7 @@ public abstract class Vehicle : NetworkBehaviour,
     #endregion
 
     #region Enums
-    public enum VehicleCategory { MBT, IFV, ScoutHelicopter, AttackHelicopter, TransportHelicopter, AttackJet, StealthJet, Gunship }
+    public enum VehicleCategory { Jet, Boat, Helicopter, Tank }
     public enum VehicleType { Air, Land }
     #endregion
 }

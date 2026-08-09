@@ -18,14 +18,14 @@ public class SetInWorldPositionUI : MonoBehaviour
         }
     }
 
-    [SerializeField] private Updatemehtod updateMethod;
+    [SerializeField] private UpdateMethod updateMethod;
 
     [SerializeField] private bool disableWithinDistance;
     [SerializeField] private float viewDistance;
 
     [SerializeField] private List<UIWorldMapping> elements = new List<UIWorldMapping>();
 
-    private enum Updatemehtod
+    private enum UpdateMethod
     {
         Update,
         LateUpdate
@@ -33,12 +33,12 @@ public class SetInWorldPositionUI : MonoBehaviour
 
     private void Update()
     {
-        if (updateMethod == Updatemehtod.Update) MovePosition();
+        if (updateMethod == UpdateMethod.Update) MovePosition();
     }
 
     private void LateUpdate()
     {
-        if (updateMethod == Updatemehtod.LateUpdate) MovePosition();
+        if (updateMethod == UpdateMethod.LateUpdate) MovePosition();
     }
 
     private void MovePosition()

@@ -1,11 +1,11 @@
 using UnityEngine;
 
-public abstract class PersistentLocalSingleton<T> : MonoBehaviour where T : MonoBehaviour
+public class InMatchClientSingleton<T> : MonoBehaviour where T : MonoBehaviour
 {
     public static T Instance { get; private set; }
 
     protected virtual void Awake() => SetInstance();
-    protected virtual void SetInstance()
+    protected void SetInstance()
     {
         if (Instance != null && Instance != this)
         {
@@ -14,6 +14,6 @@ public abstract class PersistentLocalSingleton<T> : MonoBehaviour where T : Mono
         }
 
         Instance = this as T;
-        DontDestroyOnLoad(transform.root.gameObject);
     }
+
 }

@@ -7,7 +7,7 @@ public static class ProcessKill
     {
         EliminationMarker.Instance.InstantiateInfantryKillImage();
 
-        if (isHeadshot) AccountManager.Instance.status.AddHeadShotKill();
+        if (isHeadshot) AccountManager.Instance.accountStatus.AddHeadShotKill();
         if (itemUsedToKill != null)
         {
             UpgradeLevel up = itemUsedToKill.GetComponent<UpgradeLevel>();
@@ -36,7 +36,7 @@ public static class ProcessKill
     private static void MutualProcess(GameObject itemUsedToKill, string name)
     {
         KillFeedDisplay.Instance.AddKill(AccountManager.Instance.account_name, name, itemUsedToKill != null ? itemUsedToKill.name : "Placeholder");
-        AccountManager.Instance.status.AddKill();
+        AccountManager.Instance.accountStatus.AddKill();
         AccountManager.Instance.AddPointsToLevelUp(10);
     }
 

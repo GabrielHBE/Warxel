@@ -14,7 +14,7 @@ public class SpotController : NetworkBehaviour
     {
         base.OnStartClient();
 
-        if (playerProperties.selectedClass.Value != ClassManager.Class.Recoon || !IsOwner)
+        if (playerProperties.selectedClass.Value != ClassManager.Class.Recon || !IsOwner)
         {
             enabled = false;
         }

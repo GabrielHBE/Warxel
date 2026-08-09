@@ -119,25 +119,12 @@ public class SkinSelectionManager : MonoBehaviour
         if (skin != null && infantryLoadoutCustomization.currentItemParent != null)
         {
             // Instancia o GameObject da skin diretamente
-            _currentSkinPreview = Instantiate(skin.gameObject, infantryLoadoutCustomization.currentItemParent);
+            _currentSkinPreview = Instantiate(skin.anim.gameObject, infantryLoadoutCustomization.currentItemParent);
 
             // Ajusta a posição, rotação e escala para melhor visualização
             _currentSkinPreview.transform.localPosition = new Vector3(0.7f, -1, 0);
             _currentSkinPreview.transform.localRotation = Quaternion.Euler(0, 90, 0);
-            _currentSkinPreview.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
-
-            // Atualiza o texto de status com informações da skin
-            if (infantryLoadoutCustomization.uIUpdateManager != null)
-            {
-                string statusText = $"Skin: {skin.skingName}\n";
-                statusText += $"Classe: {skin.skinClass}\n";
-                statusText += $"Status: {(skin.battleCoinsToUnlock == 0 || PlayerPrefs.GetInt($"Skin_Unlocked_{skin.skingName}_{skin.skinClass}", 0) == 1 ? "Desbloqueada" : "Bloqueada")}";
-
-                if (skin.battleCoinsToUnlock > 0) statusText += $"\nPreço: {skin.battleCoinsToUnlock} Battle Coins";
-
-                infantryLoadoutCustomization.uIUpdateManager.UpdateItemStatusText(statusText);
-            }
-
+            _currentSkinPreview.transform.localScale = new Vector3(70,70, 70);
         }
     }
 
@@ -147,8 +134,7 @@ public class SkinSelectionManager : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    public static string LoadCurrentSkinForClass(ClassManager.Class classType) =>
-        PlayerPrefs.GetString($"Skin_Selected_{classType}", "");
+    public static string LoadCurrentSkinForClass(ClassManager.Class classType) => PlayerPrefs.GetString($"Skin_Selected_{classType}", "");
 
     public void UpdateAllButtonOutlines()
     {

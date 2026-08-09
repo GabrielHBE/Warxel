@@ -1,8 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
+using System;
 
-public class AccountStatus : PersistentLocalSingleton<AccountStatus>
+public class AccountStatus
 {
-    //public static AccountStatus Instance {get; private set;}
     public ClassManager.Class most_used_class;
     public float kd_ratio;
     public int total_head_shot_kills;
@@ -15,19 +16,22 @@ public class AccountStatus : PersistentLocalSingleton<AccountStatus>
     public int total_matches_lost;
     public float win_rate;
 
-    protected override void Awake()
-    {
-        base.Awake();
-        LoadAccountStatus();
+    private Dictionary<ClassManager.Class, int> classSelecion = new Dictionary<ClassManager.Class, int>();
 
+    // Constante para o prefixo das keys no PlayerPrefs
+    private const string CLASS_SELECTION_PREFIX = "AccountStatus_class_selection_";
+
+    public void Initialize()
+    {
+        LoadAccountStatus();
+        LoadClassSelections();
         CalculateKdRatio();
         CalculateWinRate();
+        UpdateMostUsedClass();
     }
-
 
     public void LoadAccountStatus()
     {
-        // Carregar todos os valores do PlayerPrefs (usando 0 como valor padrão caso não exista)
         total_kills = PlayerPrefs.GetInt("AccountStatus_total_kills", 0);
         total_deaths = PlayerPrefs.GetInt("AccountStatus_total_deaths", 0);
         total_head_shot_kills = PlayerPrefs.GetInt("AccountStatus_total_head_shot_kills", 0);
@@ -35,29 +39,83 @@ public class AccountStatus : PersistentLocalSingleton<AccountStatus>
         total_matches_played = PlayerPrefs.GetInt("AccountStatus_total_matches_played", 0);
         total_matches_won = PlayerPrefs.GetInt("AccountStatus_total_matches_won", 0);
         total_matches_lost = PlayerPrefs.GetInt("AccountStatus_total_matches_lost", 0);
-
-        // Carregar a win_rate se você estiver salvando ela também
         win_rate = PlayerPrefs.GetFloat("AccountStatus_win_rate", 0f);
-
     }
+
+    public void LoadClassSelections()
+    {
+        classSelecion.Clear();
+        
+        // Pega todos os valores do enum ClassManager.Class
+        foreach (ClassManager.Class classType in Enum.GetValues(typeof(ClassManager.Class)))
+        {
+            string key = GetClassSelectionKey(classType);
+            int value = PlayerPrefs.GetInt(key, 0);
+            classSelecion[classType] = value;
+        }
+    }
+
+    public void SaveClassSelections()
+    {
+        foreach (var kvp in classSelecion)
+        {
+            string key = GetClassSelectionKey(kvp.Key);
+            PlayerPrefs.SetInt(key, kvp.Value);
+        }
+        PlayerPrefs.Save();
+    }
+
+    public void IncreaseClassSelecion()
+    {
+        if (classSelecion.ContainsKey(AccountManager.Instance.selected_class)) classSelecion[AccountManager.Instance.selected_class] += 1;
+        else return;
+        
+        // Salva imediatamente a mudança
+        SaveClassSelections();
+        
+        // Atualiza a classe mais usada
+        UpdateMostUsedClass();
+    }
+
+    public int GetClassSelectionCount(ClassManager.Class _class)
+    {
+        if (classSelecion.ContainsKey(_class)) return classSelecion[_class];
+        
+        return 0;
+    }
+
+    private void UpdateMostUsedClass()
+    {
+        if (classSelecion.Count == 0) return;
+
+        ClassManager.Class mostUsed = ClassManager.Class.Assault;
+        int maxCount = 0;
+
+        foreach (var kvp in classSelecion)
+        {
+            if (kvp.Value > maxCount)
+            {
+                maxCount = kvp.Value;
+                mostUsed = kvp.Key;
+            }
+        }
+
+        most_used_class = mostUsed;
+        
+        // Salva a classe mais usada no PlayerPrefs
+        PlayerPrefs.SetString("AccountStatus_most_used_class", most_used_class.ToString());
+        PlayerPrefs.Save();
+    }
+
+    private string GetClassSelectionKey(ClassManager.Class classType) => $"{CLASS_SELECTION_PREFIX}{classType}";
+    public Dictionary<ClassManager.Class, int> GetClassSelections() => new Dictionary<ClassManager.Class, int>(classSelecion);
 
     public void CalculateKdRatio()
     {
-        // Evitar divisão por zero
-        if (total_deaths > 0)
-        {
-            kd_ratio = total_kills / total_deaths;
-        }
-        else if (total_kills > 0)
-        {
-            kd_ratio = total_kills; // Se não morreu, K/D é igual ao número de kills
-        }
-        else
-        {
-            kd_ratio = 0f;
-        }
-
-        // Opcional: salvar o K/D ratio
+        if (total_deaths > 0) kd_ratio = (float)total_kills / total_deaths;
+        else if (total_kills > 0) kd_ratio = total_kills;
+        else kd_ratio = 0f;
+        
         PlayerPrefs.SetFloat("AccountStatus_kd_ratio", kd_ratio);
         PlayerPrefs.Save();
     }
@@ -80,7 +138,7 @@ public class AccountStatus : PersistentLocalSingleton<AccountStatus>
 
     public void AddHeadShotKill()
     {
-        total_head_shot_kills += 1; // Corrigido: era =+1, agora é +=1
+        total_head_shot_kills += 1;
         PlayerPrefs.SetInt("AccountStatus_total_head_shot_kills", total_head_shot_kills);
         PlayerPrefs.Save();
     }
@@ -119,26 +177,17 @@ public class AccountStatus : PersistentLocalSingleton<AccountStatus>
     {
         total_matches_played = total_matches_won + total_matches_lost;
 
-        if (total_matches_played > 0)
-        {
-            win_rate = ((float)total_matches_won / (float)total_matches_played) * 100f;
-        }
-        else
-        {
-            win_rate = 0f;
-        }
-
-        // Salvar a win rate
+        if (total_matches_played > 0) win_rate = ((float)total_matches_won / (float)total_matches_played) * 100f;
+        else win_rate = 0f;
+        
         PlayerPrefs.SetFloat("AccountStatus_win_rate", win_rate);
-
-        // Atualizar total_matches_played no PlayerPrefs
         PlayerPrefs.SetInt("AccountStatus_total_matches_played", total_matches_played);
         PlayerPrefs.Save();
     }
 
-    // Método útil para resetar todos os status (para testes)
     public void ResetAllStats()
     {
+        // Remove todas as keys de status
         PlayerPrefs.DeleteKey("AccountStatus_total_kills");
         PlayerPrefs.DeleteKey("AccountStatus_total_deaths");
         PlayerPrefs.DeleteKey("AccountStatus_total_head_shot_kills");
@@ -148,11 +197,22 @@ public class AccountStatus : PersistentLocalSingleton<AccountStatus>
         PlayerPrefs.DeleteKey("AccountStatus_total_matches_lost");
         PlayerPrefs.DeleteKey("AccountStatus_win_rate");
         PlayerPrefs.DeleteKey("AccountStatus_kd_ratio");
+        PlayerPrefs.DeleteKey("AccountStatus_most_used_class");
+
+        // Remove todas as keys de seleção de classe
+        foreach (ClassManager.Class classType in System.Enum.GetValues(typeof(ClassManager.Class)))
+        {
+            PlayerPrefs.DeleteKey(GetClassSelectionKey(classType));
+        }
+
         PlayerPrefs.Save();
 
+        // Recarrega os dados
         LoadAccountStatus();
+        LoadClassSelections();
         CalculateKdRatio();
         CalculateWinRate();
+        UpdateMostUsedClass();
 
         Debug.Log("Todos os status foram resetados!");
     }

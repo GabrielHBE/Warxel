@@ -64,24 +64,24 @@ public class AccountMainMenu : MainMenuTabs
         selected_class.text = "Selected Class: " + AccountManager.Instance.selected_class.ToString().Replace("_", " ");
 
         //Account Status
-        most_used_class.text = "Most Used Class: " + AccountManager.Instance.status.most_used_class.ToString().Replace("_", " ");
-        kd_ratio.text = "K/D Ratio: " + AccountManager.Instance.status.kd_ratio.ToString();
-        total_head_shot_kills.text = "Head Shot Kills: " + AccountManager.Instance.status.total_head_shot_kills.ToString();
-        total_kills.text = "Total Kills: " + AccountManager.Instance.status.total_kills.ToString();
-        total_assists.text = "Total Assists: " + AccountManager.Instance.status.total_assists.ToString();
-        total_deaths.text = "Total Deaths: " + AccountManager.Instance.status.total_deaths.ToString();
-        if (AccountManager.Instance.status.most_used_weapon != null)
+        most_used_class.text = "Most Used Class: " + AccountManager.Instance.accountStatus.most_used_class.ToString().Replace("_", " ");
+        kd_ratio.text = "K/D Ratio: " + AccountManager.Instance.accountStatus.kd_ratio.ToString();
+        total_head_shot_kills.text = "Head Shot Kills: " + AccountManager.Instance.accountStatus.total_head_shot_kills.ToString();
+        total_kills.text = "Total Kills: " + AccountManager.Instance.accountStatus.total_kills.ToString();
+        total_assists.text = "Total Assists: " + AccountManager.Instance.accountStatus.total_assists.ToString();
+        total_deaths.text = "Total Deaths: " + AccountManager.Instance.accountStatus.total_deaths.ToString();
+        if (AccountManager.Instance.accountStatus.most_used_weapon != null)
         {
-            most_used_weapon.text = "Most Used Weapon: " + AccountManager.Instance.status.most_used_weapon.ToString();
+            most_used_weapon.text = "Most Used Weapon: " + AccountManager.Instance.accountStatus.most_used_weapon.ToString();
         }
         else
         {
             most_used_weapon.text = "Most Used Weapon: None";
         }
-        total_matches_played.text = "Total Matches Played: " + AccountManager.Instance.status.total_matches_played.ToString();
-        total_matches_won.text = "Total Matches Won: " + AccountManager.Instance.status.total_matches_won.ToString();
-        total_matches_lost.text = "Total Matches Lost: " + AccountManager.Instance.status.total_matches_lost.ToString();
-        win_rate.text = "Win Rate: " + AccountManager.Instance.status.win_rate.ToString();
+        total_matches_played.text = "Total Matches Played: " + AccountManager.Instance.accountStatus.total_matches_played.ToString();
+        total_matches_won.text = "Total Matches Won: " + AccountManager.Instance.accountStatus.total_matches_won.ToString();
+        total_matches_lost.text = "Total Matches Lost: " + AccountManager.Instance.accountStatus.total_matches_lost.ToString();
+        win_rate.text = "Win Rate: " + AccountManager.Instance.accountStatus.win_rate.ToString();
     }
 
 }

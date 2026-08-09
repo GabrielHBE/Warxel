@@ -3,25 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public enum VehicleCategory
+public class VehicleLoadoutCustomization : InMatchClientSingleton<VehicleLoadoutCustomization>
 {
-    MBT,
-    IFV,
-    ScoutHelicopter,
-    AttackHelicopter,
-    TransportHelicopter,
-    AttackJet,
-    StealthJet,
-    Gunship
-}
-
-public class VehicleLoadoutCustomization : MonoBehaviour
-{
-    public static VehicleLoadoutCustomization Instance { get; private set; }
-
     [Header("Camera")]
     [SerializeField] private Camera switchLoadoutCamera;
 
@@ -38,14 +23,10 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     [SerializeField] private Transform currentItemParent;
 
     [Header("Vehicle Lists")]
-    public GameObject[] mbtVehicles;
-    public GameObject[] ifvVehicles;
-    public GameObject[] scoutHeliVehicles;
-    public GameObject[] attackHeliVehicles;
-    public GameObject[] transportHeliVehicles;
-    public GameObject[] attackJetVehicles;
-    public GameObject[] stealthJetVehicles;
-    public GameObject[] gunshipVehicles;
+    public GameObject[] tankVehicles;
+    public GameObject[] jetVehicles;
+    public GameObject[] boatVehicles;
+    public GameObject[] helicopterVehicles;
 
     [Space]
 
@@ -92,7 +73,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     }
 
     private SelectionStage _currentStage = SelectionStage.CategorySelection;
-    private VehicleCategory _selectedCategory;
+    private Vehicle.VehicleCategory _selectedCategory;
     private GameObject _selectedVehiclePrefab;
     private GameObject _currentVehicleInstance;
     private VehicleCustomizableParts _selectedPartType;
@@ -103,34 +84,23 @@ public class VehicleLoadoutCustomization : MonoBehaviour
 
     private VehicleLoadoutSaver loadoutSaver;
 
-    public Vehicle selectedMbt;
-    public Vehicle selectedIfv;
-    public Vehicle selectedScountHeli;
-    public Vehicle selectedAttackHeli;
-    public Vehicle selectedTransportHeli;
-    public Vehicle selectedAttackJet;
-    public Vehicle selectedStealthJet;
-    public Vehicle selectedGunship;
+    public Vehicle selectedBoat;
+    public Vehicle selectedJet;
+    public Vehicle selectedTank;
+    public Vehicle selectedHelicopter;
 
     #region Unity Lifecycle
-
     private void Start()
     {
-        Instance = this;
         InitializeComponents();
         InitializeUI();
         ShowCategories();
     }
 
-    private void Update()
-    {
-        UpdateCameraVisibility();
-    }
-
+    private void Update() => UpdateCameraVisibility();
     #endregion
 
     #region Initialization
-
     private void InitializeComponents()
     {
         loadoutSaver = gameObject.AddComponent<VehicleLoadoutSaver>();
@@ -145,7 +115,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         // Inicializa o botão de customização
         if (customizeVehicleButton != null)
         {
-            customizeVehicleButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(OnCustomizeVehicleButtonClicked);
+            customizeVehicleButton.GetComponent<Button>().onClick.AddListener(OnCustomizeVehicleButtonClicked);
             customizeVehicleButton.SetActive(false);
         }
 
@@ -218,14 +188,14 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         if (currentSelectionText != null) currentSelectionText.text = "Selecione a Categoria de Veículos";
 
         int index = 0;
-        foreach (VehicleCategory category in Enum.GetValues(typeof(VehicleCategory)))
+        foreach (Vehicle.VehicleCategory category in Enum.GetValues(typeof(Vehicle.VehicleCategory)))
         {
             CreateCategoryButton(category, index);
             index++;
         }
     }
 
-    public void ShowVehicles(VehicleCategory category)
+    public void ShowVehicles(Vehicle.VehicleCategory category)
     {
         _currentStage = SelectionStage.VehicleSelection;
         _selectedCategory = category;
@@ -252,7 +222,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
     }
 
     // NOVO: Chamado ao clicar no botão de um veículo
-    public void OnVehicleSelected(GameObject vehiclePrefab, VehicleCategory category)
+    public void OnVehicleSelected(GameObject vehiclePrefab, Vehicle.VehicleCategory category)
     {
         if (selectItemSfx != null) SoundManager.Play2dSoundLocal(selectItemSfx.clip, selectItemSfx.properties);
         
@@ -272,14 +242,10 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         {
             switch (category)
             {
-                case VehicleCategory.MBT: selectedMbt = vehicleComponent; break;
-                case VehicleCategory.IFV: selectedIfv = vehicleComponent; break;
-                case VehicleCategory.ScoutHelicopter: selectedScountHeli = vehicleComponent; break;
-                case VehicleCategory.AttackHelicopter: selectedAttackHeli = vehicleComponent; break;
-                case VehicleCategory.TransportHelicopter: selectedTransportHeli = vehicleComponent; break;
-                case VehicleCategory.AttackJet: selectedAttackJet = vehicleComponent; break;
-                case VehicleCategory.StealthJet: selectedStealthJet = vehicleComponent; break;
-                case VehicleCategory.Gunship: selectedGunship = vehicleComponent; break;
+                case Vehicle.VehicleCategory.Boat: selectedBoat = vehicleComponent; break;
+                case Vehicle.VehicleCategory.Helicopter: selectedHelicopter = vehicleComponent; break;
+                case Vehicle.VehicleCategory.Tank: selectedHelicopter = vehicleComponent; break;
+                case Vehicle.VehicleCategory.Jet: selectedJet = vehicleComponent; break;
             }
         }
 
@@ -402,14 +368,14 @@ public class VehicleLoadoutCustomization : MonoBehaviour
 
     #region UI Creation Helpers
 
-    private void CreateCategoryButton(VehicleCategory category, int index)
+    private void CreateCategoryButton(Vehicle.VehicleCategory category, int index)
     {
         GameObject btnObj = Instantiate(vehicleCategoryButtonPrefab, categoriesParent);
         RectTransform rt = btnObj.GetComponent<RectTransform>();
         if (rt != null) rt.anchoredPosition = new Vector2(buttonStartX + (index * buttonSpacingX), buttonY);
 
         btnObj.GetComponentInChildren<TextMeshProUGUI>().text = category.ToString();
-        btnObj.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(() => ShowVehicles(category));
+        btnObj.GetComponent<Button>().onClick.AddListener(() => ShowVehicles(category));
         _buttonsList.Add(btnObj);
     }
 
@@ -422,7 +388,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         btnObj.GetComponentInChildren<TextMeshProUGUI>().text = vehiclePrefab.name;
 
         // MODIFICADO: Agora chama OnVehicleSelected em vez de abrir direto ShowOptions
-        btnObj.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(() => OnVehicleSelected(vehiclePrefab, _selectedCategory));
+        btnObj.GetComponent<Button>().onClick.AddListener(() => OnVehicleSelected(vehiclePrefab, _selectedCategory));
 
         _buttonsList.Add(btnObj);
     }
@@ -434,7 +400,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         if (rt != null) rt.anchoredPosition = new Vector2(0, loadoutOptionStartY + (index * loadoutOptionSpacingY));
 
         btnObj.GetComponentInChildren<TextMeshProUGUI>().text = slotType.ToString();
-        btnObj.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(() => ShowParts(slotType));
+        btnObj.GetComponent<Button>().onClick.AddListener(() => ShowParts(slotType));
         _buttonsList.Add(btnObj);
     }
 
@@ -508,18 +474,14 @@ public class VehicleLoadoutCustomization : MonoBehaviour
         }
     }
 
-    private GameObject[] GetVehiclesArrayForCategory(VehicleCategory category)
+    private GameObject[] GetVehiclesArrayForCategory(Vehicle.VehicleCategory category)
     {
         return category switch
         {
-            VehicleCategory.MBT => mbtVehicles,
-            VehicleCategory.IFV => ifvVehicles,
-            VehicleCategory.ScoutHelicopter => scoutHeliVehicles,
-            VehicleCategory.AttackHelicopter => attackHeliVehicles,
-            VehicleCategory.TransportHelicopter => transportHeliVehicles,
-            VehicleCategory.AttackJet => attackJetVehicles,
-            VehicleCategory.StealthJet => stealthJetVehicles,
-            VehicleCategory.Gunship => gunshipVehicles,
+            Vehicle.VehicleCategory.Tank => tankVehicles,
+            Vehicle.VehicleCategory.Boat => boatVehicles,
+            Vehicle.VehicleCategory.Jet => jetVehicles,
+            Vehicle.VehicleCategory.Helicopter => helicopterVehicles,
             _ => new GameObject[0]
         };
     }
@@ -544,7 +506,7 @@ public class VehicleLoadoutCustomization : MonoBehaviour
             if (buttonText != null) buttonText.text = _part.GetCustomizationPartName();
 
             SetupOutline();
-            GetComponent<UnityEngine.UI.Button>().onClick.AddListener(() => _parent.OnPartClicked(_part));
+            GetComponent<Button>().onClick.AddListener(() => _parent.OnPartClicked(_part));
         }
 
         private void SetupOutline()

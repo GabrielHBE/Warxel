@@ -1,5 +1,4 @@
 using UnityEngine;
-using System;
 
 public class ClassManager : MonoBehaviour
 {
@@ -20,8 +19,8 @@ public class ClassManager : MonoBehaviour
         Engineer,
         Assault,
         Support,
-        Recoon,
-        Squad_leader,
+        Recon,
+        SquadLeader,
         Pilot
     }
 

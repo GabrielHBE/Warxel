@@ -1,19 +1,18 @@
-using UnityEngine;
+using FishNet.Object;
 
-public abstract class PersistentLocalSingleton<T> : MonoBehaviour where T : MonoBehaviour
+public class ServerSingleton<T> : NetworkBehaviour where T : NetworkBehaviour
 {
     public static T Instance { get; private set; }
 
     protected virtual void Awake() => SetInstance();
-    protected virtual void SetInstance()
+    protected void SetInstance()
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            if (IsServerInitialized) Despawn();
             return;
         }
 
         Instance = this as T;
-        DontDestroyOnLoad(transform.root.gameObject);
     }
 }

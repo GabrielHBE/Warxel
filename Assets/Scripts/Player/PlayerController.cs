@@ -232,8 +232,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
         interactivesLayer = LayerMask.GetMask("Interactives");
         playerLayer = LayerMask.GetMask("Player");
 
-        playerHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
-
         InitializeVolume();
 
         readyToJump = true;
@@ -527,8 +525,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
             rb.AddForce(GetSlopeMoveDirection() * currentMoveSpeed * state_multiplier * rb.mass, ForceMode.Force);
 
-            if (rb.linearVelocity.y > 0)
-                rb.AddForce(Vector3.down * 80f * rb.mass, ForceMode.Force);
+            if (rb.linearVelocity.y > 0) rb.AddForce(Vector3.down * 80f * rb.mass, ForceMode.Force);
         }
         else if (grounded)
         {
@@ -544,10 +541,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
     private void ApplyCustomGravity()
     {
-        if (rb.linearVelocity.y < 0)
-        {
-            rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
-        }
+        if (rb.linearVelocity.y < 0) rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
     }
 
     private void ApplyWindPhysics()
@@ -932,7 +926,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
         if (deathProgress >= 1)
         {
-            AccountManager.Instance.status.AddDeath();
+            AccountManager.Instance.accountStatus.AddDeath();
             AccountManager.Instance.RemoveBattleCoin(10);
             PlayerSpawnController.Instance.Reestart();
 
