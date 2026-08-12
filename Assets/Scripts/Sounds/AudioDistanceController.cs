@@ -36,10 +36,8 @@ public class AudioDistanceController : LocalPooledObject
     protected void Awake()
     {
         // Salva os sons padrão configurados no Inspector do Prefab
-        if (distanceSounds != null)
-        {
-            defaultDistanceSounds = (DistanceSounds[])distanceSounds.Clone();
-        }
+        if (distanceSounds != null) defaultDistanceSounds = (DistanceSounds[])distanceSounds.Clone();
+        
     }
 
     // 2. Limpa o estado quando sair do Pool
@@ -75,10 +73,7 @@ public class AudioDistanceController : LocalPooledObject
         }
     }
 
-    public override void LocalFixedUpdate()
-    {
-        return;
-    }
+    public override void LocalFixedUpdate() {}
 
     private System.Collections.IEnumerator DeactivateAfterDelay(float delay)
     {

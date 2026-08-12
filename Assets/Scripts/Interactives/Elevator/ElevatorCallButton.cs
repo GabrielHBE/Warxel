@@ -23,14 +23,8 @@ public class ElevatorCallButton : InteractiveButton
 
         if (door != null && elevator != null && can_move_door)
         {
-            if (elevator.currentFloor == floor && !elevator.isMoving)
-            {
-                StartCoroutine(OpenDoor());
-            }
-            else
-            {
-                StartCoroutine(CloseDoor());
-            }
+            if (elevator.currentFloor == floor && !elevator.isMoving) StartCoroutine(OpenDoor());
+            else StartCoroutine(CloseDoor());
         }
 
     }
@@ -77,7 +71,4 @@ public class ElevatorCallButton : InteractiveButton
         can_move_door = false;
         Debug.Log("Door fully opened");
     }
-
-
-
 }

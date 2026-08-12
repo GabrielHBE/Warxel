@@ -14,10 +14,8 @@ public class RollTransitionState : StateMachineBehaviour
 
             Debug.DrawLine(origin_, origin_ + Vector3.up * distance, Color.green, 2);
 
-            if (Physics.SphereCast(origin_, playerController.stand_collider.radius, Vector3.up, out RaycastHit hit, distance, playerController.groundLayer))
-            {
-                playerProperties.crouched = true;
-            }
+            if (Physics.SphereCast(origin_, playerController.stand_collider.radius, Vector3.up, out RaycastHit hit, distance, playerController.groundLayer)) playerProperties.crouched = true;
+            
         }
 
         animator.GetComponentInParent<PlayerProperties>().roll = false;

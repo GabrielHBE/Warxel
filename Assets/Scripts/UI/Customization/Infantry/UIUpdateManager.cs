@@ -61,19 +61,16 @@ public class UIUpdateManager : MonoBehaviour
     {
         if (infantryLoadoutCustomization.GetCurrentStage() == InfantryLoadoutCustomization.SelectionStage.ClassSelection)
         {
-            if (switchLoadoutCamera != null)
-                switchLoadoutCamera.enabled = false;
+            if (switchLoadoutCamera != null) switchLoadoutCamera.enabled = false;
             infantryLoadoutCustomization.updateLoadoutButton.SetActive(true);
         }
         else
         {
-            if (switchLoadoutCamera != null)
-                switchLoadoutCamera.enabled = true;
+            if (switchLoadoutCamera != null) switchLoadoutCamera.enabled = true;
             infantryLoadoutCustomization.updateLoadoutButton.SetActive(false);
         }
     }
 
     private void UpdateClassParentVisibility() => infantryLoadoutCustomization.classesParent.gameObject.SetActive(infantryLoadoutCustomization.GetCurrentStage() == InfantryLoadoutCustomization.SelectionStage.ClassSelection);
     public void UpdateItemStatusText(string text) => itemStatusText.text = text;
-
 }

@@ -18,28 +18,18 @@ public class LANServerBrowser : MonoBehaviour
 
     private void OnEnable()
     {
-        if (networkDiscovery != null)
-        {
-            // Inscreve-se no evento disparado quando um servidor é encontrado
-            networkDiscovery.ServerFoundCallback += OnServerFound;
-        }
+        if (networkDiscovery != null)  networkDiscovery.ServerFoundCallback += OnServerFound;
 
-        // Inicia a busca automaticamente assim que o painel for ativado na tela!
         StartSearching();
     }
 
     private void OnDisable()
     {
-        if (networkDiscovery != null)
-        {
-            networkDiscovery.ServerFoundCallback -= OnServerFound;
-        }
-
-        // Para a busca ao fechar o painel para não gastar processamento à toa
+        if (networkDiscovery != null) networkDiscovery.ServerFoundCallback -= OnServerFound;
+        
         StopSearching();
     }
 
-    // Chame este método em um botão de "Atualizar / Search" caso o jogador queira recarregar a lista
     public void StartSearching()
     {
         ClearServerList();
@@ -56,49 +46,31 @@ public class LANServerBrowser : MonoBehaviour
     {
         if (networkDiscovery != null)
         {
-            // TRAVA DE SEGURANÇA:
-            // Se nós somos o Host (o servidor está ligado), não podemos usar o comando que desliga tudo,
-            // senão nós vamos matar o nosso próprio anúncio!
-            if (InstanceFinder.ServerManager != null && InstanceFinder.ServerManager.Started)
-            {
-                // Se a sua versão do FishNet Discovery tiver a função "StopSearching()", use ela:
-                // networkDiscovery.StopSearching();
 
-                Debug.Log("Busca interrompida. (Anúncio do servidor mantido ligado).");
-                return; // Sai da função antes de desligar o anúncio
-            }
+            if (InstanceFinder.ServerManager != null && InstanceFinder.ServerManager.Started) return;
 
-            // Se não somos o Host, é seguro desligar tudo
             networkDiscovery.StopSearchingOrAdvertising();
-            Debug.Log("Busca de servidores interrompida.");
+
         }
     }
     private void OnServerFound(IPEndPoint endpoint)
     {
-        // Instancia o botão na lista
         GameObject newButton = Instantiate(serverButtonPrefab, serverListParent);
 
-        // Pega o texto e coloca o IP do servidor
         TextMeshProUGUI buttonText = newButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (buttonText != null)
-        {
-            buttonText.text = $"Servidor: {endpoint.Address}";
-        }
-
-        // Adiciona a lógica de clique no botão gerado
+        if (buttonText != null)  buttonText.text = $"Servidor: {endpoint.Address}";
+        
         UnityEngine.UI.Button btn = newButton.GetComponent<UnityEngine.UI.Button>();
         btn.onClick.AddListener(() => ConnectToServer(endpoint.Address.ToString()));
     }
 
     private void ConnectToServer(string ipAddress)
     {
-        if (mainMenuConnection != null)
-            mainMenuConnection.StartMapImage("Conectando ao servidor...");
+        if (mainMenuConnection != null) mainMenuConnection.StartMapImage("Conectando ao servidor...");
 
-        // Para a busca antes de conectar para evitar problemas
+
         StopSearching();
 
-        // Inicia a conexão usando o IP encontrado
         InstanceFinder.ClientManager.StartConnection(ipAddress);
     }
 

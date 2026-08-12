@@ -26,10 +26,8 @@ public class GadgetButtonComponents : MonoBehaviour
     private void SetupImage()
     {
         Image[] allImages = GetComponentsInChildren<Image>(true);
-        if (allImages != null && allImages.Length > 0)
-        {
-            allImages[allImages.Length - 1].sprite = _imageHud;
-        }
+        if (allImages != null && allImages.Length > 0) allImages[allImages.Length - 1].sprite = _imageHud;
+        
     }
 
     private void SetupOutline()
@@ -48,11 +46,8 @@ public class GadgetButtonComponents : MonoBehaviour
     }
 
     private void OnPointerEnter() => infantryLoadoutCustomization.itemSelectionManager.OnButtonMouseEnter(_gadgetGameObject);
-    
-
     private void OnPointerClick() =>  infantryLoadoutCustomization.itemSelectionManager.OnButtonClicked(_gadgetGameObject);
     
-
     private void AddEventTrigger(EventTrigger trigger, EventTriggerType type, UnityEngine.Events.UnityAction action)
     {
         var entry = new EventTrigger.Entry { eventID = type };

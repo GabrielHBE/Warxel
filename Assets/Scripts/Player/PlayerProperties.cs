@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlayerProperties : NetworkBehaviour
 {
-    public readonly SyncVar<string> player_name = new SyncVar<string>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    public readonly SyncVar<string> playerName = new SyncVar<string>();
     public readonly SyncVar<ClassManager.Class> selectedClass = new SyncVar<ClassManager.Class>();
     public readonly SyncVar<FactionManager.Faction> faction = new SyncVar<FactionManager.Faction>();
     public bool crouched;
@@ -33,13 +33,7 @@ public class PlayerProperties : NetworkBehaviour
 
         hp.Value = 100;
         is_dead.Value = false;
-        if (IsOwner)
-        {
-            if (AccountManager.Instance.selected_class == ClassManager.Class.Support)
-            {
-                resistance.Value = 25;
-            }
-        }
+        if (IsOwner && AccountManager.Instance.selected_class == ClassManager.Class.Support) resistance.Value = 25;
 
     }
 

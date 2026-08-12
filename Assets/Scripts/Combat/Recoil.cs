@@ -34,9 +34,6 @@ public static class Recoil
         return (finalVertical, finalHorizontal);
     }
 
-    /// <summary>
-    /// Calcula o deslocamento (offset) físico da arma na tela do jogador.
-    /// </summary>
     public static Vector3 CalculateVisualRecoilOffset(Vector3 baseVisualRecoil, bool isAiming)
     {
         float randomSignX = Random.value > 0.5f ? 1f : -1f;
@@ -49,23 +46,13 @@ public static class Recoil
             -baseVisualRecoil.z / 10
         );
 
-        if (!isAiming)
-        {
-            return randomizedRecoil;
-        }
-
-        // Se estiver mirando, o recuo visual é reduzido pela metade
+        if (!isAiming) return randomizedRecoil;
+    
         return randomizedRecoil / 2f;
     }
 
-    /// <summary>
-    /// Calcula a rotação aleatória no eixo Z da câmera (efeito de trepidação lateral).
-    /// </summary>
-    public static float CalculateCameraZRoll(float horizontal, float vertical)
-    {
-        return ((horizontal + vertical) / 5) * (Random.value > 0.5f ? 1f : -1f);
-    }
-
+    public static float CalculateCameraZRoll(float horizontal, float vertical) => ((horizontal + vertical) / 5) * (Random.value > 0.5f ? 1f : -1f);
+    
     public static float GetHorizontalRecoilDirection(HorizontalRecoil horizontalRecoil)
     {
         if(horizontalRecoil.type == HorizontalRecoilType.Left) return horizontalRecoil.value * -1;

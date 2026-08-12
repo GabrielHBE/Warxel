@@ -71,15 +71,9 @@ public class ProximityVoiceChatController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void CmdVoipState(bool state)
-    {
-        ClientUpdateVoipState(state);
-    }
+    private void CmdVoipState(bool state) => ClientUpdateVoipState(state);
 
     [ObserversRpc(ExcludeOwner = true)]
-    private void ClientUpdateVoipState(bool state)
-    {
-        // Agora o RPC apenas avisa aos outros clientes se este jogador específico está falando ou não
-        isTalking = state;
-    }
+    private void ClientUpdateVoipState(bool state) => isTalking = state;
+    
 }

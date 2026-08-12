@@ -33,9 +33,9 @@ public class CreateVoxelMaterial : MonoBehaviour
         mat.SetFloat("_Brightness", 1.0f);
         mat.SetFloat("_AmbientIntensity", 0.6f);
         mat.SetFloat("_LightIntensity", 0.7f);
-        mat.SetFloat("_TopLightBoost", 0.8f);      // Reduz iluminação no topo
-        mat.SetFloat("_SideLightBoost", 1.0f);     // Mantém laterais
-        mat.SetFloat("_BottomLightBoost", 1.3f);   // Aumenta iluminação embaixo
+        mat.SetFloat("_TopLightBoost", 0.8f);   
+        mat.SetFloat("_SideLightBoost", 1.0f);  
+        mat.SetFloat("_BottomLightBoost", 1.3f);
 
         #if UNITY_EDITOR
         UnityEditor.AssetDatabase.CreateAsset(mat, "Assets/VoxelMaterial_URP.mat");

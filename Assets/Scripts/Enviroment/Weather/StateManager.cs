@@ -1,9 +1,8 @@
-﻿using FishNet.Object;
+﻿
 using UnityEngine;
 
-public class StateManager : NetworkBehaviour
+public class StateManager : ServerSingleton<StateManager>
 {
-    public static StateManager Instance { get; private set; }
 
     [Header("Systems")]
     [SerializeField] private WeatherStateManager weatherState;
@@ -18,9 +17,9 @@ public class StateManager : NetworkBehaviour
 
     private DayNightCycleManager dayNightCycle;
 
-    private void Awake()
+    protected override void Awake()
     {
-        Instance = this;
+        base.Awake();
         InitializeSystems();
     }
 

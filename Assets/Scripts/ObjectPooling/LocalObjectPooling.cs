@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class LocalObjectPooling : MonoBehaviour
+public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
 {
-    public static LocalObjectPooling Instance { get; private set; }
 
     [System.Serializable]
     public struct LocalPoolSettings
@@ -21,25 +20,9 @@ public class LocalObjectPooling : MonoBehaviour
 
     private List<LocalPooledObject> instantiatedLocalPooledItems = new List<LocalPooledObject>();
 
-    void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else if (Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-    }
 
-    void Start()
-    {
-        InitializePools();
-    }
-
+    void Start() => InitializePools();
+    
     public void InitializePools()
     {
         if (isInitialized) return;

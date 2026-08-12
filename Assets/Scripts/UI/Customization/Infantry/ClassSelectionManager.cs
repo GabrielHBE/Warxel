@@ -98,8 +98,6 @@ public class ClassSelectionManager : MonoBehaviour
             Debug.LogWarning("[Loadout] Dados ainda não carregados, pulando LoadLoadoutForClass");
         }
 
-        infantryLoadoutCustomization.class_description_text.text = "Class attributes:\n" +
-            infantryLoadoutCustomization.classManager.GetClassDescription(@class);
         UpdateClassButtonColors();
         UpdateSelectionText($"Classe: {@class}");
     }

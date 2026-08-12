@@ -53,21 +53,13 @@ public class FlagCapture : NetworkBehaviour
                     PlayerProperties playerProperties = col.GetComponent<PlayerProperties>();
                     
                     // Se tiver o script e a classe for Assault, aumenta o peso
-                    if (playerProperties != null && playerProperties.selectedClass.Value == ClassManager.Class.Assault)
-                    {
-                        captureWeight = assaultClassMultiplier; // Aplica o peso 1.5x
-                    }
+                    if (playerProperties != null && playerProperties.selectedClass.Value == ClassManager.Class.Assault) captureWeight = assaultClassMultiplier;
                 }
 
                 // Adiciona o peso calculado para a facção correspondente
-                if (entityFaction.GetFaction() == FactionManager.Faction.FactionA)
-                {
-                    teamACapturePower += captureWeight;
-                } 
-                else if (entityFaction.GetFaction() == FactionManager.Faction.FactionB)
-                {
-                    teamBCapturePower += captureWeight;
-                } 
+                if (entityFaction.GetFaction() == FactionManager.Faction.FactionA) teamACapturePower += captureWeight;
+                else if (entityFaction.GetFaction() == FactionManager.Faction.FactionB)teamBCapturePower += captureWeight;
+                
             }
         }
 
@@ -83,35 +75,21 @@ public class FlagCapture : NetworkBehaviour
         // Facção A tem vantagem
         if (netDifference > 0f) 
         {
-            if (teamBProgress.Value > 0)
-            {
-                teamBProgress.Value = Mathf.Max(0, teamBProgress.Value - delta); 
-            }
+            if (teamBProgress.Value > 0) teamBProgress.Value = Mathf.Max(0, teamBProgress.Value - delta); 
             else
             {
                 teamAProgress.Value = Mathf.Min(maxProgress, teamAProgress.Value + delta);
-                
-                if (teamAProgress.Value >= maxProgress && currentOwner.Value != FactionManager.Faction.FactionA)
-                {
-                    OnFlagCapture(FactionManager.Faction.FactionA);
-                }
+                if (teamAProgress.Value >= maxProgress && currentOwner.Value != FactionManager.Faction.FactionA) OnFlagCapture(FactionManager.Faction.FactionA);  
             }
         }
         // Facção B tem vantagem
         else 
         {
-            if (teamAProgress.Value > 0)
-            {
-                teamAProgress.Value = Mathf.Max(0, teamAProgress.Value - delta);
-            }
+            if (teamAProgress.Value > 0) teamAProgress.Value = Mathf.Max(0, teamAProgress.Value - delta);
             else
             {
                 teamBProgress.Value = Mathf.Min(maxProgress, teamBProgress.Value + delta);
-                
-                if (teamBProgress.Value >= maxProgress && currentOwner.Value != FactionManager.Faction.FactionB)
-                {
-                    OnFlagCapture(FactionManager.Faction.FactionB);
-                }
+                if (teamBProgress.Value >= maxProgress && currentOwner.Value != FactionManager.Faction.FactionB) OnFlagCapture(FactionManager.Faction.FactionB);
             }
         }
     }
@@ -121,33 +99,21 @@ public class FlagCapture : NetworkBehaviour
         if (!IsServerInitialized) return;
 
         // Verifica a LayerMask
-        if ((captureLayers.value & (1 << other.gameObject.layer)) > 0)
-        {
-            if (!entitiesInZone.Contains(other))
-            {
-                entitiesInZone.Add(other);
-            }
-        }
+        if ((captureLayers.value & (1 << other.gameObject.layer)) > 0 && !entitiesInZone.Contains(other)) entitiesInZone.Add(other);
+        
     }
 
     private void OnTriggerExit(Collider other)
     {
         if (!IsServerInitialized) return;
 
-        if (entitiesInZone.Contains(other))
-        {
-            entitiesInZone.Remove(other);
-        }
+        if (entitiesInZone.Contains(other)) entitiesInZone.Remove(other);
+        
     }
 
-    private void OnFlagCapture(FactionManager.Faction newOwner)
-    {
-        currentOwner.Value = newOwner;
-        Debug.Log($"Bandeira capturada pela facção: {newOwner}");
-    }
+    private void OnFlagCapture(FactionManager.Faction newOwner) => currentOwner.Value = newOwner;
+    
 
-    public FactionManager.Faction GetFactionInControl()
-    {
-        return currentOwner.Value;
-    }
+    public FactionManager.Faction GetFactionInControl() => currentOwner.Value;
+    
 }

@@ -26,18 +26,9 @@ public class FlashbangPostFX : PostFX
 
     public override void SetActive(bool active)
     {
-        // Interrompe qualquer transição que esteja acontecendo no momento
-        if (transitionCoroutine != null)
-        {
-            StopCoroutine(transitionCoroutine);
-        }
-
-        if (active)
-        {
-            // Ativa os componentes imediatamente para começarmos a ver o efeito
-            ToggleComponents(true);
-        }
-
+        if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
+        if (active) ToggleComponents(true);
+        
         transitionCoroutine = StartCoroutine(TransitionRoutine(active));
     }
 

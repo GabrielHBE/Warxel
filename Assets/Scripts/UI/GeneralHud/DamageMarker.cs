@@ -40,18 +40,12 @@ public class DamageMarker : PersistentLocalSingleton<DamageMarker>
         
         // Resetar e somar o dano
         currentDamage += damage;
-        damage_text.text = currentDamage.ToString("F0"); // Formato sem casas decimais
+        damage_text.text = currentDamage.ToString("F0");
         
-        // Tornar visível instantaneamente
         canvasGroup.alpha = 1f;
+
+        if (fadeCoroutine != null)  StopCoroutine(fadeCoroutine);
         
-        // Parar qualquer fade em andamento
-        if (fadeCoroutine != null)
-        {
-            StopCoroutine(fadeCoroutine);
-        }
-        
-        // Iniciar nova coroutine para verificar se ficou idle
         fadeCoroutine = StartCoroutine(CheckIdleAndFade());
     }
 
@@ -61,11 +55,8 @@ public class DamageMarker : PersistentLocalSingleton<DamageMarker>
         yield return new WaitForSeconds(idleTimeToFade);
         
         // Verificar se realmente ficou idle (se não houve novas chamadas)
-        if (Time.time - lastUpdateTime >= idleTimeToFade)
-        {
-            // Iniciar fade out
-            yield return StartCoroutine(FadeOut());
-        }
+        if (Time.time - lastUpdateTime >= idleTimeToFade) yield return StartCoroutine(FadeOut());
+        
     }
 
     private IEnumerator FadeOut()

@@ -20,10 +20,4 @@ public class Mag : Attatchment
         WeaponHolder wh = GetComponentInParent<WeaponHolder>();
         if (wh != null) wh.SetWeaponMag(magHandPosition);
     }
-
-    public override string GetAttatchmentDescription()
-    {
-        throw new System.NotImplementedException();
-    }
-
 }

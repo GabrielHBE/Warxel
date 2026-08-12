@@ -9,7 +9,6 @@ public class Skin : MonoBehaviour
     public Sprite HudIcon;
     public Animator anim;
 
-
     [Header("Core")]
     public GameObject head;
     public GameObject torso;

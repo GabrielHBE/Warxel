@@ -9,10 +9,8 @@ public class FireModeUI : MonoBehaviour
 
     [SerializeField] private TextMeshProUGUI key;
 
-    void Update()
-    {
-        key.text = SettingsHUD.Instance.WEAPON_switchFireModeButton.text;
-    }
+    void Update() => key.text = SettingsHUD.Instance.WEAPON_switchFireModeButton.text;
+    
 
     public void SetFireMode(Firing.FireMode fire_mode)
     {

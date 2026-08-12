@@ -27,7 +27,7 @@ public class CustomizationButtonComponents : MonoBehaviour
         infantryLoadoutCustomization = parent;
         _isRemoveButton = isRemoveButton;
         
-        var attatchment = component.GetComponent<Attatchment>();
+        Attatchment attatchment = component.GetComponent<Attatchment>();
         _isAttachmentUnlocked = attatchment != null && attatchment.IsAttatchmentUnlocked();
 
         SetupImage();
@@ -41,7 +41,6 @@ public class CustomizationButtonComponents : MonoBehaviour
     {
         Image[] allImages = GetComponentsInChildren<Image>(true);
         if (allImages != null && allImages.Length > 0) allImages[allImages.Length - 1].sprite = _isAttachmentUnlocked ? _imageHud : InfantryLoadoutCustomization.locked_item_image;
-        
     }
 
     private void SetupText()
@@ -113,17 +112,13 @@ public class CustomizationButtonComponents : MonoBehaviour
                 _outline.effectDistance = new Vector2(infantryLoadoutCustomization.outlineWidth, infantryLoadoutCustomization.outlineWidth);
                 _outline.enabled = true;
             }
-            else
-            {
-                _outline.enabled = false;
-            }
+            else _outline.enabled = false;
         }
     }
 
     private bool IsSelected()
     {
-        if (infantryLoadoutCustomization == null || infantryLoadoutCustomization._weaponBeingCustomized == null || _component == null)
-            return false;
+        if (infantryLoadoutCustomization == null || infantryLoadoutCustomization._weaponBeingCustomized == null || _component == null) return false;
 
         Type componentType = _component.GetType();
         Component[] components = infantryLoadoutCustomization._weaponBeingCustomized.GetComponentsInChildren(componentType, true);
@@ -131,7 +126,6 @@ public class CustomizationButtonComponents : MonoBehaviour
         foreach (Component comp in components)
         {
             if (comp.gameObject.activeInHierarchy && comp.gameObject.name == _partGameObject.name) return true;
-            
         }
 
         return false;

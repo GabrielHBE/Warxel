@@ -54,8 +54,7 @@ public class StromManager : NetworkBehaviour
 
         // Toca o efeito visual se tiver ParticleSystem
         ParticleSystem ps = lightningGO.GetComponent<ParticleSystem>();
-        if (ps != null)
-            ps.Play();
+        if (ps != null) ps.Play();
 
         SoundManager.Instance.RequestPlay3dSound(thunderSound.clip.name, thunderSound.properties, lightningPosition, true);
 
@@ -64,21 +63,14 @@ public class StromManager : NetworkBehaviour
 
     private Vector3 GetRandomLightningPosition()
     {
-
         float x = Random.Range(-1000f, 1000f);
         float z = Random.Range(-1000f, 1000f);
 
         if (Physics.Raycast(new Vector3(x, MapSettings.Instance.max_altitude, z), Vector3.down, out RaycastHit hit, MapSettings.Instance.max_altitude))
         {
-            if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Player"))
-            {
-                DamagePlayer(hit);
-
-            }else if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Vechicle"))
-            {
-                DamageVehicle(hit);
-            }
-
+            if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Player")) DamagePlayer(hit);
+            else if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Vechicle")) DamageVehicle(hit);
+            
             return hit.point;
         }
 
@@ -95,13 +87,11 @@ public class StromManager : NetworkBehaviour
     {
         Vehicle vehicle = hit.transform.GetComponent<Vehicle>();
         if (vehicle != null) vehicle.TakeDamage(100);
-        
     }
 
     private System.Collections.IEnumerator DestroyAfterDelay(GameObject obj, float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (obj != null)
-            Destroy(obj);
+        if (obj != null) Destroy(obj);
     }
 }

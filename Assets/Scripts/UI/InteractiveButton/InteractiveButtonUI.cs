@@ -1,9 +1,7 @@
 using UnityEngine;
 
-public class InteractiveButtonUI : MonoBehaviour
+public class InteractiveButtonUI : InMatchClientSingleton<InteractiveButtonUI>
 {
-    public static InteractiveButtonUI Instance { get; private set; }
-
     [SerializeField] private SetInWorldPositionUI setInWorldPositionUI;
     [SerializeField] private InteractiveButtonUIIndicator InteractiveButtonIndicator;
     [SerializeField] private Canvas canvas;
@@ -22,11 +20,6 @@ public class InteractiveButtonUI : MonoBehaviour
             this.Rect = Rect;
             this.Text = Text;
         }
-    }
-
-    void Awake()
-    {
-        Instance = this;
     }
 
     public void CreateButtonUI(InteractiveButton interactiveButton)

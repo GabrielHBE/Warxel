@@ -32,30 +32,15 @@ public class FootstepSound : NetworkBehaviour
     {   
         if(!IsOwner) return;
         
-        if (playerProperties.crouched || playerProperties.is_proned)
-        {
-            original_volume = audioSource.volume / 2;
-        }
-        else
-        {
-            original_volume = audioSource.volume;
-        }
-
+        if (playerProperties.crouched || playerProperties.is_proned) original_volume = audioSource.volume / 2;
+        else original_volume = audioSource.volume;
+        
         RaycastHit hit;
         if (Physics.Raycast(transform.position, Vector3.down, out hit, raycast_distance, layers))
         {
-            if (hit.transform.tag == "Concrete")
-            {
-                current_step = Steps.Concrete;
-            }
-            else if (hit.transform.tag == "Sand / Dirt")
-            {
-                current_step = Steps.Sand_dirt;
-            }
-            else if (hit.transform.tag == "Grass")
-            {
-                current_step = Steps.Grass;
-            }
+            if (hit.transform.tag == "Concrete") current_step = Steps.Concrete;
+            else if (hit.transform.tag == "Sand / Dirt") current_step = Steps.Sand_dirt;
+            else if (hit.transform.tag == "Grass") current_step = Steps.Grass;
         }
     }
 
@@ -66,7 +51,6 @@ public class FootstepSound : NetworkBehaviour
         {
             i = Random.Range(0, concrete_steps.Length);
             return concrete_steps[i];
-
         }
         else if (current_step == Steps.Grass)
         {
@@ -84,14 +68,9 @@ public class FootstepSound : NetworkBehaviour
         return grass_steps[i];
     }
 
-    // 1. The Client calls this method to ask the server to play the sound
     [ServerRpc(RequireOwnership = false)]
-    public void CmdPlayStepSound()
-    {
-        RpcPlayStepSound();
-    }
-
-    // 2. The Server calls this method to broadcast to all clients
+    public void CmdPlayStepSound() => RpcPlayStepSound();
+    
     [ObserversRpc]
     private void RpcPlayStepSound()
     {
@@ -101,14 +80,10 @@ public class FootstepSound : NetworkBehaviour
         audioSource.PlayOneShot(audioClip);
     }
 
-
     private enum Steps
     {
         Concrete,
         Grass,
         Sand_dirt
-
     }
-
 }
-

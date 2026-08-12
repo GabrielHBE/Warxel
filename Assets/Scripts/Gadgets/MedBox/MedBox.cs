@@ -53,23 +53,10 @@ public class MedBox : Gadget
         {
             if (!med_box_thrown)
             {
-
-                if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey))
-                {
-                    SelfHeal();
-                }
-
-                // Verifica duplo clique para a tecla de mirar
-                if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey))
-                {
-                    CheckForDoubleClick();
-                }
-
-                // Mantém a funcionalidade normal de curar outros enquanto segura a tecla
-                if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_aimKey) && aimKeyPressCount < 2)
-                {
-                    HealOthers();
-                }
+                if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey)) SelfHeal();
+                if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_aimKey)) CheckForDoubleClick();
+                if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_aimKey) && aimKeyPressCount < 2) HealOthers();
+                
             }
         }
 
@@ -80,10 +67,8 @@ public class MedBox : Gadget
             {
                 Ray ray = new Ray(playerController.playerCamera.transform.position, playerController.playerCamera.transform.forward);
                 RaycastHit hit;
-                if (Physics.Raycast(ray, out hit, 10) && hit.transform.gameObject == owner)
-                {
-                    PickUp();
-                }
+                if (Physics.Raycast(ray, out hit, 10) && hit.transform.gameObject == owner) PickUp();
+                
             }
 
             UpdateHealingCirclePosition();
@@ -156,14 +141,10 @@ public class MedBox : Gadget
             }
             circleLineRenderer.SetPositions(points);
 
-            // Ativa o círculo
             circleVisual.SetActive(true);
         }
-        else
-        {
-            // Se não encontrar chão, desativa o círculo
-            circleVisual.SetActive(false);
-        }
+        else circleVisual.SetActive(false);
+        
     }
 
     private void CheckForDoubleClick()
@@ -181,19 +162,14 @@ public class MedBox : Gadget
                 aimKeyPressCount = 0; // Reseta o contador após executar
             }
         }
-        else
-        {
-            // Primeiro clique ou clique após muito tempo
-            aimKeyPressCount = 1;
-        }
+        else aimKeyPressCount = 1;
+        
 
         lastAimKeyPressTime = Time.time;
     }
 
-    private void SelfHeal()
-    {
-        playerController.Regenerate(Time.deltaTime * heal_rate);
-    }
+    private void SelfHeal() => playerController.Regenerate(Time.deltaTime * heal_rate);
+    
 
     private void HealOthers()
     {
@@ -213,10 +189,8 @@ public class MedBox : Gadget
         if (Physics.Raycast(ray, out hit, heal_distance, layerMask))
         {
             PlayerController pc = hit.transform.GetComponent<PlayerController>();
-            if (pc != null)
-            {
-                pc.Regenerate(Time.deltaTime * heal_rate);
-            }
+            if (pc != null) pc.Regenerate(Time.deltaTime * heal_rate);
+            
         }
     }
 
@@ -225,11 +199,8 @@ public class MedBox : Gadget
         CreateHealingCircle();
         med_box_thrown = true;
         rb.isKinematic = false;
-
         transform.SetParent(null);
-
         rb.AddForce(playerController.transform.forward * 20 * rb.mass, ForceMode.Impulse);
-
     }
 
 }

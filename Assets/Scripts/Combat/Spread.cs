@@ -8,14 +8,12 @@ public static class Spread
     private static float minModifier = 0.9f;
     private static float maxModifier = 1.1f;
 
-    public static Quaternion CalculateSpreadRotation(Transform shootPosition, float currentSpread)
-    {
-        return shootPosition.rotation * Quaternion.Euler(new Vector3(
-                                                            Random.Range(-currentSpread, currentSpread),
-                                                            Random.Range(-currentSpread, currentSpread),
-                                                            Random.Range(-currentSpread, currentSpread)
-                                                        ));
-    }
+    public static Quaternion CalculateSpreadRotation(Transform shootPosition, float currentSpread) => shootPosition.rotation * Quaternion.Euler(new Vector3(
+                                                                                                            Random.Range(-currentSpread, currentSpread),
+                                                                                                            Random.Range(-currentSpread, currentSpread),
+                                                                                                            Random.Range(-currentSpread, currentSpread)
+                                                                                                        ));
+    
 
     public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread)
     {
@@ -24,11 +22,8 @@ public static class Spread
 
     public static float ResetSpread(float currentSpread, float baseSpread, float spreadRecoveryTime)
     {
-        if (currentSpread < 0.01f)
-        {
-            return 0;
-        }
-
+        if (currentSpread < 0.01f) return 0;
+        
         return Mathf.MoveTowards(currentSpread, baseSpread, Time.deltaTime * spreadRecoveryTime);
     }
 

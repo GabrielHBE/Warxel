@@ -151,10 +151,8 @@ public class Projectile : LocalPooledObject
     }
     public void SetDirection(Vector3 direction, float muzzleVelocity)
     {
-        if (rb != null)
-        {
-            rb.linearVelocity = direction * muzzleVelocity;
-        }
+        if (rb != null) rb.linearVelocity = direction * muzzleVelocity;
+        
     }
     #endregion
 
@@ -186,16 +184,10 @@ public class Projectile : LocalPooledObject
 
         hitEffects.CustomHitEffect(hitPoint);
 
-        if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
-        {
-            ProcessVoxelCollision(collider, hitPoint);
+        if (hitObject.layer == LayerMask.NameToLayer("Voxel")) ProcessVoxelCollision(collider, hitPoint);
 
-        }
-
-        if (hitObject.layer == LayerMask.NameToLayer("Ground"))
-        {
-            ProcessGroundCollision(hitPoint);
-        }
+        if (hitObject.layer == LayerMask.NameToLayer("Ground"))ProcessGroundCollision(hitPoint);
+        
 
         if (hitObject.layer == LayerMask.NameToLayer("Vehicle") && canDamageArmoredVehicles)
         {
@@ -216,18 +208,9 @@ public class Projectile : LocalPooledObject
     void OnTriggerEnter(Collider collider)
     {
         if (isDespawning || projectileCollider == null || !projectileCollider.isTrigger) return;
-
-        if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") ||
-            collider.gameObject.layer == LayerMask.NameToLayer("Player"))
-        {
-            return;
-        }
-
-        if (ignoredTransform != null && collider.transform.IsChildOf(ignoredTransform))
-        {
-            return;
-        }
-
+        if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") || collider.gameObject.layer == LayerMask.NameToLayer("Player")) return;
+        if (ignoredTransform != null && collider.transform.IsChildOf(ignoredTransform)) return;
+    
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
     }
 
@@ -260,11 +243,9 @@ public class Projectile : LocalPooledObject
     #region Visual Management
     public void SetVisualsActive(bool active)
     {
-        if (meshRenderer != null)
-            meshRenderer.enabled = active;
+        if (meshRenderer != null) meshRenderer.enabled = active;
 
-        if (projectileLight != null)
-            projectileLight.enabled = active;
+        if (projectileLight != null) projectileLight.enabled = active;
 
         if (trail != null)
         {
@@ -274,14 +255,8 @@ public class Projectile : LocalPooledObject
 
         if (particle != null)
         {
-            if (active)
-            {
-                particle.Play();
-            }
-            else
-            {
-                particle.Stop();
-            }
+            if (active) particle.Play();
+            else particle.Stop();
         }
 
         visualsEnabled = active;
@@ -291,10 +266,7 @@ public class Projectile : LocalPooledObject
     #region Helpers
     protected void AddForceDown()
     {
-        if (rb != null)
-        {
-            rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
-        }
+        if (rb != null) rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
     }
 
     protected void ProcessRaycastHitValidation()

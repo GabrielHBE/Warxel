@@ -19,10 +19,8 @@ public class AssistsManager : MonoBehaviour
         {
             PlayerProperties p = infantryAssistList[i];
 
-            if (p.is_dead.Value)
-            {
-                ConfirmInfantryAssist(i);
-            }
+            if (p.is_dead.Value) ConfirmInfantryAssist(i);
+            
         }
 
         // Loop reverso para a lista de veículos
@@ -30,10 +28,8 @@ public class AssistsManager : MonoBehaviour
         {
             Vehicle v = vehicleAssistList[i];
 
-            if (v.vehicle_destroyed.Value)
-            {
-                ConfirmVehicleAssist(i);
-            }
+            if (v.vehicle_destroyed.Value) ConfirmVehicleAssist(i);
+            
         }
     }
 

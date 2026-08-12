@@ -211,7 +211,6 @@ public class SoundManager : ServerSingleton<SoundManager>
         foreach (var loopAudio in loopAudioList)
         {
             if (loopAudio.target == target && loopAudio.audioSource != null && loopAudio.audioSource.clip == clip) action(loopAudio.audioSource);
-            
         }
     }
 
@@ -511,20 +510,15 @@ public class SoundManager : ServerSingleton<SoundManager>
 
     public static void Play3dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target) => SetupLoopAudio("LoopAudio", clip, soundProperties, target, is3D: true);
     public static void Play2dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target) => SetupLoopAudio("LoopAudio2D", clip, soundProperties, target, is3D: false);
-
     public static void ServerPause3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.Pause());
     public static void ServerContinue3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.UnPause());
     public static void Stop3dLoopSoundLocal(AudioClip clip, Transform target) => DestroyLoopAudio(clip, target);
-
     public static void ServerPause2dLoopSoundLocal(AudioClip clip, Transform target) => ServerPause3dLoopSoundLocal(clip, target);
     public static void ServerContinue2dLoopSoundLocal(AudioClip clip, Transform target) => ServerContinue3dLoopSoundLocal(clip, target);
     public static void Stop2dLoopSoundLocal(AudioClip clip, Transform target) => Stop3dLoopSoundLocal(clip, target);
-
     public static void ServerStop3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.Stop());
     public static void ServerStop2dLoopSoundLocal(AudioClip clip, Transform target) => ServerStop3dLoopSoundLocal(clip, target);
-
     public static void SetLoopSoundPitchLocal(AudioClip clip, Transform target, float newPitch) => ModifyLoopAudio(clip, target, src => src.pitch = newPitch);
-
     #endregion
 
     #region Helper

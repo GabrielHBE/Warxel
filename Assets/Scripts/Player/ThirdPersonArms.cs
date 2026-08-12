@@ -30,12 +30,10 @@ public class ThirdPersonArms : NetworkBehaviour
     #region Unity Lifecycle
     void Awake()
     {
-
         currentRightHandtwoBoneIKConstraintWeight = 0;
         currentLeftHandtwoBoneIKConstraintWeight = 0;
 
         currentWeaponSlot.OnChange += OnWeaponSlotChanged;
-
         syncPrimary.OnChange += OnWeaponInstantiated;
         syncSecondary.OnChange += OnWeaponInstantiated;
         syncGadget1.OnChange += OnWeaponInstantiated;

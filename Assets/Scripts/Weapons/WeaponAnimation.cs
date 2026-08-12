@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class WeaponAnimation : MonoBehaviour
 {
-
     [HideInInspector] public AnimationClip fireClip;
     private AnimationClip reloadClip;
 
@@ -17,25 +16,17 @@ public class WeaponAnimation : MonoBehaviour
 
     bool restarted;
 
-    void Awake()
-    {
-        restarted = false;
-    }
+    void Awake() => restarted = false;
+    
 
     void Update()
     {
         if (!restarted) return;
 
-        // Controlar o tempo da animação de disparo
         if (is_in_fire_animation)
         {
             elapsed += Time.deltaTime;
-
-            // Se o tempo da animação foi concluído, parar a animação
-            if (elapsed >= shoot_animation_timer)
-            {
-                StopFireAnimation();
-            }
+            if (elapsed >= shoot_animation_timer) StopFireAnimation();
         }
     }
 
@@ -83,10 +74,8 @@ public class WeaponAnimation : MonoBehaviour
                         anim.SetBool("Last_bullet", false);
                         break;
                     }
-                    else
-                    {
-                        reloadClip = null;
-                    }
+                    else reloadClip = null;
+                    
                 }
             }
             else
@@ -103,10 +92,8 @@ public class WeaponAnimation : MonoBehaviour
                         anim.SetBool("Last_bullet", true);
                         break;
                     }
-                    else
-                    {
-                        reloadClip = null;
-                    }
+                    else reloadClip = null;
+                    
                 }
             }
 
@@ -121,10 +108,7 @@ public class WeaponAnimation : MonoBehaviour
         anim.SetBool("Is_reloading", true);
     }
 
-    public void FinishReloadAnimation()
-    {
-        anim.SetBool("Is_reloading", false);
-    }
+    public void FinishReloadAnimation() => anim.SetBool("Is_reloading", false);
 
     public void StartFireAnimation()
     {
@@ -137,11 +121,8 @@ public class WeaponAnimation : MonoBehaviour
         {
             targetDuration = weaponProperties.firing.interval - weaponProperties.delay_to_shoot_animation;
 
-            if (targetDuration <= 0.01f)
-            {
-                targetDuration = 0.01f;
-            }
-
+            if (targetDuration <= 0.01f) targetDuration = 0.01f;
+        
             speedMultiplier = fireClip.length / targetDuration;
         }
         else

@@ -17,14 +17,9 @@ public class DeadPlayerHud : MonoBehaviour
         // Preenche com os nomes dos jogadores disponíveis
         for (int i = 0; i < maxIndex; i++)
         {
-            if (i < playersCount)
-            {
-                medics_players[i].text = "[" + players[i].distance + "] " + players[i].player_name;
-            }
-            else
-            {
-                medics_players[i].text = "------";
-            }
+            if (i < playersCount) medics_players[i].text = "[" + players[i].distance + "] " + players[i].playerName;
+            else medics_players[i].text = "------";
+            
         }
 
         // Se tivermos menos de 6 jogadores, preenche o restante com "------"

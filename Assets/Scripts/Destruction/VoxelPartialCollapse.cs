@@ -54,17 +54,14 @@ public class VoxelPartialCollapse : VoxelDestruction
                 if (swap.mesh != null)
                 {
                     meshFilter.sharedMesh = swap.mesh;
-                    // Atualiza o Mesh de Colisão
                     meshCollider.sharedMesh = swap.mesh;
                 }
 
                 // Atualiza o Material Visual
-                if (swap.material != null)
-                {
-                    meshRenderer.sharedMaterial = swap.material;
-                }
+                if (swap.material != null)  meshRenderer.sharedMaterial = swap.material;
+                
 
-                break; // Encontrou o modelo correto, não precisa continuar procurando
+                break;
             }
         }
     }
@@ -97,15 +94,9 @@ public class VoxelPartialCollapse : VoxelDestruction
     {
         if (!IsServerInitialized || !isDestroyed.Value) return;
 
-        if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
-        {
-            ProcessHit.VehicleHit(collision.gameObject, rb.linearVelocity.magnitude, gameObject);
-        }
-
-        if (collision.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox"))
-        {
-            ProcessHit.PlayerHit(collision.gameObject, rb.linearVelocity.magnitude, 1, gameObject);
-        }
+        if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle")) ProcessHit.VehicleHit(collision.gameObject, rb.linearVelocity.magnitude, gameObject);
+        if (collision.gameObject.layer == LayerMask.NameToLayer("PlayerHitBox")) ProcessHit.PlayerHit(collision.gameObject, rb.linearVelocity.magnitude, 1, gameObject);
+        
     }
 
     [Server]

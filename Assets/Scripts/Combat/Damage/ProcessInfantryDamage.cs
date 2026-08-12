@@ -9,7 +9,7 @@ public class ProcessInfantryDamage : MonoBehaviour
     public LimbMultiplier GetLimbMultiplier() => limbMultiplier;
     public bool IsPlayerDead() => playerController.playerProperties.is_dead.Value;
     public float GetResistance() => playerController.playerProperties.resistance.Value;
-    public string GetPlayerName() => playerController.playerProperties.player_name.Value;
+    public string GetPlayerName() => playerController.playerProperties.playerName.Value;
     public float GetHP() => playerController.playerProperties.hp.Value;
     public void SetPlayerController(PlayerController playerController) => this.playerController = playerController;
 

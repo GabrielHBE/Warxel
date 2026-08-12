@@ -23,7 +23,8 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     [Header("Handling")]
     public float pick_up_weapon_speed;
     public float store_weapon_speed;
-
+    public bool canReloadAiming;
+    
     [Header("Shooting & Reloading")]
     public float delay_to_shoot_animation;
     public bool changeShootAnimationSpeed;
@@ -77,7 +78,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
         Pistol,
         Launcher
     }
-
     #endregion
 
     #region Initialization & Setup
@@ -112,19 +112,13 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #region Logic & Calculations
     public void CreateBulletExtractor()
     {
-        if (bulletExtractor != null)
-        {
-            bulletExtractor.CreateBullet();
-        }
+        if (bulletExtractor != null) bulletExtractor.CreateBullet();
     }
     #endregion
 
     #region Progression Systems
-    public void AddKill()
-    {
-        weapon_kills += 1;
-    }
-
+    public void AddKill() => weapon_kills += 1;
+    
     public void ResetWeaponlevel()
     {
         PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", 0);

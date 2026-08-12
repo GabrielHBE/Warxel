@@ -20,11 +20,8 @@ public class MainMenuManager : MonoBehaviour
 
     private CurrentButton currentButton;
 
-    void Start()
-    {
-        SelectStartGameButton();
-    }
-
+    void Start() => SelectStartGameButton();
+    
     void Update()
     {
         if (SettingsHUD.Instance == null) return;
@@ -45,11 +42,8 @@ public class MainMenuManager : MonoBehaviour
         ActivateParent(currentButton);
     }
 
-    public void SettingsButton()
-    {
-        SettingsHUD.Instance.ToggleSettingsMenu();
-    }
-
+    public void SettingsButton() => SettingsHUD.Instance.ToggleSettingsMenu();
+    
     public void SelectStartGameButton()
     {
         currentButton = CurrentButton.StartGame;

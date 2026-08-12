@@ -22,10 +22,4 @@ public class Grip : Attatchment
         }
 
     }
-
-    public override string GetAttatchmentDescription()
-    {
-        throw new System.NotImplementedException();
-    }
-
 }

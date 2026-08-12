@@ -5,11 +5,9 @@ using UnityEngine.UI;
 
 public class AlertMessages : PersistentLocalSingleton<AlertMessages>
 {
-    //public static AlertMessages Instance { get; private set; }
     [SerializeField] private TextMeshProUGUI message;
     [SerializeField] private Image message_image;
     private Coroutine current_message;
-
 
     public void CreateMessage(string msg, float duration = 2)
     {

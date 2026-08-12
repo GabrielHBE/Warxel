@@ -1,20 +1,11 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class SpotUIManager : MonoBehaviour
+public class SpotUIManager : InMatchClientSingleton<SpotUIManager>
 {
-    public static SpotUIManager Instance { get; private set; }
-
     public GameObject spotMarkerPrefab;
     public Transform spotCanvasContainer;
-    
-    // Um simples pool para reutilizar os marcadores
     private List<SpotMarker> markerPool = new List<SpotMarker>();
-
-    private void Awake()
-    {
-        Instance = this;
-    }
 
     public void ShowSpot(Transform spotPosition)
     {

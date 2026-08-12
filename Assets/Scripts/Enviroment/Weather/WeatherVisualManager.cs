@@ -174,9 +174,6 @@ public class WeatherVisualManager : MonoBehaviour
             if (storm_sound.volume > 0)
                 currentSoundDeactivationCoroutine = StartCoroutine(DeactivateSoundsAfterDelay(storm_sound, transitionManager.transitionSpeed));
         }
-
-
-
     }
 
     private void ActivateSnow()

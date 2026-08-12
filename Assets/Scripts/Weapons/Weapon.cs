@@ -1,5 +1,4 @@
 using System.Collections;
-using FishNet.Object;
 using UnityEngine;
 
 public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
@@ -18,11 +17,10 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     [SerializeField] private GameObject bullet;
 
     [Header("Instances")]
-    [SerializeField] private PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
-    [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
     [SerializeField] private PlayerProperties playerProperties;
     [SerializeField] private Camera player_camera;
     [SerializeField] private SwitchWeapon switchWeapon;
+    [SerializeField] private ProcessCameraRecoil processCameraRecoil;
 
     [Header("Sounds")]
     public AudioSource switch_fire_mode_sound;
@@ -37,7 +35,6 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     [HideInInspector] public bool did_shoot = false;
     private WeaponSounds weaponSounds;
     [HideInInspector] public WeaponProperties weaponProperties;
-    private PlayerController playerController;
     private Shell shell;
     [HideInInspector] public WeaponAnimation weaponAnimation;
     private Sight sight_attatchment;
@@ -48,7 +45,6 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     private string ammo;
     private Quaternion initialRotation;
 
-    // REMOVIDO: private int firingStateId;
 
     #region Unity Lifecycle Methods
     void Awake()
@@ -109,7 +105,6 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         transform.localRotation = initialRotation;
         weaponProperties = GetComponentInChildren<WeaponProperties>();
         weaponAnimation = GetComponent<WeaponAnimation>();
-        playerController = GetComponentInParent<PlayerController>();
         sight_attatchment = GetComponentInChildren<Sight>();
         weaponSounds = GetComponentInChildren<WeaponSounds>();
 
@@ -123,34 +118,20 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         weaponProperties.transform.localPosition = weaponProperties.initial_potiion;
         weaponProperties.transform.localRotation = weaponProperties.initial_rotation;
 
-        if (sight_attatchment != null)
-        {
-            AdsBehaviour.Instance.Setup(sight_attatchment.adsPosition, weaponProperties.ads_speed, weaponProperties.zoom);
-        }
-        else
-        {
-            AdsBehaviour.Instance.Setup(null, weaponProperties.ads_speed, weaponProperties.zoom);
-        }
+        if (sight_attatchment != null) AdsBehaviour.Instance.Setup(sight_attatchment.adsPosition, weaponProperties.ads_speed, weaponProperties.zoom, weaponProperties.canReloadAiming);
+        else AdsBehaviour.Instance.Setup(null, weaponProperties.ads_speed, weaponProperties.zoom, weaponProperties.canReloadAiming);
 
         current_spread = weaponProperties.spreadValues.baseSpread;
-
-        // Initialize firing system
         SetupFiringSystem();
     }
 
     private void SetupFiringSystem()
     {
-        // ATUALIZADO: sem stateId, apenas reseta o estado
         Firing.ResetState();
-        // Garante que o modo de tiro estático atual é válido para este armamento
         if (weaponProperties != null && weaponProperties.firing.fireModes != null && weaponProperties.firing.fireModes.Count > 0)
         {
-            if (!weaponProperties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
-            {
-                Firing.SwitchFireMode(weaponProperties.firing.fireModes);
-            }
+            if (!weaponProperties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(weaponProperties.firing.fireModes);
         }
-
         // Update HUD with current fire mode
         UpdateFireModeHUD(Firing.GetCurrentFireMode());
     }
@@ -173,15 +154,11 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
 
         switch_fire_mode_sound.Play();
 
-        // ATUALIZADO: sem stateId
         Firing.FireMode newMode = Firing.SwitchFireMode(weaponProperties.firing.fireModes);
         UpdateFireModeHUD(newMode);
     }
 
-    private void UpdateFireModeHUD(Firing.FireMode mode)
-    {
-        soldierHudManager.fire_mode_hud.SetFireMode(mode);
-    }
+    private void UpdateFireModeHUD(Firing.FireMode mode) => soldierHudManager.fire_mode_hud.SetFireMode(mode);
     #endregion
 
     #region Reload
@@ -196,8 +173,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             playerProperties.roll,
             reserveAmmo))
         {
-            if (reserveAmmo == 0)
-                AlertMessages.Instance.CreateMessage("Cant reload", 2);
+            if (reserveAmmo == 0) AlertMessages.Instance.CreateMessage("Cant reload", 2);
             return;
         }
 
@@ -233,20 +209,13 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             return;
         }
 
-        if (!weaponProperties.reloadValues.isSingleReload)
-        {
-            HandleStandardReload();
-        }
-        else
-        {
-            HandleSingleReload();
-        }
+        if (!weaponProperties.reloadValues.isSingleReload) HandleStandardReload();
+        else HandleSingleReload();
+        
     }
 
-    private void CalculateReserveAmmo()
-    {
-        reserve_ammo = weaponProperties.reloadValues.GetTotalReserveAmmo();
-    }
+    private void CalculateReserveAmmo() => reserve_ammo = weaponProperties.reloadValues.GetTotalReserveAmmo();
+    
 
     private void HandleStandardReload()
     {
@@ -266,20 +235,12 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         if (result.shouldFinishReload)
         {
             weaponAnimation.FinishReloadAnimation();
-            // ATUALIZADO: sem stateId
             Firing.ResetState();
         }
     }
 
-    public void ApplyMagAmmo(int amount)
-    {
-        weaponProperties.reloadValues.mags[^1] = amount;
-    }
-
-    public void RemoveMagAmmo(int amount, int index)
-    {
-        weaponProperties.reloadValues.mags[index] -= amount;
-    }
+    public void ApplyMagAmmo(int amount) => weaponProperties.reloadValues.mags[^1] = amount;
+    public void RemoveMagAmmo(int amount, int index) => weaponProperties.reloadValues.mags[index] -= amount;
 
     private void HandleSingleReload()
     {
@@ -328,55 +289,33 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         );
 
         // Handle the result
-        if (result.shouldResetShotState)
-        {
-            ResetShotState();
-        }
-
-        if (result.shouldShoot)
-        {
-            ExecuteShot(result.isFirstShot);
-        }
-
+        if (result.shouldResetShotState)  ResetShotState();
+        if (result.shouldShoot) ExecuteShot(result.isFirstShot);
+        
         // ATUALIZADO: sem stateId
         playerProperties.is_firing = Firing.IsFiring();
 
-        if (weaponProperties.reloadValues.mags[^1] <= 0)
-        {
-            playerProperties.is_firing = false;
-        }
+        if (weaponProperties.reloadValues.mags[^1] <= 0) playerProperties.is_firing = false;
+        
     }
 
     private void ExecuteShot(bool isFirstShot)
     {
         did_shoot = true;
 
-        if (weaponAnimation != null)
-        {
-            weaponAnimation.StartFireAnimation();
-        }
-
-        if (weaponAnimation.fireClip == null)
-        {
-            weaponProperties.CreateBulletExtractor();
-        }
-
+        if (weaponAnimation != null) weaponAnimation.StartFireAnimation();
+        if (weaponAnimation.fireClip == null) weaponProperties.CreateBulletExtractor();
+        
         // Apply recoil using the next recoil index
         int patternLength = weaponProperties.recoilValues.recoilPattern.Length;
         if (patternLength > 0)
         {
-            // ATUALIZADO: sem stateId
             int recoilIndex = Firing.GetNextRecoilIndex(patternLength);
 
-            // Extra safety check to ensure index is within bounds
-            if (recoilIndex >= 0 && recoilIndex < patternLength)
-            {
-                StartCoroutine(ApplyVisualRecoilOffset(recoilIndex, isFirstShot));
-            }
+            if (recoilIndex >= 0 && recoilIndex < patternLength)  StartCoroutine(ApplyVisualRecoilOffset(recoilIndex, isFirstShot));
             else
             {
                 Debug.LogWarning($"Recoil index {recoilIndex} out of range for pattern length {patternLength}");
-                // Fallback to index 0
                 StartCoroutine(ApplyVisualRecoilOffset(0, isFirstShot));
             }
         }
@@ -436,23 +375,16 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             ignoredObject = transform.root
         };
 
-        if(ProjectileSpawner.Instance!=null) ProjectileSpawner.Instance.CreateProjectile(bullet, dummyBullet.gameObject, prop, weaponProperties.projectileValues);
+        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(bullet, dummyBullet.gameObject, prop, weaponProperties.projectileValues);
 
-        /*
-        LocalObjectPooling.Instance.GetPooledItem(dummyBullet.gameObject).GetComponent<DummyProjectile>().CreateBullet(prop, weaponProperties.projectileValues);
-        playerNetworkObjectSpawner.ServerSpawnBullet(serverBullet, prop, weaponProperties.projectileValues, weaponProperties.gameObject.name);
-        */
     }
 
-    // ATUALIZADO: recebe isFirstShot como parâmetro
+
     IEnumerator ApplyVisualRecoilOffset(int recoilIndex, bool isFirstShot)
     {
         // Safety check
-        if (recoilIndex < 0 || recoilIndex >= weaponProperties.recoilValues.recoilPattern.Length)
-        {
-            recoilIndex = 0;
-        }
-
+        if (recoilIndex < 0 || recoilIndex >= weaponProperties.recoilValues.recoilPattern.Length) recoilIndex = 0;
+        
         ApplyRecoilToCamera(
             Recoil.GetVerticalRecoilDirection(weaponProperties.recoilValues.recoilPattern[recoilIndex].verticalRecoil),
             Recoil.GetHorizontalRecoilDirection(weaponProperties.recoilValues.recoilPattern[recoilIndex].horizontalRecoil),
@@ -476,26 +408,19 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             weaponProperties.reloadValues.mags[^1]
         );
 
-        playerController.ApplyCameraRecoil(recoil.vertical, recoil.horizontal);
+        // Chamada direta para o ProcessCameraRecoil
+        if (processCameraRecoil != null) processCameraRecoil.ApplyRecoil(recoil.vertical, recoil.horizontal);
+        
     }
-
-    private Vector3 GetRecoilOffset()
-    {
-        return Recoil.CalculateVisualRecoilOffset(
-            weaponProperties.recoilValues.visual_recoil,
-            playerProperties.is_aiming
-        );
-    }
-
+    private Vector3 GetRecoilOffset() => Recoil.CalculateVisualRecoilOffset(weaponProperties.recoilValues.visual_recoil, playerProperties.is_aiming);
+    
     private IEnumerator ApplyPositionRecoilAnimation(Vector3 start, Vector3 target)
     {
         float elapsed = 0f;
-        float originalFOV = playerController.playerCamera.fieldOfView;
         while (elapsed < weaponProperties.recoilValues.applyRecoilSpeed)
         {
             elapsed += Time.deltaTime;
             weaponProperties.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
-            playerController.playerCamera.fieldOfView = Mathf.Lerp(playerController.playerCamera.fieldOfView, playerController.playerCamera.fieldOfView + 0.3f, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
             yield return null;
         }
 
@@ -509,8 +434,6 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
                 start,
                 elapsed / weaponProperties.recoilValues.applyRecoilSpeed
             );
-            playerController.playerCamera.fieldOfView = Mathf.Lerp(playerController.playerCamera.fieldOfView, originalFOV, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
-
             yield return null;
         }
     }
@@ -519,21 +442,13 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     #region Bullet Concatenation
     private void ConcatenateBullets()
     {
-        if (weaponProperties.reloadValues.mags == null || weaponProperties.reloadValues.mags.Count == 0)
-        {
-            return;
-        }
-
+        if (weaponProperties.reloadValues.mags == null || weaponProperties.reloadValues.mags.Count == 0) return;
+        
         if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_composeBulletsKey) &&
             !playerProperties.is_firing &&
-            !playerProperties.is_reloading)
-        {
-            ProcessBulletConcatenation();
-        }
-        else
-        {
-            ResetConcatenation();
-        }
+            !playerProperties.is_reloading) ProcessBulletConcatenation();
+        else ResetConcatenation();
+        
     }
 
     private void ProcessBulletConcatenation()
@@ -548,12 +463,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         }
     }
 
-    private void TransferBulletsBetweenMags()
-    {
-        ProcessReload.Reload.ReloadLogic.TransferBulletBetweenMags(weaponProperties.reloadValues);
-    }
-
-
+    private void TransferBulletsBetweenMags() => ProcessReload.Reload.ReloadLogic.TransferBulletBetweenMags(weaponProperties.reloadValues);
     private void ResetConcatenation()
     {
         playerProperties.is_composing_bullets = false;
@@ -566,5 +476,4 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     public float GetMaxSpread() => weaponProperties.spreadValues.maxSpread;
     #endregion
 
-    // REMOVIDO: OnDestroy não é mais necessário pois não há stateId para limpar
 }

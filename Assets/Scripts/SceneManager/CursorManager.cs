@@ -1,19 +1,16 @@
 using UnityEngine;
 
-public class CursorManager : MonoBehaviour
+public class CursorManager : InMatchClientSingleton<CursorManager>
 {
-    public static CursorManager Instance { get; private set; }
 
-
-    void Start()
+    protected override void Awake()
     {
-        Instance = this;
+        base.Awake();
 
         if (PlayerSpawnController.Instance == null)
         {
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
-
         }
 
     }

@@ -84,10 +84,8 @@ public class Jet : Vehicle
         ApplyForwardPropulsion();
     }
 
-    protected override void OnDestructionPhysicsTick(float timer)
-    {
-        rb.AddTorque(transform.forward * 400 * rb.mass);
-    }
+    protected override void OnDestructionPhysicsTick(float timer) =>  rb.AddTorque(transform.forward * 400 * rb.mass);
+    
     #endregion
 
     #region Flight Input & Physics
@@ -109,8 +107,7 @@ public class Jet : Vehicle
     {
         float deltaTime = Time.fixedDeltaTime;
 
-        if (isNearGround && mouseY > 0 && speed > 50)
-            rb.AddForce(Vector3.up * rb.mass * 20);
+        if (isNearGround && mouseY > 0 && speed > 50) rb.AddForce(Vector3.up * rb.mass * 20);
 
         if (transform.position.y < MapSettings.Instance.max_altitude)
         {
@@ -124,15 +121,11 @@ public class Jet : Vehicle
                 float limit = isNearGround ? -50f : 100f;
                 if (throttle.Value > limit) throttle.Value -= _properties.aceleration * deltaTime * (isNearGround ? 2f : 1f);
             }
-            else
-            {
-                throttle.Value = Mathf.MoveTowards(throttle.Value, 0, (isNearGround ? 0.8f : 1f) * deltaTime);
-            }
+            else throttle.Value = Mathf.MoveTowards(throttle.Value, 0, (isNearGround ? 0.8f : 1f) * deltaTime);
+            
         }
-        else
-        {
-            SlowDownEngine();
-        }
+        else SlowDownEngine();
+        
     }
 
     private void Rotate()
@@ -188,10 +181,8 @@ public class Jet : Vehicle
             float totalPenalty = Mathf.Clamp((upwardIntensity * Physics.gravity.magnitude * 0.3f + upwardIntensity * _properties.dive_speed_boost * 0.5f) * Time.fixedDeltaTime, 0, _properties.max_throttle * 0.7f);
             _diveSpeedModifier = -totalPenalty * 400 * Time.fixedDeltaTime;
         }
-        else
-        {
-            _diveSpeedModifier = Mathf.Lerp(_diveSpeedModifier, 0, 2 * Time.fixedDeltaTime);
-        }
+        else _diveSpeedModifier = Mathf.Lerp(_diveSpeedModifier, 0, 2 * Time.fixedDeltaTime);
+        
     }
 
     private void ApplyGravityModifier()
@@ -227,20 +218,16 @@ public class Jet : Vehicle
         throttle.Value = Mathf.Lerp(throttle.Value, 0, Time.fixedDeltaTime / 2);
     }
 
-    protected void UpdateLandingGear()
-    {
-        retractLandingGear = !Physics.Raycast(_core.position, Vector3.down, 10, LayerMask.GetMask("Ground", "Voxel"));
-    }
+    protected void UpdateLandingGear() => retractLandingGear = !Physics.Raycast(_core.position, Vector3.down, 10, LayerMask.GetMask("Ground", "Voxel"));
+    
     #endregion
 
     #region Ejection & Sounds
     protected override void HandleVehicleInput()
     {
         base.HandleVehicleInput();
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f)
-        {
-            if (throttle.Value > 10) EjectPlayer();
-        }
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f && throttle.Value > 10) EjectPlayer();
+        
     }
 
     protected void EjectPlayer()

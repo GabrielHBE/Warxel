@@ -2,10 +2,8 @@ using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 
-public class WeatherStateManager : NetworkBehaviour
+public class WeatherStateManager : ServerSingleton<WeatherStateManager>
 {
-    public static WeatherStateManager Instance { get; private set; }
-
     public readonly SyncVar<float> NetworkTime = new SyncVar<float>(43200f);
     public readonly SyncVar<string> NetworkWeather = new SyncVar<string>("clear-day");
 
@@ -15,22 +13,12 @@ public class WeatherStateManager : NetworkBehaviour
     [Header("Current Weather")]
     public readonly SyncVar<WeatherType> ActiveWeatherType = new SyncVar<WeatherType>();
 
-    private void Awake()
-    {
-        if (Instance == null)
-            Instance = this;
-        else
-            Destroy(gameObject);
-
-    }
 
     [ObserversRpc]
     public void SetWeather(string weather)
     {
-
         NetworkWeather.Value = weather;
         ActiveWeatherType.Value = ParseWeatherType(weather);
- 
     }
 
     private WeatherType ParseWeatherType(string weather)

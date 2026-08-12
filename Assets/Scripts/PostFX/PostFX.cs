@@ -6,7 +6,6 @@ public abstract class PostFX : MonoBehaviour
 {
     [SerializeField] protected Volume volume;
 
-    // Controle da animação
     protected Coroutine transitionCoroutine;
     protected float currentMultiplier = 0f;
     

@@ -10,13 +10,11 @@ public class SideGrip : Attatchment
     
     bool state = true;
     private Weapon weapon;
-    private CameraShake cameraShake;
 
-    void Start()
+    void Awake()
     {
         weapon = GetComponentInParent<Weapon>();
         weaponProperties = GetComponentInParent<WeaponProperties>();
-        cameraShake = GetComponentInParent<CameraShake>();
         if(Object!=null) Object.SetActive(state);
     }
 
@@ -27,7 +25,6 @@ public class SideGrip : Attatchment
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_activateSideGrip))
         {
             if (weaponProperties != null) StartCoroutine(Shake(weaponProperties.transform));
-            if (cameraShake != null) cameraShake.RequestShake(0.5f);
             state = !state;
 
             Object.SetActive(state);
@@ -63,11 +60,6 @@ public class SideGrip : Attatchment
         }
 
         weapon.localRotation = originalRot;
-    }
-
-    public override string GetAttatchmentDescription()
-    {
-        throw new System.NotImplementedException();
     }
 
 }

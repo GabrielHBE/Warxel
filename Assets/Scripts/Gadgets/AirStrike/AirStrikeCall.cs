@@ -20,11 +20,8 @@ public class AirStrikeCall : Gadget
         originalCallInDelay = callInDelay;
         nextAvailableTime = 0; // Começa disponível
         line = GetComponent<LineRenderer>();
-        if (line == null)
-        {
-            line = gameObject.AddComponent<LineRenderer>();
-        }
-
+        if (line == null) line = gameObject.AddComponent<LineRenderer>();
+        
         line.positionCount = 2;
         line.startWidth = 0.01f;
         line.endWidth = 0.01f;
@@ -36,9 +33,7 @@ public class AirStrikeCall : Gadget
     {
         if (!is_active) return;
 
-        // Calcula o tempo restante de cooldown
 
-        
         float remainingCooldown = Mathf.Max(0, nextAvailableTime - Time.time);
         UpdateAmmoHUD(remainingCooldown);
 
@@ -62,15 +57,9 @@ public class AirStrikeCall : Gadget
         Ray ray = new Ray(laserPos.position, laserPos.forward);
         RaycastHit hit;
         Vector3 raihitpos;
-        if (Physics.Raycast(ray, out hit, distance, layerMask))
-        {
-            raihitpos = hit.point;
-        }
-        else
-        {
-            raihitpos = ray.origin + ray.direction * distance;
-        }
-
+        if (Physics.Raycast(ray, out hit, distance, layerMask)) raihitpos = hit.point;
+        else raihitpos = ray.origin + ray.direction * distance;
+        
         line.SetPosition(0, transform.position);
         line.SetPosition(1, raihitpos);
     }
@@ -81,14 +70,8 @@ public class AirStrikeCall : Gadget
 
         if (soldierHudManager != null)
         {
-            if (remainingCooldown > 0)
-            {
-                soldierHudManager.SetCurrentAmmo("Wait: " + remainingCooldown.ToString("F1"));
-            }
-            else
-            {
-                soldierHudManager.SetCurrentAmmo("Ready!");
-            }
+            if (remainingCooldown > 0) soldierHudManager.SetCurrentAmmo("Wait: " + remainingCooldown.ToString("F1"));
+            else soldierHudManager.SetCurrentAmmo("Ready!");
         }
     }
 

@@ -3,7 +3,8 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class WeatherData : MonoBehaviour {
+public class WeatherData : MonoBehaviour
+{
 	private float timer;
 	public float minutesBetweenUpdate;
 	public WeatherInfo Info;
@@ -13,19 +14,22 @@ public class WeatherData : MonoBehaviour {
 	private bool locationInitialized;
 	public GetLocation getLocation;
 
-	public void Begin() {
+	public void Begin()
+	{
 		latitude = getLocation.latitude;
 		longitude = getLocation.longitude;
 		locationInitialized = true;
 	}
-	void Update() {
-		if (locationInitialized) {
-			if (timer <= 0) {
-				StartCoroutine (GetWeatherInfo ());
+	void Update()
+	{
+		if (locationInitialized)
+		{
+			if (timer <= 0)
+			{
+				StartCoroutine(GetWeatherInfo());
 				timer = minutesBetweenUpdate * 60;
-			} else {
-				timer -= Time.deltaTime;
 			}
+			else timer -= Time.deltaTime;
 		}
 	}
 	private IEnumerator GetWeatherInfo()
@@ -37,12 +41,8 @@ public class WeatherData : MonoBehaviour {
 
 		yield return www.SendWebRequest();
 
-		if (www.result == UnityWebRequest.Result.ConnectionError|| www.result == UnityWebRequest.Result.ProtocolError)
-		{
-			//error
-			yield break;
-		}
-
+		if (www.result == UnityWebRequest.Result.ConnectionError || www.result == UnityWebRequest.Result.ProtocolError) yield break;
+		
 		Info = JsonUtility.FromJson<WeatherInfo>(www.downloadHandler.text);
 	}
 }

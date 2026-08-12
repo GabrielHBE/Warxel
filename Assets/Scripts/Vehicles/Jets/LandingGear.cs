@@ -22,10 +22,8 @@ public class LandingGear : MonoBehaviour
 
         if (jet.is_in_vehicle)
         {
-
             if (jet.retractLandingGear)
             {
-
                 wheel_collider.enabled = false;
                 Retract();
             }
@@ -81,13 +79,6 @@ public class LandingGear : MonoBehaviour
 
     void OnCollisionStay(Collision collision)
     {
-
-        if (collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
-        {
-            jet.isWheelTouchingGround = true;
-        }
-
+        if (collision.gameObject.layer == LayerMask.NameToLayer("Ground")) jet.isWheelTouchingGround = true;
     }
-
-
 }

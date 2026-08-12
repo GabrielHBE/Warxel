@@ -15,8 +15,7 @@ public class SunRotationController : MonoBehaviour
     {
         dayNightCycle = cycleManager;
         
-        if (sunLight == null)
-            sunLight = GetComponent<Light>();
+        if (sunLight == null) sunLight = GetComponent<Light>();
     }
     
     public void UpdateRotation()

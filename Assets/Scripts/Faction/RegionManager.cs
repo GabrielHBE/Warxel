@@ -13,6 +13,6 @@ public class RegionManager : MonoBehaviour
         France,
         Russia,
         Gibraltar,
-        Egipt
+        Egypt
     }
 }

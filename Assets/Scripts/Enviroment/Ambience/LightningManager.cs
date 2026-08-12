@@ -21,23 +21,16 @@ public class LightningManager : MonoBehaviour
             day_time %= 24;
             UpdateLightning(day_time / 24f);
         }
-        else
-        {
-            UpdateLightning(day_time / 24f);
-        }
+        else UpdateLightning(day_time / 24f);
+        
     }
 
     private void OnValidate()
     {
-        if (directional_light != null)
-        {
-            return;
-        }
+        if (directional_light != null) return;
+        
 
-        if (RenderSettings.sun != null)
-        {
-            directional_light = RenderSettings.sun;
-        }
+        if (RenderSettings.sun != null) directional_light = RenderSettings.sun;
         else
         {
             Light[] lights = FindObjectsByType<Light>(FindObjectsSortMode.None);

@@ -39,9 +39,7 @@ public class SpotMarker : MonoBehaviour
             if (!uiElement.gameObject.activeSelf) uiElement.gameObject.SetActive(true);
             uiElement.position = screenPosition;
         }
-        else
-        {
-            if (uiElement.gameObject.activeSelf) uiElement.gameObject.SetActive(false);
-        }
+        else if (uiElement.gameObject.activeSelf) uiElement.gameObject.SetActive(false);
+        
     }
 }

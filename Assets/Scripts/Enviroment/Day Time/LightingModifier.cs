@@ -36,16 +36,14 @@ public class LightingModifier : MonoBehaviour
         if (sunLight != null)
         {
             sunLight.intensity = intensity;
-            if (sunLight.useColorTemperature)
-                sunLight.colorTemperature = temperature;
+            if (sunLight.useColorTemperature) sunLight.colorTemperature = temperature;
         }
     }
     
     private void ApplySkybox(float intensity, float exposure)
     {
         RenderSettings.ambientIntensity = intensity;
-        if (skyboxMaterial != null && skyboxMaterial.HasProperty("_Exposure"))
-            skyboxMaterial.SetFloat("_Exposure", exposure);
+        if (skyboxMaterial != null && skyboxMaterial.HasProperty("_Exposure")) skyboxMaterial.SetFloat("_Exposure", exposure);
     }
     
     private void ApplyFog(float density, Color color)

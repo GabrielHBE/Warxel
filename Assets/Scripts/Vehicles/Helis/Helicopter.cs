@@ -64,14 +64,9 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         Ray ray = new Ray(transform.position, Vector3.down);
         if (Physics.Raycast(ray, out RaycastHit hit, 1000, collisionLayers))
         {
-            if (hit.distance >= 5)
-            {
-                rb.AddTorque(transform.up * rotate_value * rb.mass);
-            }
-            else
-            {
-                Explode(hit.point, hit.normal, hit.transform.gameObject.layer, 12);
-            }
+            if (hit.distance >= 5) rb.AddTorque(transform.up * rotate_value * rb.mass);
+            else Explode(hit.point, hit.normal, hit.transform.gameObject.layer, 12);
+            
         }
     }
     #endregion
@@ -152,12 +147,9 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_pitch_up_key)) mouseY = heliProperties.max_pitch_value;
         if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_pitch_down_key)) mouseY = -heliProperties.max_pitch_value;
 
-        if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_lean_left_key))
-            lean_value -= heliProperties.lean_value * deltaTime;
-        else if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_lean_right_key))
-            lean_value += heliProperties.lean_value * deltaTime;
-        else
-            lean_value = 0;
+        if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_lean_left_key)) lean_value -= heliProperties.lean_value * deltaTime;
+        else if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_lean_right_key)) lean_value += heliProperties.lean_value * deltaTime;
+        else lean_value = 0;
 
         lean_value = Mathf.Clamp(lean_value, -heliProperties.max_lean_value, heliProperties.max_lean_value);
         if (Settings.Instance._controls.invert_vertical_heli_mouse) mouseY *= -1;
@@ -249,20 +241,14 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
     }
 
     [ServerRpc]
-    private void CmdSetEngineState(bool state) // Substitui o antigo CmdToggleEngine
-    {
-        startEngine.Value = state;
-    }
+    private void CmdSetEngineState(bool state) => startEngine.Value = state;
+    
 
     protected override void OnCollisionEnter(Collision collision)
     {
         base.OnCollisionEnter(collision);
-        if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers))
-        {
-            SoundManager.Play2dSoundLocal(fallAlarmSound.clip, fallAlarmSound.properties);
-        }
+        if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers)) SoundManager.Play2dSoundLocal(fallAlarmSound.clip, fallAlarmSound.properties);
     }
-
 
     public override float GetCurrentThrottle() => localThrottle;
     public override float GetMinFov() => Settings.Instance._video.helicopter_fov;

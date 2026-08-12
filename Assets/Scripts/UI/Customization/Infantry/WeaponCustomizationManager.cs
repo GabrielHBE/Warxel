@@ -233,18 +233,12 @@ public class WeaponCustomizationManager : MonoBehaviour
     {
         var attachmentManager = weaponProps.GetComponent<AttatchmentManager>();
 
-        if (part is Sight sight)
-            attachmentManager.UpdateSight(sight, weaponProps);
-        else if (part is Barrel barrel)
-            attachmentManager.UpdateBarrel(barrel, weaponProps);
-        else if (part is Mag mag)
-            attachmentManager.UpdateMag(mag, weaponProps);
-        else if (part is Grip grip)
-            attachmentManager.UpdateGrip(grip, weaponProps);
-        else if (part is SideGrip sidegrip)
-            attachmentManager.UpdateSideGrip(sidegrip, weaponProps);
-        else if (part is Ergonomics ergonomics)
-            attachmentManager.UpdateErgonomics(ergonomics, weaponProps);
+        if (part is Sight sight) attachmentManager.UpdateSight(sight, weaponProps);
+        else if (part is Barrel barrel)attachmentManager.UpdateBarrel(barrel, weaponProps);
+        else if (part is Mag mag) attachmentManager.UpdateMag(mag, weaponProps);
+        else if (part is Grip grip) attachmentManager.UpdateGrip(grip, weaponProps);
+        else if (part is SideGrip sidegrip) attachmentManager.UpdateSideGrip(sidegrip, weaponProps);
+        else if (part is Ergonomics ergonomics) attachmentManager.UpdateErgonomics(ergonomics, weaponProps);
     }
 
     public void RemoveAttachment(string partType, GameObject weaponBeingCustomized)
@@ -259,16 +253,11 @@ public class WeaponCustomizationManager : MonoBehaviour
 
         AttatchmentManager attachmentManager = weaponBeingCustomized.GetComponent<AttatchmentManager>();
 
-        if (targetType == typeof(Grip))
-            attachmentManager.RemoveGrip(weaponProps);
-        else if (targetType == typeof(Barrel))
-            attachmentManager.RemoveBarrel(weaponProps);
-        else if (targetType == typeof(Sight))
-            attachmentManager.RemoveSight(weaponProps);
-        else if (targetType == typeof(SideGrip))
-            attachmentManager.RemoveSideGrip(weaponProps);
-        else if (targetType == typeof(Ergonomics))
-            attachmentManager.RemoveErgonomics();
+        if (targetType == typeof(Grip)) attachmentManager.RemoveGrip(weaponProps);
+        else if (targetType == typeof(Barrel)) attachmentManager.RemoveBarrel(weaponProps);
+        else if (targetType == typeof(Sight)) attachmentManager.RemoveSight(weaponProps);
+        else if (targetType == typeof(SideGrip)) attachmentManager.RemoveSideGrip(weaponProps);
+        else if (targetType == typeof(Ergonomics)) attachmentManager.RemoveErgonomics();
 
         DisableAttachmentInInstance(targetType, weaponBeingCustomized);
         infantryLoadoutCustomization.UpdateWeaponStats(weaponProps);
@@ -306,10 +295,8 @@ public class WeaponCustomizationManager : MonoBehaviour
             if (button == null) continue;
 
             var customizationComponent = button.GetComponent<CustomizationButtonComponents>();
-            if (customizationComponent != null)
-            {
-                customizationComponent.UpdateOutlineState();
-            }
+            if (customizationComponent != null) customizationComponent.UpdateOutlineState();
+            
         }
     }
 
@@ -375,7 +362,6 @@ public class WeaponCustomizationManager : MonoBehaviour
 
     private void UpdateSelectionText(string text)
     {
-        if (infantryLoadoutCustomization.currentSelectionText != null)
-            infantryLoadoutCustomization.currentSelectionText.text = text;
+        if (infantryLoadoutCustomization.currentSelectionText != null) infantryLoadoutCustomization.currentSelectionText.text = text;
     }
 }

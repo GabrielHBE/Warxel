@@ -50,7 +50,6 @@ public class Gadget : MonoBehaviour, UpgradeLevel
 
     public virtual void Reestart()
     {
-        print(firstPersonArms);
         if (firstPersonArms != null)
         {
             if (rightHandTarget != null) firstPersonArms.MoveRightHand(rightHandTarget, 0);
@@ -62,25 +61,16 @@ public class Gadget : MonoBehaviour, UpgradeLevel
     {
         this.is_active = is_active;
     }
-    public Transform GetTransform()
-    {
-        return transform;
-    }
 
-    public void UpgradeGadgetLevel(float points)
+    public void AddKill()
     {
-        gadget_level_progression += points;
+        gadget_level_progression += 1;
 
         if (gadget_level_progression >= points_to_up_level)
         {
             gadget_level += 1;
             gadget_level_progression = 0;
         }
-
-    }
-    public void AddKill()
-    {
-
     }
 
 }

@@ -29,28 +29,24 @@ public class ClassManager : MonoBehaviour
     public Sprite GetClassIcon(Class classType)
     {
         foreach (var classInfo in classes) if (classInfo.classType == classType) return classInfo.classIcon;
-        
         return null;
     }
 
     public string GetClassName(Class classType)
     {
         foreach (var classInfo in classes) if (classInfo.classType == classType) return classInfo.className;
-            
         return null;
     }
 
     public string GetClassDescription(Class classType)
     {
-        foreach (var classInfo in classes) if (classInfo.classType == classType) return classInfo.classDescription;
-            
+        foreach (var classInfo in classes) if (classInfo.classType == classType) return classInfo.classDescription; 
         return null;
     }
 
     public Gadget GetClassGadget(Class classType)
     {
         foreach (var classInfo in classes) if (classInfo.classType == classType) return classInfo.gadget;
-            
         return null;
     }
 

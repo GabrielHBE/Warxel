@@ -8,17 +8,10 @@ public abstract class InteractiveButton : NetworkBehaviour
 
     private void OnEnable()
     {
-        if (InteractiveButtonUI.Instance != null)
-        {
-            InteractiveButtonUI.Instance.CreateButtonUI(this);
-        } 
+        if (InteractiveButtonUI.Instance != null) InteractiveButtonUI.Instance.CreateButtonUI(this);
     }
 
     public abstract void Interact(PlayerController player);
-
-    public string GetInteractionButtonText()
-    {
-        return interactionButtonText;
-    }
+    public string GetInteractionButtonText() => interactionButtonText;
     
 }

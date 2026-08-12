@@ -63,10 +63,8 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
     // Obtém a conexão do jogador local dinamicamente
     private NetworkConnection GetPlayerConnection()
     {
-        if (ClientManager.Instance != null && ClientManager.Instance.clientNetworkConnection.Value != null)
-        {
-            return ClientManager.Instance.clientNetworkConnection.Value;
-        }
+        if (ClientManager.Instance != null && ClientManager.Instance.clientNetworkConnection.Value != null) return ClientManager.Instance.clientNetworkConnection.Value;
+        
         return ClientManager.Instance != null ? ClientManager.Instance.LocalConnection : null;
     }
 
@@ -94,16 +92,12 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
 
     private void OnSquadsChanged(SyncDictionaryOperation op, FactionManager.Faction key, List<SquadManager.SquadData> value, bool asServer)
     {
-        if (accountManager != null && key == accountManager.faction)
-        {
-            RefreshSquadList();
-        }
+        if (accountManager != null && key == accountManager.faction) RefreshSquadList();
     }
 
     private void StartPolling()
     {
-        if (pollCoroutine != null)
-            StopCoroutine(pollCoroutine);
+        if (pollCoroutine != null)  StopCoroutine(pollCoroutine);
         
         pollCoroutine = StartCoroutine(PollForUpdates());
     }
@@ -129,15 +123,11 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
         }
     }
 
-    private void OnDisable()
-    {
-        UnsubscribeFromSquadEvents();
-    }
-
+    private void OnDisable() => UnsubscribeFromSquadEvents();
+    
     private void OnDestroy()
     {
-        if (refreshButton != null)
-            refreshButton.onClick.RemoveListener(RefreshSquadList);
+        if (refreshButton != null) refreshButton.onClick.RemoveListener(RefreshSquadList);
         
         UnsubscribeFromSquadEvents();
     }
@@ -255,14 +245,9 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
 
     private void OnSquadActionButtonClicked(SquadManager.SquadName squadName, bool isCurrentlyInSquad)
     {
-        if (isCurrentlyInSquad)
-        {
-            ExitSquad();
-        }
-        else
-        {
-            JoinSpecificSquad(squadName);
-        }
+        if (isCurrentlyInSquad) ExitSquad();
+        else JoinSpecificSquad(squadName);
+        
     }
 
     public void JoinSpecificSquad(SquadManager.SquadName squadName)

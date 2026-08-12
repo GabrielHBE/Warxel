@@ -40,7 +40,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     private IEnumerator FindSpawnCameraPosition()
     {
         // Tenta encontrar o GameObject por alguns frames
-        float timeout = 2f;
+        float timeout = 5f;
         float elapsed = 0f;
 
         while (map_spawn_camera_pos == null && elapsed < timeout)
@@ -231,22 +231,13 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         ClassManager.Class playerClass = AccountManager.Instance.selected_class;
         FactionManager.Faction playerFaction = AccountManager.Instance.faction;
 
-        if (currentSpawnType == CurrentSpawnType.Infantary)
-        {
-            SpawnPlayer(spawn_point.position, spawn_point.rotation, playerClass, playerFaction);
-        }
-        else
-        {
-            SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle, playerClass, playerFaction);
-        }
+        if (currentSpawnType == CurrentSpawnType.Infantary) SpawnPlayer(spawn_point.position, spawn_point.rotation, playerClass, playerFaction, AccountManager.Instance.account_name);
+        else SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle, playerClass, playerFaction, AccountManager.Instance.account_name);
 
         OnSpawnFinished();
     }
 
-    private void OnSpawnFinished()
-    {
-        AccountManager.Instance.accountStatus.IncreaseClassSelecion();
-    }
+    private void OnSpawnFinished() => AccountManager.Instance.accountStatus.IncreaseClassSelecion();
 
     private IEnumerator TransitionCameraToSpawnPoint(Transform spawn_point)
     {
@@ -276,7 +267,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     }
 
     [ServerRpc]
-    private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab, ClassManager.Class playerClass, FactionManager.Faction playerFaction)
+    private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab, ClassManager.Class playerClass, FactionManager.Faction playerFaction, string playerName)
     {
         // 1. Instancia o Player na rede
         player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
@@ -285,6 +276,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         PlayerProperties props = player_instantiated.GetComponent<PlayerProperties>();
         props.selectedClass.Value = playerClass;
         props.faction.Value = playerFaction;
+        props.playerName.Value = playerName;
 
         NetworkObject playerNetObj = player_instantiated.GetComponent<NetworkObject>();
         Spawn(playerNetObj, Owner);
@@ -302,7 +294,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     }
 
     [ServerRpc]
-    private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation, ClassManager.Class playerClass, FactionManager.Faction playerFaction)
+    private void SpawnPlayer(Vector3 spawnPosition, Quaternion spawnRotation, ClassManager.Class playerClass, FactionManager.Faction playerFaction, string playerName)
     {
         player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
 
@@ -310,6 +302,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         PlayerProperties props = player_instantiated.GetComponent<PlayerProperties>();
         props.selectedClass.Value = playerClass;
         props.faction.Value = playerFaction;
+        props.playerName.Value = playerName;
 
         NetworkObject spawnedNetworkObject = player_instantiated.GetComponent<NetworkObject>();
 
@@ -339,7 +332,6 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
 
         if (playerController != null)
         {
-            playerController.GetComponent<PlayerProperties>().player_name.Value = AccountManager.Instance.account_name;
             WeaponProperties[] weaponProperties = player_instantiated.GetComponentsInChildren<WeaponProperties>(true);
             foreach (WeaponProperties wp in weaponProperties)
             {
@@ -373,7 +365,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
 
         if (InfantryLoadoutCustomization.Instance != null) InfantryLoadoutCustomization.Instance.gameObject.SetActive(false);
         if (VehicleLoadoutCustomization.Instance != null) VehicleLoadoutCustomization.Instance.gameObject.SetActive(false);
-        if(SquadSelecionUI.Instance!=null) SquadSelecionUI.Instance.gameObject.SetActive(false);
+        if (SquadSelecionUI.Instance != null) SquadSelecionUI.Instance.gameObject.SetActive(false);
         if (canvas != null) canvas.SetActive(false);
     }
 
@@ -390,10 +382,10 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
             spawn_camera.GetComponent<AudioListener>().enabled = true;
         }
 
-        if(SquadSelecionUI.Instance!=null) SquadSelecionUI.Instance.gameObject.SetActive(true);
-        if (InfantryLoadoutCustomization.Instance != null)InfantryLoadoutCustomization.Instance.gameObject.SetActive(true);
+        if (SquadSelecionUI.Instance != null) SquadSelecionUI.Instance.gameObject.SetActive(true);
+        if (InfantryLoadoutCustomization.Instance != null) InfantryLoadoutCustomization.Instance.gameObject.SetActive(true);
         if (canvas != null) canvas.SetActive(true);
-        
+
     }
     private Coroutine fov_transition_coroutine;
     public void EnablePlayerCustomization()
@@ -471,9 +463,6 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         fov_transition_coroutine = null;
     }
 
-    public void SwitchPerspectiveButtons(bool state)
-    {
-        infantaryVehicleSwitch.parent.SetActive(state);
-    }
+    public void SwitchPerspectiveButtons(bool state) => infantaryVehicleSwitch.parent.SetActive(state);
 
 }

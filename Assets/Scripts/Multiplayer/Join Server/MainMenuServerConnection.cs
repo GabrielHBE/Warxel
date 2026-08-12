@@ -64,11 +64,9 @@ public class MainMenuConnection : MonoBehaviour
 
     }
 
-    public void StartMapImage(string message)
-    {
-        ShowLoading(message);
+    public void StartMapImage(string message) => ShowLoading(message);
 
-    }
+    
 
     // Este evento é disparado automaticamente quando o status do Servidor muda
     private void ServerManager_OnServerConnectionState(ServerConnectionStateArgs args)

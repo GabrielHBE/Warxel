@@ -13,16 +13,13 @@ public class ScreenBlood : MonoBehaviour
     void Awake()
     {
         // Garantir que a imagem comece transparente
-        if (screenBloodImage != null)
-        {
-            SetImageAlpha(0f);
-        }
+        if (screenBloodImage != null) SetImageAlpha(0f);
+        
     }
 
     public void TriggerBlood()
     {
-        if (currentRoutine != null)
-            StopCoroutine(currentRoutine);
+        if (currentRoutine != null) StopCoroutine(currentRoutine);
 
         if (screenBloodImage.gameObject.activeSelf) currentRoutine = StartCoroutine(BloodRoutine());
     }

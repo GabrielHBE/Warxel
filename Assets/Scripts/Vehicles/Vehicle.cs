@@ -312,7 +312,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
             // Se passou pelas verificações, ocupa o assento
             seat.isOccupied = true;
-            occupantsNames.Add(props.player_name.Value);
+            occupantsNames.Add(props.playerName.Value);
 
             if (seat.vehicleArmory?.Length > 0) seat.SetAuthority(conn);
             if (seat.seatType == VehicleSeats.SeatType.Pilot) NetworkObject.GiveOwnership(conn);
@@ -484,7 +484,7 @@ public abstract class Vehicle : NetworkBehaviour,
         {
             VehicleSeats seat = vehicleSeats[seatIndex];
             if (seat.playerGameObject != null && seat.playerGameObject.TryGetComponent(out PlayerProperties props))
-                occupantsNames.Remove(props.player_name.Value);
+                occupantsNames.Remove(props.playerName.Value);
         }
         RpcUpdateSeatStatus(seatIndex, occupiedStatus, null);
     }
@@ -512,8 +512,7 @@ public abstract class Vehicle : NetworkBehaviour,
     public void TakeDamage(float damage)
     {
         if (ignore_damage) return;
-        float effectiveDamage = damage * ((100f - resistance.Value) / 100f);
-        hp.Value -= effectiveDamage;
+        hp.Value -= damage;
         if (hp.Value <= 0) vehicle_destroyed.Value = true;
     }
     protected void HandleCollision(Collision collision, float destruction_force)
@@ -633,8 +632,6 @@ public abstract class Vehicle : NetworkBehaviour,
         currentSeat.currentArmory?.ActivateArmory();
     }
     protected bool IsInLayerMask(int layer, LayerMask layerMask) => layerMask == (layerMask | (1 << layer));
-    public float GetHp() => hp.Value;
-    public float GetResistance() => resistance.Value;
     #endregion
 
     #region Interfaces Implementation
@@ -675,7 +672,6 @@ public abstract class Vehicle : NetworkBehaviour,
     public virtual float GetMaxSpeed() => float.MaxValue;
     public virtual float GetCurrentThrottle() => throttle.Value;
     public virtual float GetMaxThrottle() => float.MaxValue;
-    public int GetUpgradeLevel() => 1;
     #endregion
 
     #region Enums

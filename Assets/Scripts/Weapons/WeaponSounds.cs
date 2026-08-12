@@ -18,10 +18,8 @@ public class WeaponSounds : MonoBehaviour
     [SerializeField] private SoundManager.SoundComponents pushExtractorSound;
 
     private CameraShake cameraShake;
-    void Awake()
-    {   
-        cameraShake = GetComponentInParent<CameraShake>();
-    }
+    void Awake() => cameraShake = GetComponentInParent<CameraShake>();
+    
 
     public void RemoveMag()
     {
@@ -51,6 +49,5 @@ public class WeaponSounds : MonoBehaviour
     {   
         SoundManager.Instance.RequestPlay3dSound(shootSound.clip.name, shootSound.properties, transform.position, false);
         SoundManager.Play2dSoundLocal(shootSound.clip, shootSound.properties);
-        //SoundManager.Play3dSoundLocal(shootSound, shootproperties, transform.position);
     }
 }

@@ -19,28 +19,14 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
     [SerializeField] private Canvas miscelaniousCanvas;
     [SerializeField] private Canvas deadPlayerCanvas;
     [SerializeField] private Canvas hpCanvas;
-    [SerializeField] private Canvas reticleCanvas;
 
     void Update()
     {
-
-        if (playerProperties.sprinting && !playerProperties.is_in_vehicle)
-        {
-            center_screen_dot.enabled = true;
-        }
-        else
-        {
-            center_screen_dot.enabled = false;
-        }
-    }
-
-    public void UpdateDeadPlayerHud(bool isDead)
-    {
-        if (deadPlayerHud.gameObject.activeSelf) deadPlayerHud.gameObject.SetActive(isDead);
+        if (playerProperties.sprinting && !playerProperties.is_in_vehicle) center_screen_dot.enabled = true;
+        else center_screen_dot.enabled = false; 
     }
 
     public void SetCurrentAmmo(string ammo) => currentAmmo = ammo;
-
     public string GetCurrentAmmo() => currentAmmo;
     public float GetCurrentHp() => playerProperties.hp.Value;
     public float GetMaxHp() => playerProperties.max_hp;
@@ -52,7 +38,6 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
         miscelaniousCanvas.gameObject.SetActive(true);
         deadPlayerCanvas.gameObject.SetActive(false);
         hpCanvas.gameObject.SetActive(true);
-        reticleCanvas.gameObject.SetActive(false);
     }
     public void ActivateDeadHUD()
     {
@@ -61,7 +46,6 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
         miscelaniousCanvas.gameObject.SetActive(true);
         deadPlayerCanvas.gameObject.SetActive(true);
         hpCanvas.gameObject.SetActive(false);
-        reticleCanvas.gameObject.SetActive(false);
     }
 
     public void ActivateStandardHUD()
@@ -71,7 +55,6 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
         miscelaniousCanvas.gameObject.SetActive(true);
         deadPlayerCanvas.gameObject.SetActive(false);
         hpCanvas.gameObject.SetActive(true);
-        reticleCanvas.gameObject.SetActive(true);
     }
 
 }

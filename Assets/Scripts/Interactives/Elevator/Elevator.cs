@@ -41,11 +41,8 @@ public class Elevator : MonoBehaviour
         currentFloor = floor;
 
         // Garante que chegou na posição final mesmo se can_move ficar false
-        if (can_move)
-        {
-            transform.localPosition = horizontalPosition;
-        }
-
+        if (can_move) transform.localPosition = horizontalPosition;
+        
         isMoving = false;
     }
 

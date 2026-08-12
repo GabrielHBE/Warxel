@@ -75,7 +75,6 @@ public class SwayNBobScript : MonoBehaviour
     private const int XRotationMultiplier = 1;
 
     #region Unity Lifecycle
-
     private void Awake()
     {
         isRestarted = false;
@@ -106,11 +105,9 @@ public class SwayNBobScript : MonoBehaviour
         UpdateBobRotation();
         UpdateCompositePositionRotation();
     }
-
     #endregion
 
     #region Public Methods
-
     public void Restart(
         float bobWalkExaggeration,
         float bobSprintExaggeration,
@@ -180,11 +177,9 @@ public class SwayNBobScript : MonoBehaviour
 
         shakeOffset = Vector3.zero;
     }
-
     #endregion
 
     #region State Management
-
     private void CachePlayerProperties()
     {
         isAiming = playerProperties.is_aiming;
@@ -213,11 +208,9 @@ public class SwayNBobScript : MonoBehaviour
             Time.deltaTime * smoothRot
         );
     }
-
     #endregion
 
     #region Bob Multipliers Logic
-
     private void UpdateBobMultipliers()
     {
         bool isSprintingActive = playerProperties.sprinting &&
@@ -269,11 +262,9 @@ public class SwayNBobScript : MonoBehaviour
             currentMultiplier = aimMultiplier;
         }
     }
-
     #endregion
 
     #region Sprinting Logic
-
     private void HandleSprinting()
     {
         if (!playerProperties.sprinting || playerProperties.is_firing) return;
@@ -323,11 +314,9 @@ public class SwayNBobScript : MonoBehaviour
             sprintTargetWeaponRotation = initialRotation;
         }
     }
-
     #endregion
 
     #region Input Handling
-
     private void UpdateInputs()
     {
         walkInput.x = playerController.moveHorizontal;
@@ -337,11 +326,9 @@ public class SwayNBobScript : MonoBehaviour
         lookInput.x = -InputManager.GetAxis("Mouse X");
         lookInput.y = InputManager.GetAxis("Mouse Y");
     }
-
     #endregion
 
     #region Sway Logic
-
     private void UpdateSway()
     {
         Vector3 invertedLook = (lookInput * -step).normalized;
@@ -357,11 +344,9 @@ public class SwayNBobScript : MonoBehaviour
         invertedLook.y = Mathf.Clamp(invertedLook.y, -maxRotationStep, maxRotationStep);
         swayEulerRot = new Vector3(invertedLook.y, invertedLook.x, invertedLook.x).normalized;
     }
-
     #endregion
 
     #region Bobbing Logic
-
     private void UpdateBobOffset()
     {
         float movementInput = (Mathf.Abs(InputManager.GetAxis("Vertical")) > 0.01f ||
@@ -389,11 +374,9 @@ public class SwayNBobScript : MonoBehaviour
         bobEulerRotation.y = isMoving ? currentMultiplier.y * cosCurve : 0f;
         bobEulerRotation.z = isMoving ? currentMultiplier.z * cosCurve * walkInput.x : 0f;
     }
-
     #endregion
 
     #region Composite Position & Rotation
-
     private void UpdateCompositePositionRotation()
     {
         UpdateInputs();
@@ -413,20 +396,12 @@ public class SwayNBobScript : MonoBehaviour
 
         combinedRotation *= Quaternion.Euler(shakeOffset);
 
-        if (!isGrounded)
-        {
-            ApplyAirborneState(deltaTime, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
-        }
-        else
-        {
-            ApplyGroundedState(deltaTime, enhancedXRotation, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
-        }
+        if (!isGrounded) ApplyAirborneState(deltaTime, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
+        else ApplyGroundedState(deltaTime, enhancedXRotation, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
     }
-
     #endregion
 
     #region Aim Movement Rotation
-
     private float CalculateAimMoveRotation()
     {
         if (!isAiming) return 0f;
@@ -478,10 +453,7 @@ public class SwayNBobScript : MonoBehaviour
 
     private Vector3 CalculateCombinedPosition()
     {
-        if (!isAiming)
-        {
-            return sprintTargetWeaponPosition + swayPos + bobPosition;
-        }
+        if (!isAiming) return sprintTargetWeaponPosition + swayPos + bobPosition;
 
         float divisor = isFiring ? 20f : 5f;
         return sprintTargetWeaponPosition + (swayPos / divisor) + (bobPosition / divisor);
@@ -539,6 +511,5 @@ public class SwayNBobScript : MonoBehaviour
         );
 
     }
-
     #endregion
 }

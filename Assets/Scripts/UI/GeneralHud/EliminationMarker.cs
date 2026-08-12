@@ -7,14 +7,14 @@ public class EliminationMarker : PersistentLocalSingleton<EliminationMarker>
 {
     //public static EliminationMarker Instance { get; private set; }
     [Header("Images")]
-    [SerializeField] private Sprite infantary_kill_image;
-    [SerializeField] private Sprite vehicle_kill_image;
+    [SerializeField] private Sprite infantryKillImage;
+    [SerializeField] private Sprite vehicleKillImage;
 
-    [SerializeField] private Sprite infantary_assist_image;
-    [SerializeField] private Sprite vehicle_assist_image;
+    [SerializeField] private Sprite infantryAssistImage;
+    [SerializeField] private Sprite vehicleAssistImage;
 
     [Header("Settings")]
-    [SerializeField] private float images_distance = 2f;
+    
     [SerializeField] private Transform images_container;
     [SerializeField] private float imageLifetime = 1f;
     [SerializeField] private float fadeDuration = 0.5f;
@@ -22,37 +22,34 @@ public class EliminationMarker : PersistentLocalSingleton<EliminationMarker>
     // Pooling para melhor performance
     private Queue<GameObject> imagePool = new Queue<GameObject>();
     private List<GameObject> activeImages = new List<GameObject>();
+    private float imagesDistance = 100;
 
     private float nextImagePositionX = 0f;
 
     protected override void Awake()
     {
         base.Awake();
-        
-        if (images_container == null)
-        {
-            images_container = transform;
-        }
+        if (images_container == null) images_container = transform;
     }
 
     public void InstantiateInfantryKillImage()
     {
-        if (infantary_kill_image != null) CreateImage(infantary_kill_image);
+        if (infantryKillImage != null) CreateImage(infantryKillImage);
     }
 
     public void InstantiateVehicleKillImage()
     {
-        if (vehicle_kill_image != null) CreateImage(vehicle_kill_image);
+        if (vehicleKillImage != null) CreateImage(vehicleKillImage);
     }
 
     public void InstantiateInfantryAssistImage()
     {
-        if (infantary_assist_image != null) CreateImage(infantary_assist_image);
+        if (infantryAssistImage != null) CreateImage(infantryAssistImage);
     }
 
     public void InstantiateVehicleAssistImage()
     {
-        if (vehicle_assist_image != null) CreateImage(vehicle_assist_image);
+        if (vehicleAssistImage != null) CreateImage(vehicleAssistImage);
     }
 
     private void CreateImage(Sprite sprite)
@@ -74,7 +71,7 @@ public class EliminationMarker : PersistentLocalSingleton<EliminationMarker>
         activeImages.Add(imageObject);
 
         // Atualizar posição para próxima imagem
-        nextImagePositionX -= images_distance;
+        nextImagePositionX -= imagesDistance;
 
         // Iniciar fade out
         StartCoroutine(FadeAndRecycleImage(imageObject, canvasGroup));
@@ -82,11 +79,8 @@ public class EliminationMarker : PersistentLocalSingleton<EliminationMarker>
 
     private GameObject GetOrCreateImageObject()
     {
-        if (imagePool.Count > 0)
-        {
-            return imagePool.Dequeue();
-        }
-
+        if (imagePool.Count > 0)  return imagePool.Dequeue();
+        
         GameObject newObj = new GameObject("KillImage");
         Image image = newObj.AddComponent<Image>();
         image.preserveAspect = true;
@@ -130,30 +124,10 @@ public class EliminationMarker : PersistentLocalSingleton<EliminationMarker>
         for (int i = 0; i < activeImages.Count; i++)
         {
             activeImages[i].transform.localPosition = new Vector3(currentX, 0f, 0f);
-            currentX -= images_distance;
+            currentX -= imagesDistance;
         }
 
         // Atualizar próxima posição
         nextImagePositionX = currentX;
-    }
-
-    public void ClearAllImages()
-    {
-        StopAllCoroutines();
-
-        // Mover todas as imagens ativas para o pool
-        foreach (var image in activeImages)
-        {
-            image.SetActive(false);
-            imagePool.Enqueue(image);
-        }
-
-        activeImages.Clear();
-        nextImagePositionX = 0f;
-    }
-
-    public void ForceReorganize()
-    {
-        ReorganizeRemainingImages();
     }
 }

@@ -114,20 +114,12 @@ public class AccountManager : PersistentLocalSingleton<AccountManager>
 
             string className = PlayerPrefs.GetString("AccountManager_selected_class", "None");
 
-            if (System.Enum.TryParse(className, out ClassManager.Class loadedClass))
-            {
-                selected_class = loadedClass;
-            }
-            else
-            {
-                selected_class = ClassManager.Class.Assault;
-                Debug.LogWarning($"Classe '{className}' não encontrada. Usando padrão: {selected_class}");
-            }
+            if (System.Enum.TryParse(className, out ClassManager.Class loadedClass)) selected_class = loadedClass;
+            else selected_class = ClassManager.Class.Assault;
+            
         }
         else
         {
-            Debug.Log("Nenhum dado salvo encontrado. Usando valores padrão.");
-
             account_name = "Jogador";
             id = System.Guid.NewGuid().ToString();
             level = 0;

@@ -39,21 +39,11 @@ public class ScopeAimShake : MonoBehaviour
         // Aplica a tremedeira com base nos estados atuais
         if (playerProperties.is_aiming)
         {
-            if (isHoldingBreath)
-            {
-                // Zera o shake (ou deixa ele estabilizado) enquanto segura a respiração
-                cameraShake.ResetAimShake(); 
-            }
-            else
-            {
-                // Se não está segurando a respiração (ou está em cooldown), treme a mira
-                cameraShake.CalculateScopeAimShake(tension);
-            }
+            if (isHoldingBreath) cameraShake.ResetAimShake(); 
+            else cameraShake.CalculateScopeAimShake(tension);
         }
-        else
-        {
-            cameraShake.ResetAimShake();
-        }
+        else cameraShake.ResetAimShake();
+        
     }
 
     private void UpdateBreathMechanic(bool wantsToHoldBreath)
@@ -91,16 +81,10 @@ public class ScopeAimShake : MonoBehaviour
 
     private void RecoverBreath()
     {
-        // Recupera o fôlego até o limite máximo
         if (currentBreath < maxBreathDuration)
         {
             currentBreath += Time.deltaTime * breathRecoveryRate;
-            
-            // Garante que não ultrapasse o limite
-            if (currentBreath > maxBreathDuration)
-            {
-                currentBreath = maxBreathDuration;
-            }
+            if (currentBreath > maxBreathDuration)  currentBreath = maxBreathDuration;
         }
     }
 }

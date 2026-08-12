@@ -60,11 +60,7 @@ public class AirStrikeMissile : NetworkBehaviour
         ShephereExplosion();
     }
 
-    private void ShephereExplosion()
-    {
-        Explosion.SphereExplosion(transform.position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, null);
-        //voxCollider.SphereExplosion(transform.position, infantary_damage, vehicle_damage);
-    }
+    private void ShephereExplosion() => Explosion.SphereExplosion(transform.position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, null);
 
     public void Detonate()
     {
@@ -77,13 +73,7 @@ public class AirStrikeMissile : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestDespawn()
     {
-        if (IsSpawned)
-        {
-            Despawn(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        if (IsSpawned) Despawn(gameObject);
+        else Destroy(gameObject);
     }
 }

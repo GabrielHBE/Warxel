@@ -86,8 +86,7 @@ public class SquadUIItem : MonoBehaviour
     {
         isExpanded = !isExpanded;
 
-        if (membersPanel != null)
-            membersPanel.SetActive(isExpanded);
+        if (membersPanel != null) membersPanel.SetActive(isExpanded);
     }
 
     private void PopulateMembers()
@@ -141,8 +140,7 @@ public class SquadUIItem : MonoBehaviour
         isPlayerInSquad = playerInSquad;
 
         // Atualiza o contador
-        if (squadCountText != null)
-            squadCountText.text = $"{updatedMembers.Length}/{SquadManager.MAX_MEMBERS_PER_SQUAD}";
+        if (squadCountText != null) squadCountText.text = $"{updatedMembers.Length}/{SquadManager.MAX_MEMBERS_PER_SQUAD}";
 
         // Atualiza o botão de ação
         ConfigureActionButton();
@@ -153,10 +151,8 @@ public class SquadUIItem : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (expandButton != null)
-            expandButton.onClick.RemoveListener(ToggleExpand);
+        if (expandButton != null) expandButton.onClick.RemoveListener(ToggleExpand);
 
-        if (actionButton != null)
-            actionButton.onClick.RemoveAllListeners();
+        if (actionButton != null) actionButton.onClick.RemoveAllListeners();
     }
 }

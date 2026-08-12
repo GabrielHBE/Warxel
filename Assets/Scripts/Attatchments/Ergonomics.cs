@@ -15,9 +15,6 @@ public class Ergonomics : Attatchment
     public int rafeOfFireChange;
     public int burstBulletsPerTapChange;
     public float burstTimeBetweenBurstsChange;
+    public bool canReloadAiming;
 
-    public override string GetAttatchmentDescription()
-    {
-        throw new System.NotImplementedException();
-    }
 }   

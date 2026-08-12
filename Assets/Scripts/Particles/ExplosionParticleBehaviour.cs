@@ -18,10 +18,8 @@ public class ExplosionParticleBehaviour : ParticlesBehaviour
         if (explosion_light != null) explosion_light.enabled = true;
 
         // Se não foi atribuída uma camada, usa a padrão "Ground"
-        if (groundLayer.value == 0)
-        {
-            groundLayer = LayerMask.GetMask("Ground");
-        }
+        if (groundLayer.value == 0) groundLayer = LayerMask.GetMask("Ground");
+        
 
         StartCoroutine(ReduceLightIntensity());
 
@@ -102,10 +100,8 @@ public class ExplosionParticleBehaviour : ParticlesBehaviour
         private void DestroySparkle()
         {
             // Opcional: adicionar efeito visual antes de destruir
-            if (TryGetComponent(out Renderer renderer))
-            {
-                renderer.enabled = false;
-            }
+            if (TryGetComponent(out Renderer renderer)) renderer.enabled = false;
+            
             Destroy(gameObject, 0.1f);
         }
 

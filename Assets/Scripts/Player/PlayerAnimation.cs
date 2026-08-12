@@ -76,21 +76,9 @@ public class PlayerAnimation : NetworkBehaviour
     #region  Update SyncVars
     private void ShouldRequestUpdateSyncVar()
     {
-        if (playerProperties.is_aiming != isAiming.Value)
-        {
-            RequestUpdateIsAimingSyncVar(playerProperties.is_aiming);
-        }
-
-        if (playerProperties.sprinting != isSprinting.Value)
-        {
-            RequestUpdateisSprintingSyncVar(playerProperties.sprinting);
-        }
-
-        if ((playerProperties.isProneTransition || playerProperties.is_proned) != isProne.Value)
-        {
-            RequestUpdateisProneSyncVar(playerProperties.isProneTransition || playerProperties.is_proned);
-        }
-
+        if (playerProperties.is_aiming != isAiming.Value) RequestUpdateIsAimingSyncVar(playerProperties.is_aiming);
+        if (playerProperties.sprinting != isSprinting.Value) RequestUpdateisSprintingSyncVar(playerProperties.sprinting);
+        if ((playerProperties.isProneTransition || playerProperties.is_proned) != isProne.Value) RequestUpdateisProneSyncVar(playerProperties.isProneTransition || playerProperties.is_proned);
     }
 
     [ServerRpc]
@@ -106,26 +94,15 @@ public class PlayerAnimation : NetworkBehaviour
     {
         if (thirdPersonArms == null) return;
 
-        // Verifica se tem left hand target
+
         bool hasLeftHandTarget = thirdPersonArms.HasLeftHandTarget();
 
-        // Right hand IK:
-        // - Se NÃO tem leftHandTarget: só ativa se estiver mirando
-        // - Se tem leftHandTarget: segue a lógica normal (sprint, dead, prone)
         bool shouldIncreaseRightIK;
-        if (!hasLeftHandTarget)
-        {
-            // Sem suporte para mão esquerda: só ativa se estiver mirando
-            shouldIncreaseRightIK = isAiming.Value && !playerProperties.is_dead.Value;
-        }
-        else
-        {
-            // Com suporte para mão esquerda: lógica normal
-            shouldIncreaseRightIK = (!isSprinting.Value && !playerProperties.is_dead.Value) && (!isProne.Value || isAiming.Value);
-        }
+        if (!hasLeftHandTarget) shouldIncreaseRightIK = isAiming.Value && !playerProperties.is_dead.Value;
+        else shouldIncreaseRightIK = (!isSprinting.Value && !playerProperties.is_dead.Value) && (!isProne.Value || isAiming.Value);
+    
         thirdPersonArms.UpdateRightRandRigValue(shouldIncreaseRightIK);
 
-        // Left hand IK: ativa se não está morto E (tem leftHandTarget OU está mirando)
         bool shouldIncreaseLeftIK = !playerProperties.is_dead.Value && (hasLeftHandTarget || isAiming.Value);
         thirdPersonArms.UpdateLeftRandRigValue(shouldIncreaseLeftIK);
 

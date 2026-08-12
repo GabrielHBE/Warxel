@@ -24,9 +24,8 @@ public class ClientManager : ServerSingleton<ClientManager>
     // Flag para controlar se já entrou no squad automaticamente
     private bool hasAutoJoinedSquad = false;
     private bool isEnteringSquad = false;
-
     protected override void Awake() { }
-    
+
     public override void OnStartClient()
     {
         base.OnStartClient();
@@ -43,18 +42,28 @@ public class ClientManager : ServerSingleton<ClientManager>
 
     [ServerRpc]
     private void RequestSetClientConnection() => clientNetworkConnection.Value = Owner;
-
     private IEnumerator InitializeWhenReady()
     {
+        // 1. Force the coroutine to wait at least one frame. 
+        // This allows FishNet to finish the current 'OnStartClient' iteration loop.
+        yield return null;
+
         // Wait until the client is fully connected and ready
         while (!IsClientReady())
         {
             yield return new WaitForSeconds(0.1f);
         }
+
+        // 2. Explicitly wait for PlayersInMatch to be instantiated AND initialized by FishNet
+        while (PlayersInMatch.Instance == null || !PlayersInMatch.Instance.IsClientInitialized)
+        {
+            yield return null;
+        }
+
         // Now initialize
         SpawnClientObjects();
+        PlayersInMatch.Instance.RequestAddPlayer(AccountManager.Instance.faction, AccountManager.Instance.account_name);
     }
-
     private IEnumerator EnterSquad()
     {
         // Aguarda o SquadManager estar pronto
@@ -107,23 +116,18 @@ public class ClientManager : ServerSingleton<ClientManager>
     private void SpawnClientObjects()
     {
         // Spawna o PlayerSpawnController (que tem NetworkBehaviour)
-        if (playerSpawnController != null)
-        {
-            SpawnPlayerSpawner();
-        }
+        if (playerSpawnController != null) RequestSpawnPlayerSpawner();
 
-        if (loadoutCustomization != null)
-            instantiated_infantary_loadout_customization = Instantiate(loadoutCustomization);
+
+        if (loadoutCustomization != null) instantiated_infantary_loadout_customization = Instantiate(loadoutCustomization);
 
         if (vehicleLoadoutCustomization != null)
         {
             instantiated_vehicle_loadout_customization = Instantiate(vehicleLoadoutCustomization);
             StartCoroutine(DisableVehicleCustomization());
         }
-        if (squadLoadoutSelecion != null)
-        {
-            instantiated_squad_selection = Instantiate(squadLoadoutSelecion);
-        }
+        if (squadLoadoutSelecion != null) instantiated_squad_selection = Instantiate(squadLoadoutSelecion);
+
     }
 
     private IEnumerator DisableVehicleCustomization()
@@ -135,48 +139,44 @@ public class ClientManager : ServerSingleton<ClientManager>
     public override void OnStopClient()
     {
         base.OnStopClient();
+
+        PlayersInMatch.Instance.RequestRemovePlayer(AccountManager.Instance.faction, AccountManager.Instance.account_name);
+        RequestDespawnPlayerSpawner();
         if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
         if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
         if (instantiated_squad_selection != null) Destroy(instantiated_squad_selection);
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void SpawnPlayerSpawner()
+    [ServerRpc]
+    private void RequestSpawnPlayerSpawner()
     {
-        // Check if we're on the server
         if (!IsServerInitialized) return;
-
-        // Only spawn if we haven't spawned this yet for this connection
         PlayerSpawner playerSpawner = InstanceFinder.NetworkManager.GetComponent<PlayerSpawner>();
-        if (playerSpawner == null || playerSpawner.Spawns == null || playerSpawner.Spawns.Length == 0)
-        {
-            Debug.LogError("[ClientManager] PlayerSpawner not properly configured!");
-            return;
-        }
+        if (playerSpawner == null || playerSpawner.Spawns == null || playerSpawner.Spawns.Length == 0) return;
 
         instantiated_player_spawner = Instantiate(playerSpawnController);
         instantiated_player_spawner.transform.position = playerSpawner.Spawns[0].position;
         Spawn(instantiated_player_spawner, Owner);
     }
 
+    [ServerRpc]
+    private void RequestDespawnPlayerSpawner()
+    {
+        if (!IsServerInitialized) return;
+        if (instantiated_player_spawner != null) Despawn(instantiated_player_spawner);
+    }
+
     private void EnterSquadAutomatically()
     {
         // Evita entrar múltiplas vezes
         if (hasAutoJoinedSquad || isEnteringSquad) return;
-        
-        if (AccountManager.Instance == null)
-        {
-            Debug.LogError("[ClientManager] AccountManager.Instance não encontrado!");
-            return;
-        }
+
+        if (AccountManager.Instance == null) return;
 
         isEnteringSquad = true;
-        
+
         FactionManager.Faction playerFaction = AccountManager.Instance.faction;
         string playerName = GetPlayerName();
-
-        Debug.Log($"[ClientManager] Tentando entrar automaticamente no squad. Facção: {playerFaction}, Jogador: {playerName}");
-
         // Marca que já tentou entrar
         hasAutoJoinedSquad = true;
 
@@ -199,25 +199,14 @@ public class ClientManager : ServerSingleton<ClientManager>
         // Força a atualização da UI
         if (SquadSelecionUI.Instance != null && SquadSelecionUI.Instance.IsInitialized())
         {
-            Debug.Log("[ClientManager] Forçando atualização da UI do squad após entrada automática.");
             SquadSelecionUI.Instance.ForceRefreshUI();
-            
-            // Verifica se o estado foi atualizado corretamente
-            if (SquadSelecionUI.Instance.IsInSquad())
+
+            if (!SquadSelecionUI.Instance.IsInSquad())
             {
-                Debug.Log($"[ClientManager] UI atualizada. Jogador está no squad: {SquadSelecionUI.Instance.GetCurrentSquad()}");
-            }
-            else
-            {
-                Debug.LogWarning("[ClientManager] UI atualizada mas jogador não está marcado como em um squad. Tentando novamente...");
-                // Tenta novamente após mais um delay
                 yield return new WaitForSeconds(0.3f);
                 SquadSelecionUI.Instance.ForceRefreshUI();
             }
-        }
-        else
-        {
-            Debug.LogWarning("[ClientManager] SquadSelecionUI não disponível para atualização.");
+
         }
     }
 
@@ -230,36 +219,17 @@ public class ClientManager : ServerSingleton<ClientManager>
         // Check if connection is valid
         if (Owner == null || !Owner.IsValid) return;
 
-        Debug.Log($"[ClientManager-Server] Processando entrada automática para {playerName} na facção {faction}");
-
         // Verifica se o jogador já está em um squad
-        if (IsPlayerInAnySquad(faction, Owner))
-        {
-            Debug.Log($"[ClientManager-Server] Jogador {playerName} já está em um squad.");
-            return;
-        }
+        if (IsPlayerInAnySquad(faction, Owner)) return;
+
 
         var availableSquad = SquadManager.Instance.FindAvailableSquad(faction);
 
         if (availableSquad.HasValue)
         {
-            Debug.Log($"[ClientManager-Server] Squad disponível encontrado: {availableSquad.Value.squadName}");
-            
             bool success = SquadManager.Instance.AddMemberToSquad(faction, availableSquad.Value.squadName, Owner, playerName);
 
-            if (success)
-            {
-                selectedSquad.Value = availableSquad.Value.squadName;
-                Debug.Log($"[ClientManager-Server] Jogador {playerName} entrou no squad {availableSquad.Value.squadName} na facção {faction}");
-            }
-            else
-            {
-                Debug.LogWarning($"[ClientManager-Server] Falha ao entrar no squad {availableSquad.Value.squadName} para {playerName}");
-            }
-        }
-        else
-        {
-            Debug.LogWarning($"[ClientManager-Server] Não há squads disponíveis para facção {faction}");
+            if (success) selectedSquad.Value = availableSquad.Value.squadName;
         }
     }
 
@@ -272,8 +242,7 @@ public class ClientManager : ServerSingleton<ClientManager>
         {
             foreach (var member in squad.squadMembers)
             {
-                if (member.connection == connection)
-                    return true;
+                if (member.connection == connection) return true;
             }
         }
         return false;
@@ -287,15 +256,7 @@ public class ClientManager : ServerSingleton<ClientManager>
 
         bool success = SquadManager.Instance.AddMemberToSquad(faction, squadName, Owner, playerName);
 
-        if (success)
-        {
-            selectedSquad.Value = squadName;
-            Debug.Log($"[ClientManager] Jogador {playerName} entrou no squad {squadName} na facção {faction}");
-        }
-        else
-        {
-            Debug.LogWarning($"[ClientManager] Falha ao entrar no squad {squadName} para {playerName}");
-        }
+        if (success) selectedSquad.Value = squadName;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -306,21 +267,13 @@ public class ClientManager : ServerSingleton<ClientManager>
 
         bool success = SquadManager.Instance.RemoveMemberFromSquad(faction, Owner);
 
-        if (success)
-        {
-            selectedSquad.Value = default(SquadManager.SquadName);
-            Debug.Log($"[ClientManager] Jogador {Owner.ClientId} saiu do squad");
-        }
+        if (success) selectedSquad.Value = default(SquadManager.SquadName);
     }
 
     private string GetPlayerName()
     {
-        if (AccountManager.Instance != null && !string.IsNullOrEmpty(AccountManager.Instance.account_name))
-            return AccountManager.Instance.account_name;
+        if (AccountManager.Instance != null && !string.IsNullOrEmpty(AccountManager.Instance.account_name)) return AccountManager.Instance.account_name;
 
         return $"Player_{Owner.ClientId}";
     }
-
-    public bool IsInSquad() => selectedSquad.Value != default(SquadManager.SquadName);
-    public string GetCurrentSquadName() => selectedSquad.Value.ToString();
 }

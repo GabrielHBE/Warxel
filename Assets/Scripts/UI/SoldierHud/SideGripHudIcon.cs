@@ -1,4 +1,3 @@
-using UnityEngine.UI;
 using TMPro;
 using UnityEngine;
 
@@ -8,7 +7,6 @@ public class SideGripIcon : MonoBehaviour
     [SerializeField] private TextMeshProUGUI keybind_hud;
     [SerializeField] private GameObject activated_image;
     [SerializeField] private GameObject deactivated_image;
-
 
     void Update()
     {
@@ -24,8 +22,4 @@ public class SideGripIcon : MonoBehaviour
             deactivated_image.SetActive(true);
         }
     }
-
-
-
-
 }

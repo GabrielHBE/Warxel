@@ -68,10 +68,7 @@ public static class Firing
 
         int currentIndex = availableModes.IndexOf(crrentMode);
         
-        if (currentIndex == -1)
-        {
-            crrentMode = availableModes[0];
-        }
+        if (currentIndex == -1)  crrentMode = availableModes[0];
         else
         {
             currentIndex = (currentIndex + 1) % availableModes.Count;
@@ -261,38 +258,19 @@ public static class Firing
         return recoilPositionIndex;
     }
 
-    public static void ResetRecoilIndex()
-    {
-        recoilPositionIndex = -1;
-    }
+    public static void ResetRecoilIndex() => recoilPositionIndex = -1;
+    
 
-    public static bool IsFirstShot()
-    {
-        return isFirstShot;
-    }
+    public static bool IsFirstShot() => isFirstShot;
     #endregion
 
     #region Utility Methods
-    public static float GetTimeToNextFire()
-    {
-        return nextTimeToFire;
-    }
-
-    public static bool IsBursting()
-    {
-        return isBursting;
-    }
-
-    public static int GetBulletsInBurst()
-    {
-        return bulletsShotInCurrentBurst;
-    }
-
-    public static float GetBurstTimer()
-    {
-        return burstTimer;
-    }
-
+    public static float GetTimeToNextFire() => nextTimeToFire;
+    public static bool IsBursting() => isBursting;
+    public static int GetBulletsInBurst() => bulletsShotInCurrentBurst;
+    public static float GetBurstTimer() => burstTimer;
+    public static bool IsFiring() => isFiring;
+    
     public static void UpdateTimeToFire(float deltaTime)
     {
         if (nextTimeToFire > 0)
@@ -300,19 +278,9 @@ public static class Firing
             nextTimeToFire -= deltaTime;
             if (nextTimeToFire < 0) nextTimeToFire = 0;
             
-            if (nextTimeToFire <= 0)
-            {
-                if (crrentMode == FireMode.Auto && !_isInputHeld)
-                {
-                    isFiring = false;
-                }
-            }
+            if (nextTimeToFire <= 0 && crrentMode == FireMode.Auto && !_isInputHeld) isFiring = false;
+                
         }
-    }
-
-    public static bool IsFiring()
-    {
-        return isFiring;
     }
     #endregion
 }

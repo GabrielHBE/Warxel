@@ -12,11 +12,8 @@ public class PlayerNetworkObjectSpawner : NetworkBehaviour
         Spawn(instantiatedAirStrike);
 
         AirStrikeMissile airStrikeMissile = instantiatedAirStrike.GetComponent<AirStrikeMissile>();
-        if (airStrikeMissile != null)
-        {
-            airStrikeMissile.EnableMissile(goToPos);
-        }
-
+        if (airStrikeMissile != null) airStrikeMissile.EnableMissile(goToPos);
+        
     }
     #endregion
 }

@@ -29,23 +29,18 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
             return;
         }
 
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchFireModeKey))
-            SwitchFireMode();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switchFireModeKey)) SwitchFireMode();
 
         // Se estiver superaquecido, força o resfriamento no Update também
         if (Heating.isOverheated(properties.heatValues))
         {
             // Se acabou de superaquecer, para o som
-            if (!wasOverheatedLastFrame)
-            {
-                wasOverheatedLastFrame = true;
-            }
+            if (!wasOverheatedLastFrame) wasOverheatedLastFrame = true;
+            
             StopFire(Time.deltaTime);
         }
-        else
-        {
-            wasOverheatedLastFrame = false;
-        }
+        else  wasOverheatedLastFrame = false;
+        
     }
 
     public void Shoot()
@@ -109,16 +104,9 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
                 properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
             }
         }
-        else
-        {
-            // RESFRIAMENTO: parou de atirar ou soltou o botão
-            StopFire(deltaTime);
-        }
-
-        if (isFiring)
-        {
-            rotationValue = properties.firing.rateOfFire;
-        }
+        else StopFire(deltaTime);
+    
+        if (isFiring) rotationValue = properties.firing.rateOfFire;
 
         transform.Rotate(Vector3.left * rotationValue * deltaTime);
     }
@@ -177,21 +165,12 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
 
         if (!Firing.CanSwitchFireMode(properties.firing.fireModes)) return;
 
-        // ATUALIZADO: sem stateId
         Firing.SwitchFireMode(properties.firing.fireModes);
     }
 
     public void SetupFiringSystem()
     {
         Firing.ResetState();
-
-        // Garante que o modo de tiro estático atual é válido para este armamento
-        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
-        {
-            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
-            {
-                Firing.SwitchFireMode(properties.firing.fireModes);
-            }
-        }
+        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0 && !properties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(properties.firing.fireModes); 
     }
 }

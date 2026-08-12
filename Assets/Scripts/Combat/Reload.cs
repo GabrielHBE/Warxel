@@ -101,14 +101,9 @@ namespace ProcessReload
 
             public static bool CanStartReload(ReloadValues reloadValues, bool isFiring, bool isReloading, bool isRolling, int reserveAmmo)
             {
-                if (isFiring || isReloading || isRolling)
-                    return false;
-
-                if (reserveAmmo <= 0)
-                    return false;
-
-                if (reloadValues.IsMagazineFull())
-                    return false;
+                if (isFiring || isReloading || isRolling) return false;
+                if (reserveAmmo <= 0) return false;
+                if (reloadValues.IsMagazineFull()) return false;
 
                 return true;
             }
@@ -146,26 +141,17 @@ namespace ProcessReload
                     return;
 
                 int maxIndex = reloadValues.FindMagazineWithMostAmmo();
-                if (maxIndex < 0 || maxIndex == reloadValues.mags.Count - 1)
-                    return;
+                if (maxIndex < 0 || maxIndex == reloadValues.mags.Count - 1) return;
 
                 int maxAmmo = reloadValues.mags[maxIndex];
                 int currentAmmo = reloadValues.mags[^1];
                 int temp = currentAmmo;
 
-                // Fill current mag with the ammo from the fullest reserve mag
                 reloadValues.mags[^1] = maxAmmo;
 
-                // Put the old current mag ammo into the reserve mag
-                if (!isLastBullet)
-                {
-                    reloadValues.mags[maxIndex] = temp;
-                }
-                else
-                {
-                    // Special case: if current mag was empty, don't add extra bullet
-                    reloadValues.mags[maxIndex] = 0;
-                }
+                if (!isLastBullet) reloadValues.mags[maxIndex] = temp;
+                else reloadValues.mags[maxIndex] = 0;
+                
             }
 
             public static bool ProcessSingleReload(
@@ -177,11 +163,8 @@ namespace ProcessReload
             {
                 shouldContinueReloading = false;
 
-                if (!isReloading || !canReload || isFiring)
-                    return false;
-
-                if (reloadValues.IsMagazineFull())
-                    return false;
+                if (!isReloading || !canReload || isFiring)return false;
+                if (reloadValues.IsMagazineFull()) return false;
 
                 shouldContinueReloading = true;
                 return true;
@@ -189,14 +172,12 @@ namespace ProcessReload
 
             public static void TransferBulletBetweenMags(ReloadValues reloadValues)
             {
-                if (reloadValues.mags.Count < 2)
-                    return;
+                if (reloadValues.mags.Count < 2)return;
 
                 int fromIndex = reloadValues.FindMagazineWithLeastAmmo();
                 int toIndex = reloadValues.FindMagazineWithMostSpace();
 
-                if (fromIndex == -1 || toIndex == -1 || fromIndex == toIndex)
-                    return;
+                if (fromIndex == -1 || toIndex == -1 || fromIndex == toIndex) return;
 
                 int fromAmmo = reloadValues.mags[fromIndex];
                 int toAmmo = reloadValues.mags[toIndex];
@@ -214,22 +195,18 @@ namespace ProcessReload
             public static float CalculateReloadTime(ReloadValues reloadValues, bool isEmpty)
             {
                 float totalTime = reloadValues.reloadTime;
-                if (isEmpty)
-                {
-                    totalTime += Weapon.LAST_MAG_RELOAD_TIMER_INCREASER; // Additional time for empty mag reload
-                }
+                if (isEmpty) totalTime += Weapon.LAST_MAG_RELOAD_TIMER_INCREASER;
+                
                 return totalTime;
             }
 
             public static bool IsReloadPossible(ReloadValues reloadValues)
             {
-                if (reloadValues.mags.Count < 2)
-                    return false;
+                if (reloadValues.mags.Count < 2)return false;
 
                 int reserveAmmo = reloadValues.GetTotalReserveAmmo();
                 int currentAmmo = reloadValues.GetCurrentMagAmmo();
 
-                // Can reload if there's reserve ammo and current mag isn't full
                 return reserveAmmo > 0 && currentAmmo < reloadValues.bulletsPerMag;
             }
         }

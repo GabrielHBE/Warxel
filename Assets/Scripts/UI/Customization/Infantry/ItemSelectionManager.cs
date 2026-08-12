@@ -173,10 +173,8 @@ public class ItemSelectionManager : MonoBehaviour
         infantryLoadoutCustomization._currentItemSelected.GetComponent<AttatchmentManager>().InitializeAttachments();
 
         WeaponProperties wp = infantryLoadoutCustomization._currentItemSelected.GetComponent<WeaponProperties>();
-        if (wp != null)
-        {
-            infantryLoadoutCustomization.UpdateWeaponStats(wp);
-        }
+        if (wp != null) infantryLoadoutCustomization.UpdateWeaponStats(wp);
+        
 
         EquipItem(item);
         UpdateAllButtonOutlines();

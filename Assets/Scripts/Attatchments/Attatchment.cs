@@ -3,7 +3,7 @@ using UnityEngine;
 
 public abstract class Attatchment : MonoBehaviour
 {   
-    protected string attatchmentDescription;
+    [SerializeField] protected string attatchmentDescription;
 
     [Header("Attatchment Settings")]
     public string attachmentName;
@@ -28,6 +28,6 @@ public abstract class Attatchment : MonoBehaviour
         weaponProperties = GetComponentInParent<WeaponProperties>();
     }
 
-    public abstract string GetAttatchmentDescription();
+    public string GetAttatchmentDescription() => attatchmentDescription;
 
 }

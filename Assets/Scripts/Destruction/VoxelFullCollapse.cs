@@ -36,14 +36,12 @@ public class VoxelFullCollapse : VoxelObj
     private bool AllTriggersActivated()
     {
         // Verifica se a lista está vazia
-        if (voxelFullCollapseTriggers == null || voxelFullCollapseTriggers.Length == 0)
-            return false;
+        if (voxelFullCollapseTriggers == null || voxelFullCollapseTriggers.Length == 0)return false;
 
         // Verifica cada trigger
         foreach (var trigger in voxelFullCollapseTriggers)
         {
-            if (trigger == null || !trigger.isTrigged)
-                return false;
+            if (trigger == null || !trigger.isTrigged) return false;
         }
 
         return true;
@@ -52,18 +50,7 @@ public class VoxelFullCollapse : VoxelObj
     [ObserversRpc]
     private void TriggerAnimation()
     {
-        if (animator != null)
-        {
-            // Método 1: Trigger
-            animator.SetTrigger("FullCollapse");
-            
-            // Método 2: Bool (alternativa)
-            // animator.SetBool("FullCollapsed", true);
-        }
-        else
-        {
-            Debug.LogWarning("Animator não atribuído em VoxelFullCollapse!");
-        }
+        if (animator != null) animator.SetTrigger("FullCollapse");
     }
 
     [Server]
@@ -84,8 +71,7 @@ public class VoxelFullCollapse : VoxelObj
         // Opcional: Resetar todos os triggers também
         foreach (var trigger in voxelFullCollapseTriggers)
         {
-            if (trigger != null)
-                trigger.ResetCollapse(); // Você precisará adicionar este método em VoxelFullCollapseTrigger
+            if (trigger != null) trigger.ResetCollapse(); // Você precisará adicionar este método em VoxelFullCollapseTrigger
         }
     }
 }

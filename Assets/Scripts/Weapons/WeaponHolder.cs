@@ -1,5 +1,4 @@
 
-using System.Collections;
 using UnityEngine;
 
 public class WeaponHolder : MonoBehaviour
@@ -13,16 +12,11 @@ public class WeaponHolder : MonoBehaviour
 
     private FirstPersonArms firstPersonArms;
 
-    public void Initialize()
-    {
-        cameraShake = GetComponentInParent<CameraShake>();
+    public void Initialize() => cameraShake = GetComponentInParent<CameraShake>();
+    
 
-    }
-
-    public void SetWeaponMag(Transform weapon_mag)
-    {
-        this.weapon_mag = weapon_mag;
-    }
+    public void SetWeaponMag(Transform weapon_mag) => this.weapon_mag = weapon_mag;
+    
 
     public void ResetWeaponState()
     {

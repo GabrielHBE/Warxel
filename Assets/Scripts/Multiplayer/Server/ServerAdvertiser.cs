@@ -7,26 +7,18 @@ using UnityEngine;
 [RequireComponent(typeof(NetworkDiscovery))]
 public class ServerAdvertiser : MonoBehaviour
 {
-    private NetworkDiscovery _networkDiscovery;
+    [SerializeField] private NetworkDiscovery networkDiscovery;
 
     private void Start()
     {
-        _networkDiscovery = GetComponent<NetworkDiscovery>();
-
         // Inscreve-se no evento global de conexão do servidor
-        if (InstanceFinder.ServerManager != null)
-        {
-            InstanceFinder.ServerManager.OnServerConnectionState += OnServerConnectionState;
-        }
+        if (InstanceFinder.ServerManager != null) InstanceFinder.ServerManager.OnServerConnectionState += OnServerConnectionState;
     }
 
     private void OnDestroy()
     {
         // Limpa o evento para evitar memory leaks
-        if (InstanceFinder.ServerManager != null)
-        {
-            InstanceFinder.ServerManager.OnServerConnectionState -= OnServerConnectionState;
-        }
+        if (InstanceFinder.ServerManager != null) InstanceFinder.ServerManager.OnServerConnectionState -= OnServerConnectionState;
     }
 
     private void OnServerConnectionState(ServerConnectionStateArgs args)
@@ -34,13 +26,13 @@ public class ServerAdvertiser : MonoBehaviour
         if (args.ConnectionState == LocalConnectionState.Started)
         {
             // Assim que o servidor iniciar (seja na cena do Menu ou após carregar o Jogo), ele começa a anunciar
-            _networkDiscovery.AdvertiseServer();
+            networkDiscovery.AdvertiseServer();
             Debug.Log("Servidor está online e anunciando na LAN.");
         }
         else if (args.ConnectionState == LocalConnectionState.Stopped)
         {
             // Quando o servidor desligar, para de anunciar
-            _networkDiscovery.StopSearchingOrAdvertising();
+            networkDiscovery.StopSearchingOrAdvertising();
             Debug.Log("Servidor parou de anunciar.");
         }
     }

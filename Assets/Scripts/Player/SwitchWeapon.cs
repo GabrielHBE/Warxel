@@ -21,7 +21,6 @@ public class SwitchWeapon : MonoBehaviour
     public AudioSource zipper;
 
     [Header("Instances")]
-    public Reticle reticle;
     [SerializeField] private ThirdPersonArms thirdPersonArms;
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerProperties playerProperties;
@@ -437,7 +436,6 @@ public class SwitchWeapon : MonoBehaviour
         }
 
         weaponAnimation?.Restart();
-        reticle?.Restart();
 
         if (weaponProperties != null)
         {
@@ -489,10 +487,7 @@ public class SwitchWeapon : MonoBehaviour
 
     private void SetWeaponActive(GameObject weaponObject, bool active)
     {
-        if (weaponObject != null)
-        {
-            weaponObject.SetActive(active);
-        }
+        if (weaponObject != null) weaponObject.SetActive(active);
     }
 
     #region Métodos Auxiliares de Captura de Tempo

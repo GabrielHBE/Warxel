@@ -46,10 +46,8 @@ public class WeaponButtonComponents : MonoBehaviour
     private void SetupText()
     {
         TextMeshProUGUI buttonText = GetComponentInChildren<TextMeshProUGUI>();
-        if (buttonText != null)
-        {
-            buttonText.text = _weaponProperties.weapon_name;
-        }
+        if (buttonText != null) buttonText.text = _weaponProperties.weapon_name;
+    
     }
 
     private void SetupOutline()
@@ -104,8 +102,7 @@ public class WeaponButtonComponents : MonoBehaviour
         if (_weaponImage != null)
             _weaponImage.sprite = _imageHud;
 
-        if (_buyButton != null)
-            Destroy(_buyButton);
+        if (_buyButton != null) Destroy(_buyButton);
 
         SetupEvents();
 

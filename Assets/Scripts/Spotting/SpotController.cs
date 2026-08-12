@@ -13,11 +13,7 @@ public class SpotController : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
-
-        if (playerProperties.selectedClass.Value != ClassManager.Class.Recon || !IsOwner)
-        {
-            enabled = false;
-        }
+        if (playerProperties.selectedClass.Value != ClassManager.Class.Recon || !IsOwner) enabled = false;
     }
 
     void Update()
@@ -27,9 +23,7 @@ public class SpotController : NetworkBehaviour
             print("Apertou o botao");
             TrySpotTarget();
         }
-
     }
-
 
     private void TrySpotTarget()
     {
@@ -44,16 +38,8 @@ public class SpotController : NetworkBehaviour
             // Tenta pegar a interface no objeto hitado
             ISspottable spottableTarget = hit.collider.GetComponentInParent<ISspottable>();
 
-            if (targetNetObj != null && spottableTarget != null)
-            {
-        
-                // Verifica a facção LOCALMENTE primeiro para evitar spam na rede
-                if (spottableTarget.GetFaction() != playerProperties.faction.Value)
-                {
-                    CmdSpotTarget(targetNetObj);
-                }
-                
-            }
+            if (targetNetObj != null && spottableTarget != null && spottableTarget.GetFaction() != playerProperties.faction.Value) CmdSpotTarget(targetNetObj);
+            
         }
     }
 
@@ -66,18 +52,13 @@ public class SpotController : NetworkBehaviour
         ISspottable spottableTarget = targetNetObj.GetComponent<ISspottable>();
         if (spottableTarget == null) return;
 
-        // Validação no servidor (Anti-cheat/Garantia)
         FactionManager.Faction targetFaction = spottableTarget.GetFaction();
         FactionManager.Faction myFaction = playerProperties.faction.Value;
 
-        if (myFaction != targetFaction)
-        {
-            // O spot é válido! Envia o sinal para TODOS os clientes
-            RpcNotifyTeamSpot(targetNetObj, myFaction);
-        }
+        if (myFaction != targetFaction) RpcNotifyTeamSpot(targetNetObj, myFaction);
+    
     }
 
-    // --- BROADCAST PARA OS CLIENTES ---
     [ObserversRpc]
     private void RpcNotifyTeamSpot(NetworkObject targetNetObj, FactionManager.Faction teamFaction)
     {
@@ -88,11 +69,7 @@ public class SpotController : NetworkBehaviour
         if (PlayerController.Instance.playerProperties.faction.Value == teamFaction)
         {
             ISspottable spottable = targetNetObj.GetComponent<ISspottable>();
-            if (spottable != null)
-            {
-                // Manda a UI rastrear o transform específico (spot_position)
-                SpotUIManager.Instance.ShowSpot(spottable.GetSpotPosition());
-            }
+            if (spottable != null) SpotUIManager.Instance.ShowSpot(spottable.GetSpotPosition());
         }
     }
 

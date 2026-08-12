@@ -87,13 +87,14 @@ public class SkinApplier : NetworkBehaviour
             InstantiatePart(skin.rightLowerLeg, rightLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
             InstantiatePart(skin.rightFoot, rightFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
-        }catch(Exception){}
+        }
+        catch (Exception) { }
     }
 
     private GameObject InstantiatePart(GameObject prefab, Transform parent)
     {
         GameObject instance = Instantiate(prefab, parent, false);
-        instance.SetActive(true);
+        if (!instance.activeSelf) instance.SetActive(true);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localScale = Vector3.one * 1.2f;
 

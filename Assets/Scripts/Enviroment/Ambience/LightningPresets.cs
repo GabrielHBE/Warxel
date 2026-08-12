@@ -8,5 +8,4 @@ public class LightningPreset : ScriptableObject
     public Gradient directional_color;
     public Gradient fog_color;
     
-
 }

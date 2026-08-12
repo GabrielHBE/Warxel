@@ -179,10 +179,8 @@ public class VehicleSeats
             if (armoryObj != null)
             {
                 IVehicleArmory armory = armoryObj.GetComponent<IVehicleArmory>();
-                if (armory != null)
-                {
-                    armory.DeactivateArmory();
-                }
+                if (armory != null) armory.DeactivateArmory();
+                
             }
         }
     }
@@ -208,17 +206,9 @@ public class VehicleSeats
                 if (nObj != null)
                 {
 
-                    if (conn != null)
-                    {
-                        Debug.Log("Setando autoridade para: " + nObj.gameObject.name);
-                        nObj.GiveOwnership(conn);
-                    }
-                    else
-                    {
-                        Debug.Log("Removendo autoridade para: " + nObj.gameObject.name);
-                        nObj.RemoveOwnership();
-                    }
-
+                    if (conn != null) nObj.GiveOwnership(conn);
+                    else nObj.RemoveOwnership();
+                    
                 }
             }
         }

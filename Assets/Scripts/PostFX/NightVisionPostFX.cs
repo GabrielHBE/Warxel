@@ -22,14 +22,9 @@ public class NightVisionPostFX : PostFX
     {
         if (volume != null && volume.profile != null)
         {
-            if (volume.profile.TryGet(out vignette))
-                defaultVignette = vignette.intensity.value;
-
-            if (volume.profile.TryGet(out filmGrain))
-                defaultGrain = filmGrain.intensity.value;
-
-            if (volume.profile.TryGet(out colorAdjustments))
-                defaultExposure = colorAdjustments.postExposure.value;
+            if (volume.profile.TryGet(out vignette)) defaultVignette = vignette.intensity.value;
+            if (volume.profile.TryGet(out filmGrain)) defaultGrain = filmGrain.intensity.value;
+            if (volume.profile.TryGet(out colorAdjustments)) defaultExposure = colorAdjustments.postExposure.value;
             
             // Garante que iniciem desligados
             ApplyEffectMultiplier(0f);
@@ -39,18 +34,9 @@ public class NightVisionPostFX : PostFX
 
     public override void SetActive(bool active)
     {
-        // Interrompe qualquer transição que esteja acontecendo no momento
-        if (transitionCoroutine != null)
-        {
-            StopCoroutine(transitionCoroutine);
-        }
-
-        if (active)
-        {
-            // Ativa os componentes imediatamente para começarmos a ver o efeito
-            ToggleComponents(true);
-        }
-
+        if (transitionCoroutine != null)StopCoroutine(transitionCoroutine);
+        if (active) ToggleComponents(true);
+        
         transitionCoroutine = StartCoroutine(TransitionRoutine(active));
     }
 

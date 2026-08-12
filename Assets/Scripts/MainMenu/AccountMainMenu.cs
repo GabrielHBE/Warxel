@@ -37,14 +37,8 @@ public class AccountMainMenu : MainMenuTabs
     private void SwitchFaction()
     {
         FactionManager.Faction current_faction = AccountManager.Instance.faction;
-        if (current_faction == FactionManager.Faction.FactionA)
-        {
-            AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionB);
-        }
-        else
-        {
-            AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionA);
-        }
+        if (current_faction == FactionManager.Faction.FactionA) AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionB);
+        else AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionA);
     }
 
     void Update()
@@ -70,14 +64,8 @@ public class AccountMainMenu : MainMenuTabs
         total_kills.text = "Total Kills: " + AccountManager.Instance.accountStatus.total_kills.ToString();
         total_assists.text = "Total Assists: " + AccountManager.Instance.accountStatus.total_assists.ToString();
         total_deaths.text = "Total Deaths: " + AccountManager.Instance.accountStatus.total_deaths.ToString();
-        if (AccountManager.Instance.accountStatus.most_used_weapon != null)
-        {
-            most_used_weapon.text = "Most Used Weapon: " + AccountManager.Instance.accountStatus.most_used_weapon.ToString();
-        }
-        else
-        {
-            most_used_weapon.text = "Most Used Weapon: None";
-        }
+        if (AccountManager.Instance.accountStatus.most_used_weapon != null) most_used_weapon.text = "Most Used Weapon: " + AccountManager.Instance.accountStatus.most_used_weapon.ToString();
+        else most_used_weapon.text = "Most Used Weapon: None"; 
         total_matches_played.text = "Total Matches Played: " + AccountManager.Instance.accountStatus.total_matches_played.ToString();
         total_matches_won.text = "Total Matches Won: " + AccountManager.Instance.accountStatus.total_matches_won.ToString();
         total_matches_lost.text = "Total Matches Lost: " + AccountManager.Instance.accountStatus.total_matches_lost.ToString();

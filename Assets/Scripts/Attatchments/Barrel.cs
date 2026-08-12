@@ -14,9 +14,4 @@ public class Barrel : Attatchment
     public float shoot_volume_change;
     public float volume_changer;
     public float spread_change;
-
-    public override string GetAttatchmentDescription()
-    {
-        throw new System.NotImplementedException();
-    }
 }

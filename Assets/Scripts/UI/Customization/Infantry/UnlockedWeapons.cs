@@ -14,11 +14,8 @@ public static class UnlockedWeapons
         PlayerPrefs.Save();
     }
 
-    public static bool CheckWeaponStatus(string weapon_name)
-    {
-        return PlayerPrefs.GetInt($"Weapon_Unlocked_{weapon_name}") == 1;
-    }
-
+    public static bool CheckWeaponStatus(string weapon_name) => PlayerPrefs.GetInt($"Weapon_Unlocked_{weapon_name}") == 1;
+    
     public static void RemoveStatus(string weapon_name)
     {
         PlayerPrefs.DeleteKey($"Weapon_Unlocked_{weapon_name}");

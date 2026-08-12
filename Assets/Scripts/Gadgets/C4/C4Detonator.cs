@@ -30,10 +30,8 @@ public class C4Detonator : Gadget
 
     void Update()
     {
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey))
-        {
-            TryPickUpC4();
-        }
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey)) TryPickUpC4();
+        
 
         if (!is_active) return;
         if (soldierHudManager != null) soldierHudManager.SetCurrentAmmo(c4_qtd.ToString());
@@ -61,17 +59,13 @@ public class C4Detonator : Gadget
 
             if (detonateIndex == 0)
             {
-                if (detonateTimer >= initialDetonateDelay)
-                {
-                    DetonateNextC4();
-                }
+                if (detonateTimer >= initialDetonateDelay) DetonateNextC4();
+                
             }
             else
             {
-                if (detonateTimer >= perC4Delay)
-                {
-                    DetonateNextC4();
-                }
+                if (detonateTimer >= perC4Delay) DetonateNextC4();
+                
             }
         }
     }
@@ -100,18 +94,14 @@ public class C4Detonator : Gadget
         }
 
         C4Explosive c4ToDetonate = c4_list[detonateIndex];
-        if (c4ToDetonate != null)
-        {
-            c4ToDetonate.Detonate();
-        }
+        if (c4ToDetonate != null) c4ToDetonate.Detonate();
+        
 
         detonateIndex++;
         detonateTimer = 0f;
 
-        if (detonateIndex >= c4_list.Count)
-        {
-            EndDetonationSequence();
-        }
+        if (detonateIndex >= c4_list.Count) EndDetonationSequence();
+        
     }
 
     private void CleanupDestroyedC4s()
@@ -130,20 +120,15 @@ public class C4Detonator : Gadget
             {
                 PickUpC4();
 
-                if (c4_list.Contains(c4))
-                {
-                    c4_list.Remove(c4);
-                }
+                if (c4_list.Contains(c4)) c4_list.Remove(c4);
+                
 
                 Destroy(hit.collider.gameObject);
             }
         }
     }
 
-    private void PickUpC4()
-    {
-        c4_qtd += 1;
-    }
+    private void PickUpC4() => c4_qtd += 1;
 
     private void Throw_C4()
     {
@@ -161,9 +146,7 @@ public class C4Detonator : Gadget
 
     }
 
-    private void UpdateAmmoHUD()
-    {
-        soldierHudManager.SetCurrentAmmo(c4_qtd.ToString());
-    }
+    private void UpdateAmmoHUD() => soldierHudManager.SetCurrentAmmo(c4_qtd.ToString());
+    
 
 }

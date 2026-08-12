@@ -26,7 +26,6 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
     [SerializeField] public Transform currentItemParent;
 
     [Header("UI Elements")]
-    [SerializeField] public TextMeshProUGUI class_description_text;
     [SerializeField] public TextMeshProUGUI current_battle_coins_indicator;
     [SerializeField] public Button buy_weapon_button;
     [SerializeField] public Image class_selection_image;
@@ -148,11 +147,9 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
             secondaryWeapons = (await secondaryHandle.Task).ToArray();
             gadgets = (await gadgetsHandle.Task).ToArray();
 
-            Debug.Log($"[Loadout] Carregadas {primaryWeapons.Length} primárias, {secondaryWeapons.Length} secundárias, {gadgets.Length} gadgets");
         }
-        catch (System.Exception ex)
+        catch (System.Exception)
         {
-            Debug.LogError($"[Loadout] Erro ao carregar Addressables: {ex.Message}");
             primaryWeapons = new GameObject[0];
             secondaryWeapons = new GameObject[0];
             gadgets = new GameObject[0];

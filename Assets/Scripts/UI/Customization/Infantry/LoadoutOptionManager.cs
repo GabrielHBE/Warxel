@@ -50,10 +50,8 @@ public class LoadoutOptionManager : MonoBehaviour
         if (buttonText != null) buttonText.text = buttonName;
 
         Button button = optionButton.GetComponent<Button>();
-        if (button != null)
-        {
-            button.onClick.AddListener(() => OnLoadoutOptionSelected(option));
-        }
+        if (button != null) button.onClick.AddListener(() => OnLoadoutOptionSelected(option));
+        
     }
 
     private void OnLoadoutOptionSelected(LoadoutOption option)
@@ -90,15 +88,11 @@ public class LoadoutOptionManager : MonoBehaviour
 
     public void OnBackToLoadoutOptions()
     {
-        if (PlayerSpawnController.Instance != null)
-            PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
+        if (PlayerSpawnController.Instance != null) PlayerSpawnController.Instance.SwitchPerspectiveButtons(false);
 
         // Limpa a pré-visualização da skin se estiver na seleção de skins
-        if (infantryLoadoutCustomization.skinSelectionManager != null)
-        {
-            infantryLoadoutCustomization.skinSelectionManager.ClearSkinPreview();
-        }
-
+        if (infantryLoadoutCustomization.skinSelectionManager != null) infantryLoadoutCustomization.skinSelectionManager.ClearSkinPreview();
+        
         infantryLoadoutCustomization.SetCurrentStage(InfantryLoadoutCustomization.SelectionStage.LoadoutOptionSelection);
 
         if (infantryLoadoutCustomization._currentItemSelected != null)

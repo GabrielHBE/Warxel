@@ -26,10 +26,8 @@ public class Flares : Countermeasures
         {
             is_reloading = false;
             countermeasures_duration -= Time.deltaTime;
-            if (countermeasures_duration <= 0)
-            {
-                StopCountermeasure();
-            }
+            if (countermeasures_duration <= 0) StopCountermeasure();
+            
         }
     }
 
@@ -54,10 +52,8 @@ public class Flares : Countermeasures
         reload_countermeasures_duration = reload_countermeasures_original_duration;
 
         // Iniciar a corrotina para instanciar flares
-        if (flareCoroutine != null)
-        {
-            StopCoroutine(flareCoroutine);
-        }
+        if (flareCoroutine != null) StopCoroutine(flareCoroutine);
+        
         flareCoroutine = StartCoroutine(InstantiateFlareParticles());
     }
 
@@ -105,35 +101,22 @@ public class Flares : Countermeasures
             transform.position,
             Quaternion.identity
         );
+
         Spawn(flareInstance2);
-        // Adicionar Rigidbody e aplicar força ao primeiro flare (direita)
+
         AddRigidbodyAndForce(flareInstance1, transform.right);
-
-        // Adicionar Rigidbody e aplicar força ao segundo flare (esquerda)
         AddRigidbodyAndForce(flareInstance2, -transform.right);
-
-        // Destruir os flares após um tempo
-        //Destroy(flareInstance1, 5f);
-        //Destroy(flareInstance2, 5f);
     }
 
     [ObserversRpc]
     private void AddRigidbodyAndForce(GameObject flare, Vector3 direction)
     {
-
         Rigidbody rb = flare.GetComponent<Rigidbody>();
-        if (rb == null)
-        {
-            rb = flare.AddComponent<Rigidbody>();
-        }
+        if (rb == null)  rb = flare.AddComponent<Rigidbody>();
 
         rb.useGravity = true;
         rb.linearDamping = 0.5f;
         rb.angularDamping = 0.5f;
-
         rb.AddForce(direction * force_multiplier, ForceMode.Impulse);
-
-        //rb.AddForce(Vector3.up * 2f, ForceMode.Impulse);
-
     }
 }

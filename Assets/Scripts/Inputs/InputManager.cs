@@ -30,23 +30,19 @@ public static class InputManager
     public static bool GetMouseButtonDown(int mouse)
     {
         if (SettingsHUD.Instance != null && SettingsHUD.Instance.is_menu_settings_active) return false;
-
         return Input.GetMouseButtonDown(mouse);
     }
 
     public static bool GetMouseButton(int mouse)
     {
         if (SettingsHUD.Instance != null && SettingsHUD.Instance.is_menu_settings_active) return false;
-
         return Input.GetMouseButton(mouse);
     }
 
     public static float GetMouseScroll()
     {
         if (SettingsHUD.Instance != null && SettingsHUD.Instance.is_menu_settings_active) return 0;
-
         return Mouse.current.scroll.ReadValue().y;
     }
-
 
 }

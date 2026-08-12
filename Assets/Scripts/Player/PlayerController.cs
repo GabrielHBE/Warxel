@@ -1,5 +1,3 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
@@ -7,10 +5,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, IDamageable
+public class PlayerController : ServerSingleton<PlayerController>, ISspottable, EntityFaction, IDamageable
 {
-    public static PlayerController Instance { get; private set; }
-
     #region Serialized Fields
     public Transform spot_position;
     [Header("Multiplayer / Player")]
@@ -29,6 +25,8 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
     [Header("Camera Settings")]
     public Camera playerCamera;
+    [SerializeField] private ProcessCameraRecoil processCameraRecoil;
+    [SerializeField] private CameraRotation cameraRotation;
 
     [Header("Movement Settings - Tutorial Style")]
     public Transform orientation;
@@ -76,10 +74,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     #endregion
 
     #region Private Variables
-    // Components
     public Rigidbody rb;
-
-    // Volume
 
     private Vignette damageTaken_vignette;
 
@@ -97,26 +92,13 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     private float colliders_difference;
     private float altitude;
     private float cold_damage_timer = 0;
-    private float damage_dealt;
 
-    // Camera & Recoil
-    private float verticalRotation;
-    private float currentMouseSensitivity;
-    private float recoilVerticalTarget;
-    private float recoilVerticalCurrent;
-    private float recoilVerticalVelocity;
+    // Camera Settings & FX
     private bool is_night_vision_active = false;
-    private float horizontalRecoilTarget;
-    private float horizontalRecoilCurrent;
-    private float horizontalRecoilVelocity;
-    private float currentRecoilZ;
-    private float targetRecoilZ;
-    private float recoilZVelocity;
     private float applyRecoilSpeed;
     private float targetVignetteIntensity;
     private float currentVignetteIntensity;
     private float vignetteVelocity;
-    private float yaw;
 
     // Ground Check
     private bool wasGroundedLastFrame;
@@ -126,7 +108,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     private int interactivesLayer;
     private int playerLayer;
 
-    // Performance: Array cache para Physics.OverlapSphereNonAlloc
     private Collider[] medicCollidersCache = new Collider[6];
 
     private enum PlayerStance { Stand, Crouch, Prone, Disabled }
@@ -138,10 +119,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     {
         base.OnStartClient();
 
-        if (IsOwner)
-        {
-            ConfigureOwner();
-        }
+        if (IsOwner) ConfigureOwner();
         else
         {
             Destroy(fist_person);
@@ -158,7 +136,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
         if (playerProperties.is_in_vehicle)
         {
             playerProperties.isGrounded = true;
-            UpdateHeadRotation();
             return;
         }
 
@@ -179,8 +156,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
         HandleInteractionInputManager();
         HandlePlayerInputManager();
-        RotateCamera();
-        UpdateRecoil();
         HandleJumpInputManager();
         HandleEnvironmentEffects();
     }
@@ -196,7 +171,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
             return;
         }
 
-        UpdateMouseSensitivity();
         MovePlayer();
         ApplyCustomGravity();
         ApplyWindPhysics();
@@ -210,7 +184,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
         soldierHudManager.ActivateStandardHUD();
 
-        Instance = this;
+        SetInstance();
         HideOwnerItems(true);
 
         playerCamera.enabled = true;
@@ -228,12 +202,13 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
         original_crouch_speed = crouchSpeed;
         currentMoveSpeed = walkSpeed;
 
-        // Caching das layers para performance
         interactivesLayer = LayerMask.GetMask("Interactives");
         playerLayer = LayerMask.GetMask("Player");
 
         InitializeVolume();
 
+        //if (cameraRotation != null) cameraRotation.Initialize(transform, playerCamera.transform, playerHead.transform, processCameraRecoil, playerProperties);
+    
         readyToJump = true;
 
         StartCoroutine(weaponIcon.Initialize());
@@ -660,7 +635,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     }
     #endregion
 
-    #region Camera & Recoil
+    #region Camera & FX
     private void HandleNightVision()
     {
         is_night_vision_active = !is_night_vision_active;
@@ -684,103 +659,12 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
         damageTaken_vignette.intensity.value = currentVignetteIntensity;
     }
 
-    private void RotateCamera()
-    {
-        if (playerProperties.roll || playerProperties.is_in_vehicle) return;
-
-        HandleHorizontalRotation();
-        HandleVerticalRotation();
-        ApplyCameraRotation();
-    }
-
-    private void UpdateMouseSensitivity()
-    {
-        currentMouseSensitivity = playerProperties.is_aiming ?
-            Settings.Instance._controls.infantary_aim_sensibility :
-            Settings.Instance._controls.infantary_sensibility;
-    }
-
-    private void HandleHorizontalRotation()
-    {
-        float mouseX = InputManager.GetAxis("Mouse X") * currentMouseSensitivity;
-
-        horizontalRecoilCurrent = Mathf.SmoothDamp(
-            horizontalRecoilCurrent,
-            horizontalRecoilTarget,
-            ref horizontalRecoilVelocity,
-            applyRecoilSpeed
-        );
-
-        yaw += mouseX + horizontalRecoilCurrent;
-        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-        horizontalRecoilTarget = 0f;
-    }
-
-    private void HandleVerticalRotation()
-    {
-        float mouseVertical = InputManager.GetAxis("Mouse Y") * currentMouseSensitivity;
-        if (Settings.Instance._controls.invert_vertical_infantary_mouse)
-        {
-            mouseVertical *= -1;
-        }
-
-        recoilVerticalCurrent = Mathf.SmoothDamp(recoilVerticalCurrent, recoilVerticalTarget, ref recoilVerticalVelocity, applyRecoilSpeed);
-
-        verticalRotation -= mouseVertical + recoilVerticalCurrent;
-        verticalRotation = playerProperties.is_proned ? Mathf.Clamp(verticalRotation, -20f, 80f) : Mathf.Clamp(verticalRotation, -80f, 70f);
-
-        recoilVerticalTarget = 0f;
-    }
-
-    private void ApplyCameraRotation()
-    {
-        currentRecoilZ = Mathf.SmoothDamp(
-            currentRecoilZ,
-            targetRecoilZ,
-            ref recoilZVelocity,
-            applyRecoilSpeed
-        );
-
-        playerCamera.transform.localEulerAngles = new Vector3(verticalRotation, 0, currentRecoilZ);
-        UpdateHeadRotation();
-    }
-
-    private void UpdateHeadRotation() => playerHead.transform.rotation = playerCamera.transform.rotation;
-
-    private void UpdateRecoil()
-    {
-        float resetSpeed = 4f;
-        if (Mathf.Abs(targetRecoilZ) > 0.01f)
-        {
-            targetRecoilZ = Mathf.Lerp(targetRecoilZ, 0f, resetSpeed * Time.deltaTime);
-            if (Mathf.Abs(targetRecoilZ) < 0.001f) targetRecoilZ = 0f;
-        }
-    }
-
     void UpdateFOV()
     {
         if (!playerProperties.is_aiming)
         {
             float targetFov = Settings.Instance._video.infantary_fov;
             if (Mathf.Abs(playerCamera.fieldOfView - targetFov) > 0.1f) playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFov, 10f * Time.deltaTime);
-        }
-    }
-
-    public void ApplyCameraRecoil(float verticalRecoil, float horizontalRecoil)
-    {
-        recoilVerticalTarget += verticalRecoil;
-        horizontalRecoilTarget += horizontalRecoil;
-
-        if (weapon != null && weapon.weaponProperties != null)
-        {
-            // Acumula o recuo Z em vez de sobrescrever
-            float newRecoilZ = Recoil.CalculateCameraZRoll(
-                horizontalRecoil,
-                verticalRecoil
-            );
-
-            targetRecoilZ += newRecoilZ;
-
         }
     }
     #endregion
@@ -947,7 +831,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
 
     private void HandleMecidProximity()
     {
-        // Otimização: Uso de NonAlloc para evitar geração excessiva de lixo no GC a cada frame
         int hitCount = Physics.OverlapSphereNonAlloc(transform.position, 50f, medicCollidersCache, playerLayer);
 
         List<PlayerInfo> jogadoresDetectados = new List<PlayerInfo>(hitCount);
@@ -959,7 +842,7 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
             if (p != null && p.selectedClass.Value == ClassManager.Class.Medic)
             {
                 float distancia = Vector3.Distance(transform.position, medicCollidersCache[i].transform.position);
-                jogadoresDetectados.Add(new PlayerInfo(medicCollidersCache[i].gameObject, p.player_name.Value, distancia));
+                jogadoresDetectados.Add(new PlayerInfo(medicCollidersCache[i].gameObject, p.playerName.Value, distancia));
             }
         }
 
@@ -969,12 +852,12 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     public class PlayerInfo
     {
         public GameObject gameObject;
-        public string player_name;
+        public string playerName;
         public float distance;
 
-        public PlayerInfo(GameObject go, string player_name, float distance)
+        public PlayerInfo(GameObject go, string playerName, float distance)
         {
-            this.player_name = player_name;
+            this.playerName = playerName;
             gameObject = go;
             this.distance = distance;
         }
@@ -997,6 +880,10 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
     {
         this.applyRecoilSpeed = applyRecoilSpeed;
+        if (processCameraRecoil != null)
+        {
+            processCameraRecoil.SetApplyRecoilSpeed(applyRecoilSpeed);
+        }
         walkSpeed = original_walk_speed + speedModifier;
         sprintSpeed = original_sprint_speed + speedModifier;
         crouchSpeed = original_crouch_speed + speedModifier;
@@ -1015,13 +902,12 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
     [TargetRpc]
     private void TargetReceiveDamage(NetworkConnection conn, float dmg)
     {
-        damage_dealt = dmg * ((100f - playerProperties.resistance.Value) / 100f);
-        playerProperties.hp.Value -= damage_dealt;
+        playerProperties.hp.Value -= dmg;
 
         RequestUpdateServerHP(playerProperties.hp.Value);
 
-        cameraShake.RequestShake(damage_dealt / 2, 0.1f);
-        if (damage_dealt > 40) soldierHudManager.screenBlood.TriggerBlood();
+        cameraShake.RequestShake(dmg / 2, 0.1f);
+        if (dmg > 40) soldierHudManager.screenBlood.TriggerBlood();
         if (playerProperties.hp.Value <= 0) ProcessDeadPlayer();
     }
 
@@ -1074,7 +960,6 @@ public class PlayerController : NetworkBehaviour, ISspottable, EntityFaction, ID
         if (!hide) thirdPersonWeapon.ShowWeapon();
         else thirdPersonWeapon.HideWeapon();
     }
-    public float GetResistance() => playerProperties.resistance.Value;
     public FactionManager.Faction GetFaction() => playerProperties.faction.Value;
     public Transform GetSpotPosition() => spot_position;
     #endregion

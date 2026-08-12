@@ -9,20 +9,15 @@ public abstract class VehicleAim : MonoBehaviour, IsVehicleCustomizationPart
     public abstract void DisableAim();
 
     #region Interface Implementations
-    public void Activate()
-    {
-        vehicle = GetComponentInParent<Vehicle>();
-    }
-
+    public void Activate() => vehicle = GetComponentInParent<Vehicle>();
+    
     public void Deactivate()
     {
         throw new System.NotImplementedException();
     }
 
-    public VehicleCustomizableParts GetCustomizationPart()
-    {
-        return VehicleCustomizableParts.VehicleAim;
-    }
+    public VehicleCustomizableParts GetCustomizationPart() => VehicleCustomizableParts.VehicleAim;
+    
 
     public string GetCustomizationPartName()
     {

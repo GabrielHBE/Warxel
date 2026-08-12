@@ -40,21 +40,15 @@ public class C4Explosive : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        if (collision.gameObject.CompareTag("Bullet"))
-        {
-            Detonate();
-
-        }
+        if (collision.gameObject.CompareTag("Bullet")) Detonate();
         else if (!collision.gameObject.CompareTag("Player") && !collision.gameObject.CompareTag("Player"))
         {
 
             // Destroy Rigidbody to prevent further physics interactions
             Rigidbody rb = GetComponent<Rigidbody>();
-            if (rb != null)
-                Destroy(rb);
+            if (rb != null) Destroy(rb);
 
             transform.parent = collision.transform;
-
         }
 
     }

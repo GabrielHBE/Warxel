@@ -6,17 +6,12 @@ public class ECM : Countermeasures
     {    
         if (reload_countermeasures_duration < 0) return;
 
-        if (vehicle.used_locking_countermeasure == false)
-        {
-            reload_countermeasures_duration -= Time.deltaTime;
-        }
+        if (vehicle.used_locking_countermeasure == false)  reload_countermeasures_duration -= Time.deltaTime;
         else
         {
             countermeasures_duration -= Time.deltaTime;
-            if (countermeasures_duration <= 0)
-            {
-                StopCountermeasure();
-            }
+            if (countermeasures_duration <= 0) StopCountermeasure();
+            
         }
     }
     protected override void StopCountermeasure()

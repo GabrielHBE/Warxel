@@ -4,7 +4,7 @@ using UnityEngine;
 public class AdsBehaviour : MonoBehaviour
 {
     public static AdsBehaviour Instance { get; private set; }
-    
+
     [Header("Instances")]
     [SerializeField] private Camera player_camera;
     [SerializeField] private PlayerProperties playerProperties;
@@ -28,29 +28,30 @@ public class AdsBehaviour : MonoBehaviour
     private Coroutine aimCoroutine;
     private bool isAimTransitionActive;
     private float targetCameraFov;
-
+    private bool canReloadAiming;
     private bool canUpdate;
 
-    public void Setup(Transform adsReference, float adsTimer, float zoom)
+    public void Setup(Transform adsReference, float adsTimer, float zoom, bool canReloadAiming)
     {
         canUpdate = true;
         this.adsReference = adsReference;
         this.adsTimer = adsTimer;
         this.zoom = zoom;
+        this.canReloadAiming = canReloadAiming;
     }
 
     void Awake()
     {
         Instance = this;
         minFov = Settings.Instance._video.infantary_fov;
-        targetCameraFov = minFov; 
+        targetCameraFov = minFov;
         original_ads_position = transform.localPosition;
     }
 
     void Update()
     {
         if (adsReference == null || !canUpdate) return;
-        
+
         if (SettingsHUD.Instance.is_menu_settings_active)
         {
             StopAiming();
@@ -113,11 +114,20 @@ public class AdsBehaviour : MonoBehaviour
     {
         if (switchWeapon == null || playerProperties == null) return false;
 
+        if (canReloadAiming)
+        {
+            return !switchWeapon._switch &&
+               !playerProperties.isProneTransition &&
+               !playerProperties.roll &&
+               !playerProperties.is_dead.Value;
+        }
+
         return !switchWeapon._switch &&
                !playerProperties.isProneTransition &&
                !playerProperties.roll &&
                !playerProperties.is_dead.Value &&
                !playerProperties.is_reloading;
+
     }
 
     private void StartAiming()
@@ -164,15 +174,15 @@ public class AdsBehaviour : MonoBehaviour
 
             elapsed += Time.deltaTime;
             float linearT = elapsed / adsTimer;
-            
+
             // --- MELHORIA DE SUAVIDADE 1 ---
             // Avalia o tempo linear na curva cinematográfica (Ease In Out)
             float smoothT = aimCurve.Evaluate(linearT);
 
             if (aiming)
             {
-                Vector3 centerGlobalTarget = transform.parent != null 
-                    ? transform.parent.TransformPoint(original_ads_position) 
+                Vector3 centerGlobalTarget = transform.parent != null
+                    ? transform.parent.TransformPoint(original_ads_position)
                     : original_ads_position;
 
                 Vector3 forwardDirection = transform.parent != null ? transform.parent.forward : transform.forward;
@@ -181,8 +191,8 @@ public class AdsBehaviour : MonoBehaviour
                 Vector3 offsetGlobal = adsReference.position - transform.position;
                 Vector3 targetGlobalPosition = centerGlobalTarget - offsetGlobal;
 
-                Vector3 targetLocalPosition = transform.parent != null 
-                    ? transform.parent.InverseTransformPoint(targetGlobalPosition) 
+                Vector3 targetLocalPosition = transform.parent != null
+                    ? transform.parent.InverseTransformPoint(targetGlobalPosition)
                     : targetGlobalPosition;
 
                 // Transiciona usando o t suavizado
@@ -206,9 +216,9 @@ public class AdsBehaviour : MonoBehaviour
 
             Vector3 offsetGlobal = adsReference.position - transform.position;
             Vector3 targetGlobalPosition = centerGlobalTarget - offsetGlobal;
-            
-            transform.localPosition = transform.parent != null 
-                ? transform.parent.InverseTransformPoint(targetGlobalPosition) 
+
+            transform.localPosition = transform.parent != null
+                ? transform.parent.InverseTransformPoint(targetGlobalPosition)
                 : targetGlobalPosition;
 
             dot_position = true;
@@ -230,10 +240,10 @@ public class AdsBehaviour : MonoBehaviour
         // --- MELHORIA DE SUAVIDADE 2 ---
         // Alterado de interpolação dependente de frame rígido para um amortecimento progressivo exponencial estável
         float targetFov = (playerProperties != null && playerProperties.is_reloading) ? minFov : targetCameraFov;
-        
+
         player_camera.fieldOfView = Mathf.Lerp(
-            player_camera.fieldOfView, 
-            targetFov, 
+            player_camera.fieldOfView,
+            targetFov,
             1f - Mathf.Exp(-fovLerpSpeed * Time.deltaTime))
         ;
     }

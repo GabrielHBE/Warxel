@@ -35,9 +35,7 @@ public class SkinButtonComponents : MonoBehaviour
         if (allImages != null && allImages.Length > 0)
         {
             _skinImage = allImages[allImages.Length - 1];
-            
             if (_skinImage != null) _skinImage.sprite = image;
-
         }
     }
 
@@ -99,11 +97,9 @@ public class SkinButtonComponents : MonoBehaviour
 
         _isUnlocked = true;
 
-        if (_skinImage != null)
-            _skinImage.color = Color.white;
+        if (_skinImage != null) _skinImage.color = Color.white;
 
-        if (_buyButton != null)
-            Destroy(_buyButton);
+        if (_buyButton != null) Destroy(_buyButton);
 
         SetupEvents();
 
@@ -131,7 +127,6 @@ public class SkinButtonComponents : MonoBehaviour
     private void OnSkinClicked()
     {
         if (infantryLoadoutCustomization.skinSelectionManager != null) infantryLoadoutCustomization.skinSelectionManager.OnSkinSelected(_skin);
-        
     }
 
     private void AddEventTrigger(EventTrigger trigger, EventTriggerType type, UnityEngine.Events.UnityAction action)
@@ -148,11 +143,9 @@ public class SkinButtonComponents : MonoBehaviour
         string currentSkinName = PlayerPrefs.GetString(
             $"Skin_Selected_{infantryLoadoutCustomization._selectedClass}", "");
         
-        bool isSelected = !string.IsNullOrEmpty(currentSkinName) && 
-                          currentSkinName == _skin.skingName;
+        bool isSelected = !string.IsNullOrEmpty(currentSkinName) && currentSkinName == _skin.skingName;
 
-        if (_outline != null)
-            _outline.enabled = isSelected;
+        if (_outline != null) _outline.enabled = isSelected;
     }
 
     private void OnDestroy()

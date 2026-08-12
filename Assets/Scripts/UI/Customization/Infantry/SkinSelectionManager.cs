@@ -31,16 +31,9 @@ public class SkinSelectionManager : MonoBehaviour
             skinIndex++;
         }
 
-        // Pré-visualiza a skin atual
-        if (_selectedSkin != null)
-        {
-            ShowSkinPreview(_selectedSkin);
-        }
-        else if (availableSkins.Count > 0)
-        {
-            // Se não tiver skin selecionada, mostra a primeira disponível
-            ShowSkinPreview(availableSkins[0]);
-        }
+        if (_selectedSkin != null) ShowSkinPreview(_selectedSkin);
+        else if (availableSkins.Count > 0) ShowSkinPreview(availableSkins[0]);
+        
 
         UpdateAllButtonOutlines();
         ResetSlider();
@@ -73,10 +66,8 @@ public class SkinSelectionManager : MonoBehaviour
                                            infantryLoadoutCustomization.weaponsGadgetsParent);
 
         RectTransform rectTransform = skinButton.GetComponent<RectTransform>();
-        if (rectTransform != null)
-        {
-            rectTransform.anchoredPosition = new Vector2(infantryLoadoutCustomization.itemButtonX, yPosition);
-        }
+        if (rectTransform != null) rectTransform.anchoredPosition = new Vector2(infantryLoadoutCustomization.itemButtonX, yPosition);
+        
 
         var component = skinButton.AddComponent<SkinButtonComponents>();
         component.Initialize(skin, infantryLoadoutCustomization);
@@ -98,11 +89,8 @@ public class SkinSelectionManager : MonoBehaviour
         UpdateAllButtonOutlines();
 
         // Toca o som de seleção
-        if (infantryLoadoutCustomization.selectItemSfx != null)
-        {
-            SoundManager.Play2dSoundLocal(infantryLoadoutCustomization.selectItemSfx.clip,
-                                         infantryLoadoutCustomization.selectItemSfx.properties);
-        }
+        if (infantryLoadoutCustomization.selectItemSfx != null)SoundManager.Play2dSoundLocal(infantryLoadoutCustomization.selectItemSfx.clip, infantryLoadoutCustomization.selectItemSfx.properties);
+        
 
         UpdateSelectionText($"Skin selecionada: {skin.skingName}");
 
@@ -151,10 +139,7 @@ public class SkinSelectionManager : MonoBehaviour
     {
         foreach (GameObject button in _buttonsList.ToArray())
         {
-            if (button != null)
-            {
-                Destroy(button);
-            }
+            if (button != null) Destroy(button);
         }
         _buttonsList.Clear();
     }
@@ -186,10 +171,8 @@ public class SkinSelectionManager : MonoBehaviour
     public Skin GetCurrentSkinForClass(ClassManager.Class classType)
     {
         string skinName = LoadCurrentSkinForClass(classType);
-        if (!string.IsNullOrEmpty(skinName))
-        {
-            return SkinsManager.GetSkin(skinName, classType);
-        }
+        if (!string.IsNullOrEmpty(skinName)) return SkinsManager.GetSkin(skinName, classType);
+        
         return null;
     }
 
