@@ -27,13 +27,13 @@ public class ServerAdvertiser : MonoBehaviour
         {
             // Assim que o servidor iniciar (seja na cena do Menu ou após carregar o Jogo), ele começa a anunciar
             networkDiscovery.AdvertiseServer();
-            Debug.Log("Servidor está online e anunciando na LAN.");
+            Debug.Log("Server is online and advertising on the LAN.");
         }
         else if (args.ConnectionState == LocalConnectionState.Stopped)
         {
             // Quando o servidor desligar, para de anunciar
             networkDiscovery.StopSearchingOrAdvertising();
-            Debug.Log("Servidor parou de anunciar.");
+            Debug.Log("Server stopped advertising.");
         }
     }
 }

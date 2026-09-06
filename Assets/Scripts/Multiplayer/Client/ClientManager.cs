@@ -62,7 +62,7 @@ public class ClientManager : ServerSingleton<ClientManager>
 
         // Now initialize
         SpawnClientObjects();
-        PlayersInMatch.Instance.RequestAddPlayer(AccountManager.Instance.faction, AccountManager.Instance.account_name);
+        PlayersInMatch.Instance.RequestAddPlayer(AccountManager.Instance.selectedFaction, AccountManager.Instance.accountName);
     }
     private IEnumerator EnterSquad()
     {
@@ -140,11 +140,15 @@ public class ClientManager : ServerSingleton<ClientManager>
     {
         base.OnStopClient();
 
-        PlayersInMatch.Instance.RequestRemovePlayer(AccountManager.Instance.faction, AccountManager.Instance.account_name);
-        RequestDespawnPlayerSpawner();
-        if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
-        if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
-        if (instantiated_squad_selection != null) Destroy(instantiated_squad_selection);
+        if (IsOwner)
+        {
+            PlayersInMatch.Instance.RequestRemovePlayer(AccountManager.Instance.selectedFaction, AccountManager.Instance.accountName);
+            RequestDespawnPlayerSpawner();
+            if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
+            if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
+            if (instantiated_squad_selection != null) Destroy(instantiated_squad_selection);
+        }
+
     }
 
     [ServerRpc]
@@ -162,7 +166,6 @@ public class ClientManager : ServerSingleton<ClientManager>
     [ServerRpc]
     private void RequestDespawnPlayerSpawner()
     {
-        if (!IsServerInitialized) return;
         if (instantiated_player_spawner != null) Despawn(instantiated_player_spawner);
     }
 
@@ -175,7 +178,7 @@ public class ClientManager : ServerSingleton<ClientManager>
 
         isEnteringSquad = true;
 
-        FactionManager.Faction playerFaction = AccountManager.Instance.faction;
+        FactionManager.Faction playerFaction = AccountManager.Instance.selectedFaction;
         string playerName = GetPlayerName();
         // Marca que já tentou entrar
         hasAutoJoinedSquad = true;
@@ -272,7 +275,7 @@ public class ClientManager : ServerSingleton<ClientManager>
 
     private string GetPlayerName()
     {
-        if (AccountManager.Instance != null && !string.IsNullOrEmpty(AccountManager.Instance.account_name)) return AccountManager.Instance.account_name;
+        if (AccountManager.Instance != null && !string.IsNullOrEmpty(AccountManager.Instance.accountName)) return AccountManager.Instance.accountName;
 
         return $"Player_{Owner.ClientId}";
     }

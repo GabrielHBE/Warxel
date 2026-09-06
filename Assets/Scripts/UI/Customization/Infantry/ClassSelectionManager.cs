@@ -10,6 +10,7 @@ public class ClassSelectionManager : MonoBehaviour
     private Dictionary<ClassManager.Class, GameObject> _classButtons = new Dictionary<ClassManager.Class, GameObject>();
     [SerializeField] private Color normalButtonColor = Color.white;
     [SerializeField] private Color selectedButtonColor = Color.darkRed;
+    private bool useConfiguredThemeColors;
     private readonly List<GameObject> _buttonsList = new List<GameObject>();
 
     public void Initialize(InfantryLoadoutCustomization infantryLoadoutCustomization) => this.infantryLoadoutCustomization = infantryLoadoutCustomization;
@@ -29,7 +30,7 @@ public class ClassSelectionManager : MonoBehaviour
     {
         infantryLoadoutCustomization.SetCurrentStage(InfantryLoadoutCustomization.SelectionStage.ClassSelection);
         ClearAllButtons();
-        UpdateSelectionText("Selecione sua Classe");
+        UpdateSelectionText("Select your class");
 
         int classIndex = 0;
         foreach (ClassManager.Class classType in Enum.GetValues(typeof(ClassManager.Class)))
@@ -66,7 +67,7 @@ public class ClassSelectionManager : MonoBehaviour
         Image buttonImage = classButton.GetComponent<Image>();
         if (buttonImage != null)
         {
-            if (_classButtons.Count == 1)
+            if (_classButtons.Count == 1 && !useConfiguredThemeColors)
                 normalButtonColor = buttonImage.color;
         }
 
@@ -76,10 +77,15 @@ public class ClassSelectionManager : MonoBehaviour
 
     public void SelectClass(ClassManager.Class @class)
     {
-        infantryLoadoutCustomization.selected_primary = null;
-        infantryLoadoutCustomization.selected_secondary = null;
-        infantryLoadoutCustomization.selected_gadget1 = null;
-        infantryLoadoutCustomization.selected_gadget2 = null;
+        // Verifica se o jogador está realmente trocando de classe antes de zerar as seleções
+        if (infantryLoadoutCustomization._selectedClass != @class)
+        {
+            infantryLoadoutCustomization.selected_primary = null;
+            infantryLoadoutCustomization.selected_secondary = null;
+            infantryLoadoutCustomization.selected_gadget1 = null;
+            infantryLoadoutCustomization.selected_gadget2 = null;
+        }
+
         infantryLoadoutCustomization._selectedClass = @class;
         AccountManager.Instance.SetClass(@class);
 
@@ -95,11 +101,11 @@ public class ClassSelectionManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[Loadout] Dados ainda não carregados, pulando LoadLoadoutForClass");
+            Debug.LogWarning("[Loadout] Data has not loaded yet; skipping LoadLoadoutForClass");
         }
 
         UpdateClassButtonColors();
-        UpdateSelectionText($"Classe: {@class}");
+        UpdateSelectionText($"Class: {@class}");
     }
 
     private void UpdateClassButtonColors()
@@ -116,6 +122,19 @@ public class ClassSelectionManager : MonoBehaviour
 
             buttonImage.color = buttonClass == infantryLoadoutCustomization._selectedClass ? selectedButtonColor : normalButtonColor;
         }
+    }
+
+    public void ConfigureThemeColors(Color normalColor, Color selectedColor)
+    {
+        normalButtonColor = normalColor;
+        selectedButtonColor = selectedColor;
+        useConfiguredThemeColors = true;
+        UpdateClassButtonColors();
+    }
+
+    public void RefreshButtonColors()
+    {
+        UpdateClassButtonColors();
     }
 
     public void OnBackToClassSelection()

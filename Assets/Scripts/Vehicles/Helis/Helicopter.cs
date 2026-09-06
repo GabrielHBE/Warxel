@@ -48,7 +48,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
             HandleThrottleInput(deltaTime);
             CalculateRotationInput(deltaTime);
             ApplyRotationTorque();
-            rb.AddForce(liftDirection * throttle.Value * rb.mass);
+            rb.AddForce(liftDirection * Throttle * rb.mass);
         }
         
     }
@@ -75,7 +75,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
     protected override void HandleEmptyVehicle()
     {
-        throttle.Value = 0;
+        localThrottle = 0f;
         base.HandleEmptyVehicle();
     }
     protected void HandleThrottleInput(float deltaTime)
@@ -122,19 +122,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
         localThrottle = Mathf.Clamp(localThrottle, 0, heliProperties.max_lift_force);
 
-        if (IsOwner)
-        {
-            throttle.Value = localThrottle;
-            _throttleUpdateTimer += deltaTime;
-            float throttleDiff = Mathf.Abs(localThrottle - _lastSentThrottle);
-
-            if (throttleDiff > THROTTLE_THRESHOLD && _throttleUpdateTimer >= THROTTLE_UPDATE_INTERVAL)
-            {
-                CmdUpdateThrottle(localThrottle);
-                _lastSentThrottle = localThrottle;
-                _throttleUpdateTimer = 0f;
-            }
-        }
+        SetThrottle(localThrottle);
 
         AddForceDown(gravity_force);
     }
@@ -198,7 +186,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (vehicle_destroyed.Value) return;
 
         // 1. Todos os clients calculam o alvo e suavizam o pitch localmente
-        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 1.2f, throttle.Value / heliProperties.max_lift_force) : 0f;
+        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 1.2f, Throttle / heliProperties.max_lift_force) : 0f;
         currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.deltaTime * 5);
 
         bool shouldBePlaying = currentPitch > 0.01f;
@@ -223,13 +211,6 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         }
     }
 
-    [ServerRpc]
-    private void CmdUpdateThrottle(float newThrottle)
-    {
-        // O servidor confirma o valor (pode adicionar validação/clamp aqui)
-        throttle.Value = Mathf.Clamp(newThrottle, 0, heliProperties.max_lift_force);
-    }
-
     protected override void StartStopEngine()
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_startEngineKey) && IsOwner)
@@ -250,9 +231,10 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers)) SoundManager.Play2dSoundLocal(fallAlarmSound.clip, fallAlarmSound.properties);
     }
 
-    public override float GetCurrentThrottle() => localThrottle;
+    public override float GetCurrentThrottle() => Throttle;
     public override float GetMinFov() => Settings.Instance._video.helicopter_fov;
     public override float GetMaxThrottle() => heliProperties.max_lift_force;
+    protected override float ClampThrottle(float value) => Mathf.Clamp(value, 0f, heliProperties.max_lift_force);
     public float GetXRotation() => transform.eulerAngles.x;
     public float GetYRotation() => transform.eulerAngles.y;
     public float GetZRotation() => transform.eulerAngles.z;

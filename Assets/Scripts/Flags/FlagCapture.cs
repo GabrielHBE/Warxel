@@ -9,13 +9,13 @@ public class FlagCapture : NetworkBehaviour
     public Sprite UI_Image;
     public Transform InWorldUIPosition;
 
-    [Header("Configurações da Bandeira")]
+    [Header("Flag Settings")]
     [SerializeField] private LayerMask captureLayers;
     [SerializeField] private float baseCaptureSpeed = 10f;
     [SerializeField] private float maxProgress = 100f;
     [SerializeField] private float assaultClassMultiplier = 1.5f; // Adicionado para facilitar ajustes no Inspector
 
-    [Header("Progresso (Sincronizado)")]
+    [Header("Progress (Synchronized)")]
     public readonly SyncVar<float> teamAProgress = new SyncVar<float>();
     public readonly SyncVar<float> teamBProgress = new SyncVar<float>();
     private readonly SyncVar<FactionManager.Faction> currentOwner = new SyncVar<FactionManager.Faction>(FactionManager.Faction.Neutral);

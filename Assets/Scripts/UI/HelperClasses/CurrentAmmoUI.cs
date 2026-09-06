@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -13,7 +12,7 @@ public class CurrentAmmoUI : MonoBehaviour
         currentAmmoUIValues = GetComponentInParent<ICurrentAmmoUIValues>();
         if (currentAmmoUIValues == null)
         {
-            Debug.LogError("CurrentAmmoUI: Não foi possível encontrar um componente que implemente ICurrentAmmoUIValues no objeto pai.");
+            Debug.LogError("CurrentAmmoUI: Could not find a component implementing ICurrentAmmoUIValues on the parent object.");
             return;
         }
     }

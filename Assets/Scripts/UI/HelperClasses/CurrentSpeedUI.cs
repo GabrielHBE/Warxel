@@ -14,7 +14,7 @@ public class CurrentSpeedUI : MonoBehaviour
         currentSpeedUIValues = GetComponentInParent<ICurrentSpeedUIValues>();
         if (currentSpeedUIValues == null)
         {
-            Debug.LogError("CurrentSpeedUI: Não foi possível encontrar um componente que implemente ICurrentSpeedUIValues no objeto pai.");
+            Debug.LogError("CurrentSpeedUI: Could not find a component implementing ICurrentSpeedUIValues on the parent object.");
             return;
         }
     }

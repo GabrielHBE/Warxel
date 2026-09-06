@@ -8,16 +8,11 @@ public class PlayerAnimation : NetworkBehaviour
     [SerializeField] private Animator anim;
     [SerializeField] private PlayerController playercontroller;
     [SerializeField] private PlayerProperties playerProperties;
-    private readonly SyncVar<bool> isAiming = new SyncVar<bool>();
+    private readonly SyncVar<bool> aiming = new SyncVar<bool>();
     private readonly SyncVar<bool> isSprinting = new SyncVar<bool>();
     private readonly SyncVar<bool> isProne = new SyncVar<bool>();
 
     #region Unity 
-    void Awake()
-    {
-        playerProperties.is_dead.OnChange += OnIsDeadChanded;
-    }
-
     private void Update()
     {
         if (IsOwner)
@@ -38,51 +33,36 @@ public class PlayerAnimation : NetworkBehaviour
         anim.SetFloat("Horizontal", playercontroller.moveHorizontal, 0.1f, Time.deltaTime);
         anim.SetFloat("Vertical", playercontroller.moveForward, 0.1f, Time.deltaTime);
         anim.SetBool("Crouched", playerProperties.crouched);
-        anim.SetBool("Proned", playerProperties.is_proned);
+        anim.SetBool("Proned", playerProperties.proned);
         anim.SetBool("Walking",
             !playerProperties.sprinting &&
-            !playerProperties.is_proned &&
+            !playerProperties.proned &&
             (playercontroller.moveHorizontal != 0 || playercontroller.moveForward != 0));
-
         anim.SetBool("Sprinting",
             !playerProperties.crouched &&
             playerProperties.sprinting &&
-            !playerProperties.is_proned &&
+            !playerProperties.proned &&
             (playercontroller.moveHorizontal != 0 || playercontroller.moveForward != 0));
-
-        anim.SetBool("Reloading", playerProperties.is_reloading);
+        anim.SetBool("Reloading", playerProperties.reloading);
         anim.SetBool("ProneTransition", playerProperties.isProneTransition);
         anim.SetBool("Roll", playerProperties.roll);
-
-        //anim.SetFloat("Rotation", InputManager.GetAxis("Mouse X"));
         anim.SetBool("HasLeftHandHolder", thirdPersonArms.HasLeftHandTarget());
-        anim.SetBool("IsGrounded", playerProperties.isGrounded);
-        anim.SetBool("InVehicle", playerProperties.is_in_vehicle);
-        anim.SetBool("Aiming", playerProperties.is_aiming);
-    }
-
-    private void OnIsDeadChanded(bool prev, bool next, bool asServer)
-    {
-        anim.SetBool("Dead", next);
-        if (next) SetDeathAnimationIndex();
-    }
-
-    public void SetDeathAnimationIndex()
-    {
-        anim.SetInteger("RandomDeadAnimation", Random.Range(1, 8));
+        anim.SetBool("IsGrounded", playerProperties.grounded);
+        anim.SetBool("InVehicle", playerProperties.isInVehicle);
+        anim.SetBool("Aiming", playerProperties.aiming);
     }
     #endregion
 
     #region  Update SyncVars
     private void ShouldRequestUpdateSyncVar()
     {
-        if (playerProperties.is_aiming != isAiming.Value) RequestUpdateIsAimingSyncVar(playerProperties.is_aiming);
+        if (playerProperties.aiming != aiming.Value) RequestUpdateIsAimingSyncVar(playerProperties.aiming);
         if (playerProperties.sprinting != isSprinting.Value) RequestUpdateisSprintingSyncVar(playerProperties.sprinting);
-        if ((playerProperties.isProneTransition || playerProperties.is_proned) != isProne.Value) RequestUpdateisProneSyncVar(playerProperties.isProneTransition || playerProperties.is_proned);
+        if ((playerProperties.isProneTransition || playerProperties.proned) != isProne.Value) RequestUpdateisProneSyncVar(playerProperties.isProneTransition || playerProperties.proned);
     }
 
     [ServerRpc]
-    private void RequestUpdateIsAimingSyncVar(bool state) => isAiming.Value = state;
+    private void RequestUpdateIsAimingSyncVar(bool state) => aiming.Value = state;
     [ServerRpc]
     private void RequestUpdateisSprintingSyncVar(bool state) => isSprinting.Value = state;
     [ServerRpc]
@@ -98,17 +78,17 @@ public class PlayerAnimation : NetworkBehaviour
         bool hasLeftHandTarget = thirdPersonArms.HasLeftHandTarget();
 
         bool shouldIncreaseRightIK;
-        if (!hasLeftHandTarget) shouldIncreaseRightIK = isAiming.Value && !playerProperties.is_dead.Value;
-        else shouldIncreaseRightIK = (!isSprinting.Value && !playerProperties.is_dead.Value) && (!isProne.Value || isAiming.Value);
+        if (!hasLeftHandTarget) shouldIncreaseRightIK = aiming.Value && !playerProperties.isDead.Value;
+        else shouldIncreaseRightIK = (!isSprinting.Value && !playerProperties.isDead.Value) && (!isProne.Value || aiming.Value);
     
         thirdPersonArms.UpdateRightRandRigValue(shouldIncreaseRightIK);
 
-        bool shouldIncreaseLeftIK = !playerProperties.is_dead.Value && (hasLeftHandTarget || isAiming.Value);
+        bool shouldIncreaseLeftIK = !playerProperties.isDead.Value && (hasLeftHandTarget || aiming.Value);
         thirdPersonArms.UpdateLeftRandRigValue(shouldIncreaseLeftIK);
 
         thirdPersonArms.UpdateRigWeight();
         thirdPersonArms.SetLeftHandFollowerPosition();
-        thirdPersonArms.SetRightHandFollowerPosition(isAiming.Value, false);
+        thirdPersonArms.SetRightHandFollowerPosition(aiming.Value, false);
     }
     #endregion
 

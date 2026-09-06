@@ -14,7 +14,7 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
     void Awake()
     {
         // ATUALIZADO: sem stateId, apenas reseta o estado
-        Firing.ResetState();
+        Firing.ResetState(properties.firing.fireModes);
         // Garante que o estado de superaquecimento comece falso
         properties.heatValues.heatState.isOverheated = false;
     }
@@ -165,12 +165,12 @@ public class JetMainCannon : NetworkBehaviour, IVehicleArmory
 
         if (!Firing.CanSwitchFireMode(properties.firing.fireModes)) return;
 
-        Firing.SwitchFireMode(properties.firing.fireModes);
+        Firing.SwitchFireMode(properties.firing);
     }
 
     public void SetupFiringSystem()
     {
-        Firing.ResetState();
-        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0 && !properties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(properties.firing.fireModes); 
+        Firing.ResetState(properties?.firing.fireModes);
+        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0 && !properties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(properties.firing);
     }
 }

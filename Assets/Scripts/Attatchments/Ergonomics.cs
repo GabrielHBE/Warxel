@@ -6,7 +6,8 @@ public class Ergonomics : Attatchment
     [Header("Changes")]
     [Space(5)]
 
-    public Vector3 visualRecoilChange;
+    public Vector3 visualRecoilPositionChange;
+    public Vector3 visualRecoilRotationChange;
     public float reloadSpeedChange;
     public float adsSpeedChange;
     public float pickupWeaponSpeedChange;

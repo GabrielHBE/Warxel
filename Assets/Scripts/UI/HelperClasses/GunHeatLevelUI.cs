@@ -11,25 +11,21 @@ public class GunHeatLevelUI : MonoBehaviour
     [SerializeField] private Color coolColor = Color.white;
     [SerializeField] private Color hotColor = Color.red;
 
-    [SerializeField] private float maxHeat;
+    private float maxHeat;
     private IGunHeatLevelUIValues gunHeatLevelUIValues;
     void Start()
     {
         gunHeatLevelUIValues = GetComponentInParent<IGunHeatLevelUIValues>();
         if (gunHeatLevelUIValues == null)
         {
-            Debug.LogError("GunHeatLevelUI: Não foi possível encontrar um componente que implemente IGunHeatLevelUIValues no objeto pai.");
+            Debug.LogError("GunHeatLevelUI: Could not find a component implementing IGunHeatLevelUIValues on the parent object.");
             return;
         }
         StartCoroutine(WaitAndSetIcons());
-        //maxHeat = gunHeatLevelUIValues.GetMaxHeat();
         originalWidth = heat_bar.sizeDelta.x;
 
-        // Garante que temos a referência para a Image
-        if (heat_bar_image == null)
-        {
-            heat_bar_image = heat_bar.GetComponent<Image>();
-        }
+        if (heat_bar_image == null)  heat_bar_image = heat_bar.GetComponent<Image>();
+        
     }
 
     private System.Collections.IEnumerator WaitAndSetIcons()
@@ -48,12 +44,8 @@ public class GunHeatLevelUI : MonoBehaviour
     }
 
 
-    void Update()
-    {
-        // Para teste, você pode atualizar o heat aqui usando um valor de exemplo
-        UpdateHeat(gunHeatLevelUIValues.GetCurrentHeat());
-    }
-
+    void Update() => UpdateHeat(gunHeatLevelUIValues.GetCurrentHeat());
+    
     public void UpdateHeat(float currentHeat)
     {
         float heatPercent = currentHeat / maxHeat;
@@ -65,13 +57,8 @@ public class GunHeatLevelUI : MonoBehaviour
             heat_bar.sizeDelta.y
         );
 
-        // Atualiza a cor da barra baseada no heatPercent
-        if (heat_bar_image != null)
-        {
-            heat_bar_image.color = Color.Lerp(coolColor, hotColor, heatPercent);
-        }
+        if (heat_bar_image != null) heat_bar_image.color = Color.Lerp(coolColor, hotColor, heatPercent);
     }
-
 }
 
 

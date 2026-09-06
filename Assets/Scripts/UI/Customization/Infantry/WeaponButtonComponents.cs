@@ -21,8 +21,8 @@ public class WeaponButtonComponents : MonoBehaviour
         _weaponProperties = weaponProperties;
         infantryLoadoutCustomization = parent;
 
-        _isUnlocked = weaponProperties.battle_coins_to_unlock == 0 ||
-                      UnlockedWeapons.CheckWeaponStatus(weaponProperties.weapon_name);
+        _isUnlocked = weaponProperties.battleCoinsToUnlock == 0 ||
+                      UnlockedWeapons.CheckWeaponStatus(weaponProperties.weaponName);
 
         SetupImage();
         SetupText();
@@ -38,6 +38,14 @@ public class WeaponButtonComponents : MonoBehaviour
         if (allImages != null && allImages.Length > 0)
         {
             _weaponImage = allImages[allImages.Length - 1];
+
+            if (_imageHud == null)
+            {
+                Destroy(_weaponImage);
+                _weaponImage = null;
+                return;
+            }
+
             _weaponImage.sprite = _isUnlocked ? _imageHud : InfantryLoadoutCustomization.locked_item_image;
             _weaponImage.color = Color.white;
         }
@@ -46,7 +54,7 @@ public class WeaponButtonComponents : MonoBehaviour
     private void SetupText()
     {
         TextMeshProUGUI buttonText = GetComponentInChildren<TextMeshProUGUI>();
-        if (buttonText != null) buttonText.text = _weaponProperties.weapon_name;
+        if (buttonText != null) buttonText.text = _weaponProperties.weaponName;
     
     }
 
@@ -76,7 +84,7 @@ public class WeaponButtonComponents : MonoBehaviour
         bgImage.color = new Color(0.2f, 0.5f, 0.2f);
 
         TextMeshProUGUI buttonText = _buyButton.GetComponentInChildren<TextMeshProUGUI>();
-        buttonText.text = $"Buy: {_weaponProperties.battle_coins_to_unlock}";
+        buttonText.text = $"Buy: {_weaponProperties.battleCoinsToUnlock}";
         buttonText.fontSize = 18;
         buttonText.alignment = TextAlignmentOptions.Center;
         buttonText.color = Color.white;
@@ -90,7 +98,7 @@ public class WeaponButtonComponents : MonoBehaviour
 
     private void OnBuyButtonClicked()
     {
-        if (AccountManager.Instance.battle_coins < _weaponProperties.battle_coins_to_unlock)
+        if (AccountManager.Instance.battleCoins < _weaponProperties.battleCoinsToUnlock)
         {
             SoundManager.Play2dSoundLocal(InfantryLoadoutCustomization.reference_purchase_denial_item_sfx.clip,
                                          InfantryLoadoutCustomization.reference_purchase_denial_item_sfx.properties);
@@ -108,8 +116,8 @@ public class WeaponButtonComponents : MonoBehaviour
 
         SoundManager.Play2dSoundLocal(InfantryLoadoutCustomization.reference_purchase_item_sfx.clip,
                                      InfantryLoadoutCustomization.reference_purchase_item_sfx.properties);
-        AccountManager.Instance.RemoveBattleCoin(_weaponProperties.battle_coins_to_unlock);
-        UnlockedWeapons.UnlockWeapon(_weaponProperties.weapon_name);
+        AccountManager.Instance.RemoveBattleCoin(_weaponProperties.battleCoinsToUnlock);
+        UnlockedWeapons.UnlockWeapon(_weaponProperties.weaponName);
     }
 
     private void SetupEvents()

@@ -17,23 +17,20 @@ public class SwitchWeapon : MonoBehaviour
     public GameObject gadget1;
     public GameObject gadget2;
 
-    [Header("Sounds")]
-    public AudioSource zipper;
-
     [Header("Instances")]
     [SerializeField] private ThirdPersonArms thirdPersonArms;
     [SerializeField] private PlayerController playerController;
     [SerializeField] private PlayerProperties playerProperties;
-    [SerializeField] private WeaponAnimation weaponAnimation;
     [SerializeField] private SwayNBobScript sway;
     [SerializeField] private Weapon weapon;
 
     [HideInInspector] public int currentWeapon = 1;
     [HideInInspector] public bool _switch = false;
+    public bool IsSwitchingWeapon => _switch || isReturning;
 
     private bool isReturning = false;
     private float switchTimer = 0f;
-    private float returnTimer = 0f; // Novo timer para a animação de sacar
+    private float returnTimer = 0f; // Timer para a animação de sacar
     private bool setupOnce = true;
 
     // Controlo de tempos dinâmicos em segundos
@@ -42,11 +39,6 @@ public class SwitchWeapon : MonoBehaviour
     private int targetWeapon = 1;
 
     private WeaponProperties weaponProperties;
-
-    private Vector3 originalPosition;
-    private Quaternion originalQuaternionRotation;
-    private readonly Quaternion saveQuaternionRotation = new(4, 0, 0, 1);
-    private Vector3 actualSavePosition;
 
     public enum WeaponSlot
     {
@@ -70,11 +62,34 @@ public class SwitchWeapon : MonoBehaviour
 
         // Configura os tempos iniciais caso a inicialização dispare a animação
         currentStoreDuration = GetStoreSpeed(currentWeapon);
-        currentPickUpDuration = GetPickUpSpeed(targetWeapon);
+        currentPickUpDuration = GetDrawSpeed(targetWeapon);
 
-        _switch = true;
-        playerProperties.is_reloading = false;
-        playerProperties.is_firing = false;
+        playerProperties.reloading = false;
+        playerProperties.firing = false;
+
+        StartInitialWeaponDraw();
+    }
+
+    private void StartInitialWeaponDraw()
+    {
+        if (primary == null)
+        {
+            _switch = false;
+            isReturning = false;
+            return;
+        }
+
+        playerProperties.aiming = false;
+        if (weapon != null) weapon.can_shoot = false;
+        sway?.EnableStoreWeapon(false);
+
+        PlaySwitchEffects();
+        ActivateSelectedWeapon();
+        ResetSwitchState();
+
+        EquippableItemAnimator initialAnimation = GetWeaponAnimationBySlot(currentWeapon);
+        if (initialAnimation != null)
+            initialAnimation.StartDrawAnimation(currentPickUpDuration);
     }
 
     public void InstantiatePrimaryWeapon()
@@ -88,7 +103,23 @@ public class SwitchWeapon : MonoBehaviour
                 attManager.InitializeAttachments();
                 attManager.LoadAttachmentsFromPlayerPrefs();
             }
+
             primary = g;
+
+            if (primary != null)
+            {
+                WeaponProperties wp = primary.GetComponent<WeaponProperties>();
+
+                wp.Initialize();
+
+                foreach (Attatchment a in wp.GetComponentsInChildren<Attatchment>(true))
+                {
+                    if (a.gameObject.activeSelf) a.Initialize();
+                    else Destroy(a.gameObject);
+                }
+
+                primary.SetActive(false);
+            }
         }
     }
 
@@ -104,7 +135,21 @@ public class SwitchWeapon : MonoBehaviour
                 attManager.LoadAttachmentsFromPlayerPrefs();
             }
             secondary = g;
-            g.SetActive(false);
+
+            if (secondary != null)
+            {
+                WeaponProperties wp = secondary.GetComponent<WeaponProperties>();
+
+                wp.Initialize();
+
+                foreach (Attatchment a in wp.GetComponentsInChildren<Attatchment>(true))
+                {
+                    if (a.gameObject.activeSelf) a.Initialize();
+                    else Destroy(a.gameObject);
+                }
+
+                secondary.SetActive(false);
+            }
         }
     }
 
@@ -114,7 +159,14 @@ public class SwitchWeapon : MonoBehaviour
         {
             GameObject g = Instantiate(gadget1, gadgets_parent);
             gadget1 = g;
-            g.SetActive(false);
+
+            if (gadget1 != null)
+            {
+                Gadget gadget = gadget1.GetComponent<Gadget>();
+                gadget.Initialize();
+
+                gadget1.SetActive(false);
+            }
         }
     }
 
@@ -124,7 +176,14 @@ public class SwitchWeapon : MonoBehaviour
         {
             GameObject g = Instantiate(gadget2, gadgets_parent);
             gadget2 = g;
-            g.SetActive(false);
+
+            if (gadget2 != null)
+            {
+                Gadget gadget = gadget2.GetComponent<Gadget>();
+                gadget.Initialize();
+
+                gadget2.SetActive(false);
+            }
         }
     }
 
@@ -135,41 +194,28 @@ public class SwitchWeapon : MonoBehaviour
         GameObject thirdPersonGadget1 = null;
         GameObject thirdPersonGadget2 = null;
 
-
         if (primary != null)
         {
             WeaponProperties primaryWP = primary.GetComponent<WeaponProperties>();
-            if (primaryWP != null && primaryWP.third_person_prefab != null) 
-            {
-                thirdPersonPrimary = primaryWP.third_person_prefab;
-            }
+            if (primaryWP != null && primaryWP.thirdPersonPrefab != null) thirdPersonPrimary = primaryWP.thirdPersonPrefab;
         }
 
         if (secondary != null)
         {
             WeaponProperties secondaryWP = secondary.GetComponent<WeaponProperties>();
-            if (secondaryWP != null && secondaryWP.third_person_prefab != null) 
-            {
-                thirdPersonSecondary = secondaryWP.third_person_prefab;
-            }
+            if (secondaryWP != null && secondaryWP.thirdPersonPrefab != null) thirdPersonSecondary = secondaryWP.thirdPersonPrefab;
         }
 
         if (gadget1 != null)
         {
             Gadget gadget1WP = primary.GetComponent<Gadget>();
-            if (gadget1WP != null && gadget1WP.third_person_prefab != null) 
-            {
-                thirdPersonGadget1 = gadget1WP.third_person_prefab;
-            }
+            if (gadget1WP != null && gadget1WP.thirdPersonPrefab != null) thirdPersonGadget1 = gadget1WP.thirdPersonPrefab;
         }
 
         if (gadget2 != null)
         {
             Gadget gadget2WP = primary.GetComponent<Gadget>();
-            if (gadget2WP != null && gadget2WP.third_person_prefab != null) 
-            {
-                thirdPersonGadget2 = gadget2WP.third_person_prefab;
-            }
+            if (gadget2WP != null && gadget2WP.thirdPersonPrefab != null) thirdPersonGadget2 = gadget2WP.thirdPersonPrefab;
         }
 
         thirdPersonArms.RequestInstantiateWeapons(thirdPersonPrimary,
@@ -180,25 +226,17 @@ public class SwitchWeapon : MonoBehaviour
 
     void Update()
     {
-
         HandleWeaponSwitchInputManager();
 
-        if (_switch)
-        {
-            ProcessWeaponSwitch();
-        }
+        if (_switch) ProcessWeaponSwitch();
 
-        if (isReturning)
-        {
-            ReturnWeaponToPosition();
-        }
+        if (isReturning) ReturnWeaponToPosition();
     }
 
     private void HandleWeaponSwitchInputManager()
     {
         // Bloqueia inputs se já estiver a trocar ou a sacar a arma
-        if (_switch || isReturning || playerProperties.is_reloading || playerProperties.is_firing || playerProperties.is_dead.Value)
-            return;
+        if (_switch || isReturning || playerProperties.reloading || playerProperties.firing || playerProperties.isDead.Value) return;
 
         float scrollY = InputManager.GetMouseScroll();
 
@@ -215,92 +253,59 @@ public class SwitchWeapon : MonoBehaviour
     {
         int nextWeapon = currentWeapon;
 
-        if (scrollDirection > 0f)
-        {
-            nextWeapon = currentWeapon == 4 ? 1 : currentWeapon + 1;
-        }
-        else if (scrollDirection < 0f)
-        {
-            nextWeapon = currentWeapon == 1 ? 4 : currentWeapon - 1;
-        }
+        if (scrollDirection > 0f) nextWeapon = currentWeapon == 4 ? 1 : currentWeapon + 1;
+        else if (scrollDirection < 0f) nextWeapon = currentWeapon == 1 ? 4 : currentWeapon - 1;
 
-        if (nextWeapon != currentWeapon)
-        {
-            StartWeaponSwitch(nextWeapon);
-        }
+        if (nextWeapon != currentWeapon) StartWeaponSwitch(nextWeapon);
+
     }
 
     private void HandleNumberKeyInputManager()
     {
-        if (InputManager.GetKeyDown(weapon1) && primary != null && currentWeapon != 1)
-        {
-            StartWeaponSwitch((int)WeaponSlot.Primary);
-        }
-        else if (InputManager.GetKeyDown(weapon2) && secondary != null && currentWeapon != 2)
-        {
-            StartWeaponSwitch((int)WeaponSlot.Secondary);
-        }
-        else if (InputManager.GetKeyDown(weapon3) && gadget1 != null && currentWeapon != 3)
-        {
-            StartWeaponSwitch((int)WeaponSlot.Gadget1);
-        }
-        else if (InputManager.GetKeyDown(weapon4) && gadget2 != null && currentWeapon != 4)
-        {
-            StartWeaponSwitch((int)WeaponSlot.Gadget2);
-        }
+        if (InputManager.GetKeyDown(weapon1) && primary != null && currentWeapon != 1) StartWeaponSwitch((int)WeaponSlot.Primary);
+        else if (InputManager.GetKeyDown(weapon2) && secondary != null && currentWeapon != 2) StartWeaponSwitch((int)WeaponSlot.Secondary);
+        else if (InputManager.GetKeyDown(weapon3) && gadget1 != null && currentWeapon != 3) StartWeaponSwitch((int)WeaponSlot.Gadget1);
+        else if (InputManager.GetKeyDown(weapon4) && gadget2 != null && currentWeapon != 4) StartWeaponSwitch((int)WeaponSlot.Gadget2);
     }
 
-    // Centraliza o início da troca calculando os tempos em segundos de cada objeto
+    // Centraliza o início da troca e aciona a animação de guardar
     private void StartWeaponSwitch(int nextWeaponSlot)
     {
         targetWeapon = nextWeaponSlot;
 
         // Obtém a velocidade de guardar do item ATUAL e de sacar do PRÓXIMO item
         currentStoreDuration = GetStoreSpeed(currentWeapon);
-        currentPickUpDuration = GetPickUpSpeed(targetWeapon);
+        currentPickUpDuration = GetDrawSpeed(targetWeapon);
 
         switchTimer = 0f;
         _switch = true;
+        sway?.EnableStoreWeapon(false);
+        AdsBehaviour.Instance?.CancelAim();
+
+        // INICIA A ANIMAÇÃO DE GUARDAR
+        EquippableItemAnimator anim = GetWeaponAnimationBySlot(currentWeapon);
+        if (anim != null) anim.StartStoreAnimation(currentStoreDuration);
     }
 
     private void ProcessWeaponSwitch()
     {
-        playerProperties.is_aiming = false;
+        playerProperties.aiming = false;
         if (weapon != null) weapon.can_shoot = false;
 
-        StoreOriginalTransform();
         PlaySwitchEffects();
 
         switchTimer += Time.deltaTime;
 
-        float t = Mathf.Clamp01(switchTimer / currentStoreDuration);
-
-        // Deixa o movimento suave (acelera no início e desacelera no fim)
-        float smoothT = Mathf.SmoothStep(0f, 1f, t);
-
-        // Interpola usando o destino corrigido (actualSavePosition)
-        transform.localPosition = Vector3.Lerp(originalPosition, actualSavePosition, smoothT);
-        transform.localRotation = Quaternion.Lerp(originalQuaternionRotation, saveQuaternionRotation, smoothT);
-
+        // Quando o timer termina, a arma já foi "guardada" pela animação
         if (switchTimer >= currentStoreDuration)
         {
             currentWeapon = targetWeapon;
             ActivateSelectedWeapon();
             ResetSwitchState();
-        }
-    }
 
-    private void StoreOriginalTransform()
-    {
-        if (setupOnce)
-        {
-            originalPosition = transform.localPosition;
-            originalQuaternionRotation = transform.localRotation;
-
-            // CORREÇÃO: Em vez de ir para -30 (que joga a arma no limbo instantaneamente),
-            // fazemos ela descer apenas 2 unidades abaixo da sua posição original atual.
-            // Você pode ajustar este -2f para mais ou para menos se a arma ainda aparecer na tela.
-            actualSavePosition = new Vector3(originalPosition.x, originalPosition.y - 0.1f, originalPosition.z);
+            // INICIA A ANIMAÇÃO DE SACAR DA NOVA ARMA ATIVADA
+            EquippableItemAnimator newAnim = GetWeaponAnimationBySlot(currentWeapon);
+            if (newAnim != null) newAnim.StartDrawAnimation(currentPickUpDuration);
         }
     }
 
@@ -308,8 +313,6 @@ public class SwitchWeapon : MonoBehaviour
     {
         if (setupOnce)
         {
-            zipper.Play();
-            sway.enabled = false;
             if (weapon != null) weapon.can_aim = false;
             setupOnce = false;
         }
@@ -358,9 +361,9 @@ public class SwitchWeapon : MonoBehaviour
         weaponObject.SetActive(true);
         if (weapon != null) weapon.is_active = isWeaponActive;
 
-        InitializeWeaponComponents();
+        InitializeWeaponComponents(weaponObject);
         ConfigureSwayForWeapon();
-        ResetWeaponState();
+        ResetWeaponState(weaponProperties);
     }
 
     private void SetupGadget(GameObject gadgetObject)
@@ -373,32 +376,8 @@ public class SwitchWeapon : MonoBehaviour
         InitializeGadgetComponents();
     }
 
-    private void InitializeWeaponComponents()
-    {
-        weaponProperties = GetComponentInChildren<WeaponProperties>();
-        if (weaponProperties != null)
-        {
-            weaponProperties.Restart();
-        }
-    }
-
-    private void ConfigureSwayForWeapon()
-    {
-        if (weaponProperties == null) return;
-
-        sway.Restart(
-            weaponProperties.bob_walk_exageration,
-            weaponProperties.bob_sprint_exageration,
-            weaponProperties.bob_crouch_exageration,
-            weaponProperties.bob_aim_exageration,
-            weaponProperties.walk_multiplier,
-            weaponProperties.sprint_multiplier,
-            weaponProperties.aim_multiplier,
-            weaponProperties.crouch_multiplier,
-            weaponProperties.vector3Values,
-            weaponProperties.quaternionValues
-        );
-    }
+    private void InitializeWeaponComponents(GameObject weaponObject) => weaponProperties = weaponObject.GetComponent<WeaponProperties>();
+    private void ConfigureSwayForWeapon() => sway.Restart(weaponProperties.swayAndBobValues);
 
     private void InitializeGadgetComponents()
     {
@@ -406,83 +385,61 @@ public class SwitchWeapon : MonoBehaviour
         if (gadget != null)
         {
             gadget.SetActive(true);
-            gadget.Reestart();
+            gadget.Restart();
             ConfigureSwayForGadget(gadget);
         }
     }
 
-    private void ConfigureSwayForGadget(Gadget gadget)
-    {
-        sway.Restart(
-            gadget.bob_walk_exageration,
-            gadget.bob_sprint_exageration,
-            gadget.bob_crouch_exageration,
-            gadget.bob_aim_exageration,
-            gadget.walk_multiplier,
-            gadget.sprint_multiplier,
-            gadget.aim_multiplier,
-            gadget.crouch_multiplier,
-            gadget.vector3Values,
-            gadget.quaternionValues
-        );
-    }
+    private void ConfigureSwayForGadget(Gadget gadget) => sway.Restart(gadget.swayAndBobValues);
 
-    private void ResetWeaponState()
+    private void ResetWeaponState(WeaponProperties wp)
     {
         if (weapon != null)
         {
-            weapon.Restart();
+            weapon.Restart(wp);
             weapon.can_shoot = false;
         }
 
-        weaponAnimation?.Restart();
-
         if (weaponProperties != null)
         {
-            playerController.UpdateWeaponProperties(weaponProperties.speed_change, weaponProperties.recoilValues.applyRecoilSpeed, weaponProperties.recoilValues.resetRecoilSpeed);
-            WeaponHolder wh = weaponProperties.GetComponent<WeaponHolder>();
-            wh.ResetWeaponState();
+            playerController.UpdateWeaponProperties(weaponProperties.speedChange, weaponProperties.recoilValues.applyRecoilSpeed, weaponProperties.recoilValues.resetRecoilSpeed);
+            EquippableItemHandTargets wh = weaponProperties.GetComponent<EquippableItemHandTargets>();
+            wh.ResetHandTargets();
         }
     }
 
     private void ResetSwitchState()
     {
         switchTimer = 0f;
-        returnTimer = 0f; // Inicializa o cronómetro de retorno
+        returnTimer = 0f;
         isReturning = true;
         _switch = false;
         setupOnce = true;
     }
 
+
     private void ReturnWeaponToPosition()
     {
         returnTimer += Time.deltaTime;
 
-        float t = Mathf.Clamp01(returnTimer / currentPickUpDuration);
+        if (returnTimer >= currentPickUpDuration) CompleteWeaponSwitch();
 
-        // Deixa a subida da nova arma suave também
-        float smoothT = Mathf.SmoothStep(0f, 1f, t);
-
-        // Saca a arma a partir do destino corrigido de volta para a posição original
-        transform.localPosition = Vector3.Lerp(actualSavePosition, originalPosition, smoothT);
-        transform.localRotation = Quaternion.Lerp(saveQuaternionRotation, originalQuaternionRotation, smoothT);
-
-        if (returnTimer >= currentPickUpDuration)
-        {
-            CompleteWeaponSwitch();
-        }
     }
 
     private void CompleteWeaponSwitch()
     {
+        EquippableItemAnimator currentAnimation = GetWeaponAnimationBySlot(currentWeapon);
+        if (currentAnimation != null) currentAnimation.FinishDrawAnimation();
+
         if (weapon != null)
         {
             weapon.can_shoot = true;
             weapon.can_aim = true;
         }
 
+        sway?.EnableStoreWeapon(true);
+
         isReturning = false;
-        sway.enabled = true;
     }
 
     private void SetWeaponActive(GameObject weaponObject, bool active)
@@ -490,32 +447,31 @@ public class SwitchWeapon : MonoBehaviour
         if (weaponObject != null) weaponObject.SetActive(active);
     }
 
-    #region Métodos Auxiliares de Captura de Tempo
-
+    #region Métodos Auxiliares de Captura
     private float GetStoreSpeed(int slot)
-    {
-        GameObject obj = GetWeaponObjectBySlot(slot);
-        if (obj == null) return 0.3f; // Fallback caso o slot esteja vazio
-
-        var wp = obj.GetComponentInChildren<WeaponProperties>();
-        if (wp != null) return wp.store_weapon_speed;
-
-        var gd = obj.GetComponentInChildren<Gadget>();
-        if (gd != null) return gd.store_gadget_speed;
-
-        return 0.3f;
-    }
-
-    private float GetPickUpSpeed(int slot)
     {
         GameObject obj = GetWeaponObjectBySlot(slot);
         if (obj == null) return 0.3f;
 
         var wp = obj.GetComponentInChildren<WeaponProperties>();
-        if (wp != null) return wp.pick_up_weapon_speed;
+        if (wp != null) return wp.storeWeaponSpeed;
 
         var gd = obj.GetComponentInChildren<Gadget>();
-        if (gd != null) return gd.pick_up_gadget_speed;
+        if (gd != null) return gd.StoreGadgetSpeed;
+
+        return 0.3f;
+    }
+
+    private float GetDrawSpeed(int slot)
+    {
+        GameObject obj = GetWeaponObjectBySlot(slot);
+        if (obj == null) return 0.3f;
+
+        var wp = obj.GetComponentInChildren<WeaponProperties>();
+        if (wp != null) return wp.drawWeaponSpeed;
+
+        var gd = obj.GetComponentInChildren<Gadget>();
+        if (gd != null) return gd.drawGadgetSped;
 
         return 0.3f;
     }
@@ -532,5 +488,12 @@ public class SwitchWeapon : MonoBehaviour
         };
     }
 
+    private EquippableItemAnimator GetWeaponAnimationBySlot(int slot)
+    {
+        GameObject obj = GetWeaponObjectBySlot(slot);
+        if (obj == null) return null;
+
+        return obj.GetComponent<EquippableItemAnimator>() ?? obj.GetComponentInChildren<EquippableItemAnimator>();
+    }
     #endregion
 }

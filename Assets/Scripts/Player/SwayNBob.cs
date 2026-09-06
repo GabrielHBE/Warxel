@@ -3,91 +3,74 @@ using UnityEngine;
 
 public class SwayNBobScript : MonoBehaviour
 {
-    private PlayerProperties playerProperties;
-    private SwitchWeapon switchWeapon;
+    [Header("References")]
+    [SerializeField] private PlayerProperties playerProperties;
+    [SerializeField] private SwitchWeapon switchWeapon;
+    [SerializeField] private PlayerController playerController;
 
-    [Header("Sway")]
-    public float step = 0.01f;
-    public float maxStepDistance = 0.06f;
-    [HideInInspector] public Vector3 swayPos;
+    private const float SWAY_POSITION_STEP = 0.01f;
+    private const float MAX_SWAY_POSITION = 0.06f;
+    private const float SWAY_ROTATION_STEP = 4f;
+    private const float MAX_SWAY_ROTATION = 5f;
+    private const float AIM_MOVE_ROTATION_AMOUNT = 1.5f;
+    private const float AIM_MOVE_ROTATION_SPEED = 5f;
+    private const float POSITION_SMOOTH_SPEED = 10f;
+    private const float ROTATION_SMOOTH_SPEED = 12f;
+    private const float CROUCH_SHAKE_DURATION = 0.1f;
+    private const float CROUCH_SHAKE_INTENSITY = 2f;
+    private const float AIRBORNE_POSITION_OFFSET = 0.01f;
 
-    [Header("Aiming Movement Rotation")]
-    public float aimMoveRotationAmount = 5f;
-    public float aimMoveRotationSpeed = 5f;
+    private static readonly Vector3 TRAVEL_LIMIT = new Vector3(0.025f, 0.025f, 0.025f);
+    private static readonly Vector3 BOB_LIMIT = new Vector3(0.01f, 0.01f, 0.01f);
 
-    [Header("Sway Rotation")]
-    public float rotationStep = 4f;
-    public float maxRotationStep = 5f;
-    [HideInInspector] public Vector3 swayEulerRot;
-    public float smooth = 10f;
-    private float smoothRot = 12f;
-
-    [Header("Bobbing")]
-    public float speedCurve;
-    public Vector3 travelLimit = Vector3.one * 0.025f;
-    public Vector3 bobLimit = Vector3.one * 0.01f;
-    public float bobExaggeration;
-
-    [HideInInspector] public float[] vector3Values = new float[3];
-    [HideInInspector] public float[] quaternionValues = new float[3];
-
-    private PlayerController playerController;
-    private Transform myTransform;
-
-    // Player state cache
-    private bool isAiming;
-    private bool isSprinting;
-    private bool isGrounded;
-    private bool isCrouched;
-    private bool isReloading;
-    private bool isFiring;
-    private bool isRolling;
-    private bool isProne;
-
-    private Quaternion initialRotation;
-    private Vector3 initialPosition;
-    private Vector3 initialVector3;
-    private bool isRestarted;
-    private Vector2 lookInput;
-    private Vector3 shakeOffset = Vector3.zero;
-    private Vector3 bobPosition;
-    private Vector3 bobEulerRotation;
-    private Vector2 walkInput;
-    private float CurveSin => Mathf.Sin(speedCurve);
-    private float CurveCos => Mathf.Cos(speedCurve);
-    private const float MaxPositionSprinting = 1f;
-    private float currentPositionSprinting;
-    private int sprintDirection = 1;
-    private Quaternion sprintTargetWeaponRotation;
-    private Vector3 sprintTargetWeaponPosition;
+    // Configuração da arma atual.
     private float bobWalkExaggeration;
     private float bobSprintExaggeration;
     private float bobCrouchExaggeration;
-    private float bobAimExaggeration;
     private Vector3 walkMultiplier;
     private Vector3 sprintMultiplier;
-    private Vector3 aimMultiplier;
     private Vector3 crouchMultiplier;
-    private Vector3 currentMultiplier;
+    private Vector3 storePosition;
+    private Quaternion storeRotation;
 
-    private const int YRotationMultiplier = 1;
-    private const int ZRotationMultiplier = 1;
-    private const int XRotationMultiplier = 1;
+    // Estado e pose base.
+    private bool isInitialized;
+    private bool canUseStoredPose;
+    private Vector3 initialPosition;
+    private Quaternion initialRotation;
+    private Vector3 baseTargetPosition;
+    private Quaternion baseTargetRotation;
+    private Vector3 defaultMovementMultiplier;
+    private Vector3 currentMovementMultiplier;
+
+    // Offset externo composto com sway/bob. Apenas este script escreve no Transform.
+    private Vector3 visualRecoilPositionOffset;
+    private Quaternion visualRecoilRotationOffset = Quaternion.identity;
+
+    // Entradas e offsets calculados a cada frame.
+    private Vector2 lookInput;
+    private Vector2 walkInput;
+    private Vector3 swayPos;
+    private Vector3 swayEulerRot;
+    private Vector3 bobPosition;
+    private Vector3 bobEulerRotation;
+    private Vector3 shakeOffset;
+    private float speedCurve;
+    private float bobExaggeration;
+    private bool lookInputBlocked;
 
     #region Unity Lifecycle
     private void Awake()
     {
-        isRestarted = false;
         initialRotation = transform.localRotation;
         initialPosition = transform.localPosition;
-        myTransform = transform;
+        baseTargetRotation = initialRotation;
+        baseTargetPosition = initialPosition;
     }
 
     private void Update()
     {
-        if (!isRestarted) return;
-
-        CachePlayerProperties();
+        if (!isInitialized) return;
 
         if (ShouldApplyDeadState())
         {
@@ -95,225 +78,193 @@ public class SwayNBobScript : MonoBehaviour
             return;
         }
 
-        UpdateBobMultipliers();
-        HandleSprinting();
-
-        StoreWeapon();
+        UpdateInputs();
+        UpdateMovementProfile();
+        UpdateStoredPoseTargets();
         UpdateSwayRotation();
-        UpdateSway();
+        UpdateSwayPosition();
         UpdateBobOffset();
         UpdateBobRotation();
-        UpdateCompositePositionRotation();
+        ApplyCompositeTransform();
     }
     #endregion
 
     #region Public Methods
-    public void Restart(
-        float bobWalkExaggeration,
-        float bobSprintExaggeration,
-        float bobCrouchExaggeration,
-        float bobAimExaggeration,
-        Vector3 walkMultiplier,
-        Vector3 sprintMultiplier,
-        Vector3 aimMultiplier,
-        Vector3 crouchMultiplier,
-        float[] vector3Values,
-        float[] quaternionValues)
+    /// <summary>Configura o sway e o bob para a arma atualmente equipada.</summary>
+    public void Restart(SwayAndBobValues values)
     {
-        this.bobWalkExaggeration = bobWalkExaggeration;
-        this.bobSprintExaggeration = bobSprintExaggeration;
-        this.bobCrouchExaggeration = bobCrouchExaggeration;
-        this.bobAimExaggeration = bobAimExaggeration;
-        this.walkMultiplier = walkMultiplier;
-        this.sprintMultiplier = sprintMultiplier;
-        this.aimMultiplier = aimMultiplier;
-        this.crouchMultiplier = crouchMultiplier;
-        this.vector3Values = vector3Values;
-        this.quaternionValues = quaternionValues;
+        bobWalkExaggeration = values.bobWalkExaggeration;
+        bobSprintExaggeration = values.bobSprintExaggeration;
+        bobCrouchExaggeration = values.bobCrouchExaggeration;
+        walkMultiplier = values.walkMultiplier;
+        sprintMultiplier = values.sprintMultiplier;
+        crouchMultiplier = values.crouchMultiplier;
+        storePosition = values.storePosition;
+        storeRotation = values.storeRotation;
 
-        switchWeapon = GetComponent<SwitchWeapon>();
-        playerController = GetComponentInParent<PlayerController>();
-        playerProperties = GetComponentInParent<PlayerProperties>();
+        currentMovementMultiplier = walkMultiplier;
+        defaultMovementMultiplier = walkMultiplier;
+        baseTargetPosition = initialPosition;
+        baseTargetRotation = initialRotation;
+        ResetVisualRecoilOffset();
 
-        currentMultiplier = this.walkMultiplier;
-        initialVector3 = currentMultiplier;
-        sprintTargetWeaponRotation = initialRotation;
-
-        isRestarted = true;
+        isInitialized = true;
     }
+
+    public void SetVisualRecoilOffset(Vector3 positionOffset, Quaternion rotationOffset)
+    {
+        visualRecoilPositionOffset = positionOffset;
+        visualRecoilRotationOffset = rotationOffset;
+    }
+
+    public void ResetVisualRecoilOffset()
+    {
+        visualRecoilPositionOffset = Vector3.zero;
+        visualRecoilRotationOffset = Quaternion.identity;
+    }
+
+    public void SetLookInputBlocked(bool blocked) => lookInputBlocked = blocked;
 
     public IEnumerator CrouchWeaponShake()
     {
         float elapsed = 0f;
-        float duration = 0.1f;
 
-        while (elapsed < duration)
+        while (elapsed < CROUCH_SHAKE_DURATION)
         {
             float crouchTime = Time.time * 5f;
-            float intensity = 2f;
-
-            shakeOffset = new Vector3(
-                (Mathf.PerlinNoise(crouchTime * 1.2f, 0f) * 2f - 1f) * 3f * intensity,
-                ((Mathf.PerlinNoise(0f, crouchTime * 1.5f) * 2f - 1f) * 0.4f +
-                 (Mathf.Sin(crouchTime * 3f) * 0.6f)) * 0.8f * intensity,
-                (Mathf.PerlinNoise(crouchTime * 0.8f, crouchTime * 0.8f) * 2f - 1f) * 0.7f * intensity
-            );
+            shakeOffset = CalculateCrouchShake(crouchTime);
 
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        float returnTime = Mathf.Min(0.1f, duration * 0.5f);
+        float returnTime = CROUCH_SHAKE_DURATION * 0.5f;
         elapsed = 0f;
-        Vector3 startingShake = shakeOffset;
+        Vector3 startingShakeOffset = shakeOffset;
 
         while (elapsed < returnTime)
         {
             float t = elapsed / returnTime;
-            shakeOffset = Vector3.Lerp(startingShake, Vector3.zero, t);
+            shakeOffset = Vector3.Lerp(startingShakeOffset, Vector3.zero, t);
             elapsed += Time.deltaTime;
             yield return null;
         }
 
         shakeOffset = Vector3.zero;
     }
+
+    private static Vector3 CalculateCrouchShake(float time)
+    {
+        float x = (Mathf.PerlinNoise(time * 1.2f, 0f) * 2f - 1f) * 3f;
+        float y = ((Mathf.PerlinNoise(0f, time * 1.5f) * 2f - 1f) * 0.4f +
+                   Mathf.Sin(time * 3f) * 0.6f) * 0.8f;
+        float z = (Mathf.PerlinNoise(time * 0.8f, time * 0.8f) * 2f - 1f) * 0.7f;
+
+        return new Vector3(x, y, z) * CROUCH_SHAKE_INTENSITY;
+    }
+
+    public void EnableStoreWeapon(bool enabled)
+    {
+        canUseStoredPose = enabled;
+
+        if (!enabled)
+        {
+            baseTargetPosition = initialPosition;
+            baseTargetRotation = initialRotation;
+        }
+    }
     #endregion
 
     #region State Management
-    private void CachePlayerProperties()
-    {
-        isAiming = playerProperties.is_aiming;
-        isSprinting = playerProperties.sprinting;
-        isGrounded = playerProperties.isGrounded;
-        isCrouched = playerProperties.crouched;
-        isReloading = playerProperties.is_reloading;
-        isFiring = playerProperties.is_firing;
-        isProne = playerProperties.is_proned;
-        isRolling = playerProperties.roll;
-    }
-
     private bool ShouldApplyDeadState()
     {
-        return playerProperties.is_dead.Value ||
+        return playerProperties.isDead.Value ||
                playerProperties.isProneTransition ||
-               playerProperties.is_composing_bullets;
+               playerProperties.isComposingBullets;
     }
 
     private void ApplyDeadState()
     {
         Quaternion deadRotation = Quaternion.Euler(40f, 0f, 0f);
-        myTransform.localRotation = Quaternion.Lerp(
-            myTransform.localRotation,
+        transform.localRotation = Quaternion.Lerp(
+            transform.localRotation,
             deadRotation,
-            Time.deltaTime * smoothRot
+            Time.deltaTime * ROTATION_SMOOTH_SPEED
         );
     }
     #endregion
 
-    #region Bob Multipliers Logic
-    private void UpdateBobMultipliers()
+    #region Movement Profile
+    private void UpdateMovementProfile()
     {
-        bool isSprintingActive = playerProperties.sprinting &&
-                                 !switchWeapon._switch &&
-                                 !playerProperties.is_aiming &&
-                                 !playerProperties.is_proned &&
-                                 !playerProperties.roll &&
-                                 !playerProperties.isProneTransition;
-
-        if (isSprintingActive)
+        if (CanUseSprintProfile())
         {
             bobExaggeration = bobSprintExaggeration;
-            currentMultiplier = sprintMultiplier;
+            currentMovementMultiplier = sprintMultiplier;
         }
         else
         {
-            currentPositionSprinting = 0f;
             bobExaggeration = bobWalkExaggeration;
-            sprintTargetWeaponPosition = initialPosition;
-            sprintTargetWeaponRotation = initialRotation;
-            currentMultiplier = initialVector3;
+            currentMovementMultiplier = defaultMovementMultiplier;
         }
 
-        bool isCrouchingOrProne = (playerProperties.crouched || playerProperties.is_proned) &&
-                                  !playerProperties.sprinting;
+        bool isCrouchingOrProne = (playerProperties.crouched || playerProperties.proned) && !playerProperties.sprinting;
 
-        if (isCrouchingOrProne || playerProperties.is_aiming)
+        if (isCrouchingOrProne || playerProperties.aiming)
         {
             bobExaggeration = bobCrouchExaggeration;
-            currentMultiplier = crouchMultiplier;
+            currentMovementMultiplier = crouchMultiplier;
         }
 
-        bool isNotMoving = Mathf.Approximately(playerController.moveForward, 0f) &&
-                          Mathf.Approximately(playerController.moveHorizontal, 0f);
-
-        if (isNotMoving)
+        if (IsPlayerStationary())
         {
             bobExaggeration = 0f;
-            sprintTargetWeaponPosition = initialPosition;
-            sprintTargetWeaponRotation = initialRotation;
-            currentMultiplier = new Vector3(0.1f, 0.1f, 0.1f);
-        }
-
-        bool isAimingAndMoving = playerProperties.is_aiming && !isNotMoving;
-
-        if (isAimingAndMoving)
-        {
-            bobExaggeration = bobAimExaggeration;
-            currentMultiplier = aimMultiplier;
+            currentMovementMultiplier = Vector3.one * 0.1f;
         }
     }
+
+    private bool CanUseSprintProfile()
+    {
+        return playerProperties.sprinting &&
+               !IsSwitchingWeapon() &&
+               !playerProperties.aiming &&
+               !playerProperties.proned &&
+               !playerProperties.roll &&
+               !playerProperties.isProneTransition;
+    }
+
+    private bool IsPlayerStationary() =>
+        Mathf.Approximately(playerController.moveForward, 0f) &&
+        Mathf.Approximately(playerController.moveHorizontal, 0f);
     #endregion
 
-    #region Sprinting Logic
-    private void HandleSprinting()
+    #region Stored Pose
+    private void UpdateStoredPoseTargets()
     {
-        if (!playerProperties.sprinting || playerProperties.is_firing) return;
+        bool isSwitchingWeapon = IsSwitchingWeapon();
+        bool isSprintOrRollActive = playerProperties.sprinting || playerProperties.roll;
+        bool canEnterStoredPose = isSprintOrRollActive &&
+                                  !playerProperties.reloading &&
+                                  !playerProperties.firing;
+        bool isSettingsMenuOpen = SettingsHUD.Instance != null && SettingsHUD.Instance.is_menu_settings_active;
 
-        currentPositionSprinting += sprintDirection * Time.deltaTime * 8f;
+        bool shouldUseStoredPose = canUseStoredPose &&
+                                   !isSwitchingWeapon &&
+                                   (canEnterStoredPose || isSettingsMenuOpen);
 
-        if (!isGrounded)
+        if (shouldUseStoredPose)
         {
-            currentPositionSprinting = 0f;
-            return;
-        }
-
-        if (currentPositionSprinting >= MaxPositionSprinting)
-        {
-            currentPositionSprinting = MaxPositionSprinting;
-            sprintDirection = -1;
-        }
-        else if (currentPositionSprinting <= -MaxPositionSprinting)
-        {
-            currentPositionSprinting = -MaxPositionSprinting;
-            sprintDirection = 1;
-        }
-    }
-
-    private void StoreWeapon()
-    {
-        bool shouldStoreWeapon = (playerProperties.sprinting || playerProperties.roll) &&
-                                 !playerProperties.is_reloading &&
-                                 !playerProperties.is_firing;
-
-        if (shouldStoreWeapon || SettingsHUD.Instance.is_menu_settings_active)
-        {
-            sprintTargetWeaponPosition = initialPosition + new Vector3(
-                vector3Values[0],
-                vector3Values[1],
-                vector3Values[2]
-            );
-            sprintTargetWeaponRotation = initialRotation * Quaternion.Euler(
-                quaternionValues[0],
-                quaternionValues[1],
-                quaternionValues[2]
-            );
+            baseTargetPosition = initialPosition + storePosition;
+            baseTargetRotation = initialRotation * storeRotation;
         }
         else
         {
-            sprintTargetWeaponPosition = initialPosition;
-            sprintTargetWeaponRotation = initialRotation;
+            baseTargetPosition = initialPosition;
+            baseTargetRotation = initialRotation;
         }
     }
+
+    private bool IsSwitchingWeapon() => switchWeapon != null && switchWeapon.IsSwitchingWeapon;
     #endregion
 
     #region Input Handling
@@ -323,25 +274,31 @@ public class SwayNBobScript : MonoBehaviour
         walkInput.y = playerController.moveForward;
         walkInput.Normalize();
 
+        if (lookInputBlocked)
+        {
+            lookInput = Vector2.zero;
+            return;
+        }
+
         lookInput.x = -InputManager.GetAxis("Mouse X");
         lookInput.y = InputManager.GetAxis("Mouse Y");
     }
     #endregion
 
     #region Sway Logic
-    private void UpdateSway()
+    private void UpdateSwayPosition()
     {
-        Vector3 invertedLook = (lookInput * -step).normalized;
-        invertedLook.x = Mathf.Clamp(invertedLook.x, -maxStepDistance, maxStepDistance);
-        invertedLook.y = Mathf.Clamp(invertedLook.y, -maxStepDistance, maxStepDistance);
+        Vector3 invertedLook = (lookInput * -SWAY_POSITION_STEP).normalized;
+        invertedLook.x = Mathf.Clamp(invertedLook.x, -MAX_SWAY_POSITION, MAX_SWAY_POSITION);
+        invertedLook.y = Mathf.Clamp(invertedLook.y, -MAX_SWAY_POSITION, MAX_SWAY_POSITION);
         swayPos = invertedLook;
     }
 
     private void UpdateSwayRotation()
     {
-        Vector2 invertedLook = (lookInput * -rotationStep).normalized;
-        invertedLook.x = Mathf.Clamp(invertedLook.x, -maxRotationStep, maxRotationStep);
-        invertedLook.y = Mathf.Clamp(invertedLook.y, -maxRotationStep, maxRotationStep);
+        Vector2 invertedLook = (lookInput * -SWAY_ROTATION_STEP).normalized;
+        invertedLook.x = Mathf.Clamp(invertedLook.x, -MAX_SWAY_ROTATION, MAX_SWAY_ROTATION);
+        invertedLook.y = Mathf.Clamp(invertedLook.y, -MAX_SWAY_ROTATION, MAX_SWAY_ROTATION);
         swayEulerRot = new Vector3(invertedLook.y, invertedLook.x, invertedLook.x).normalized;
     }
     #endregion
@@ -349,75 +306,71 @@ public class SwayNBobScript : MonoBehaviour
     #region Bobbing Logic
     private void UpdateBobOffset()
     {
-        float movementInput = (Mathf.Abs(InputManager.GetAxis("Vertical")) > 0.01f ||
-                               Mathf.Abs(InputManager.GetAxis("Horizontal")) > 0.01f) ? 1f : 0f;
+        float verticalInput = InputManager.GetAxis("Vertical");
+        float horizontalInput = InputManager.GetAxis("Horizontal");
+        bool hasMovementInput = Mathf.Abs(verticalInput) > 0.01f || Mathf.Abs(horizontalInput) > 0.01f;
+        float groundedMultiplier = playerProperties.grounded ? 1f : 0f;
 
-        float deltaTime = Time.deltaTime;
-        speedCurve += deltaTime * (isGrounded ? movementInput * bobExaggeration : 1f) + 0.005f;
+        float bobSpeed = playerProperties.grounded
+            ? (hasMovementInput ? bobExaggeration : 0f)
+            : 1f;
 
-        float cosCurve = CurveCos;
-        float sinCurve = CurveSin;
-        float groundedMultiplier = isGrounded ? 1f : 0f;
+        speedCurve += Time.deltaTime * bobSpeed + 0.005f;
 
-        bobPosition.x = (cosCurve * bobLimit.x * groundedMultiplier) - (walkInput.x * travelLimit.x);
-        bobPosition.y = (sinCurve * bobLimit.y) - (InputManager.GetAxis("Vertical") * travelLimit.y);
-        bobPosition.z = -(walkInput.y * travelLimit.z);
+        float cosCurve = Mathf.Cos(speedCurve);
+        float sinCurve = Mathf.Sin(speedCurve);
+
+        bobPosition.x = (cosCurve * BOB_LIMIT.x * groundedMultiplier) - (walkInput.x * TRAVEL_LIMIT.x);
+        bobPosition.y = (sinCurve * BOB_LIMIT.y) - (verticalInput * TRAVEL_LIMIT.y);
+        bobPosition.z = -(walkInput.y * TRAVEL_LIMIT.z);
     }
 
     private void UpdateBobRotation()
     {
         bool isMoving = walkInput != Vector2.zero;
         float sin2x = Mathf.Sin(2f * speedCurve);
-        float cosCurve = CurveCos;
+        float cosCurve = Mathf.Cos(speedCurve);
 
-        bobEulerRotation.x = currentMultiplier.x * sin2x * (isMoving ? 1f : 0.5f);
-        bobEulerRotation.y = isMoving ? currentMultiplier.y * cosCurve : 0f;
-        bobEulerRotation.z = isMoving ? currentMultiplier.z * cosCurve * walkInput.x : 0f;
+        bobEulerRotation.x = currentMovementMultiplier.x * sin2x * (isMoving ? 1f : 0.5f);
+        bobEulerRotation.y = isMoving ? currentMovementMultiplier.y * cosCurve : 0f;
+        bobEulerRotation.z = isMoving ? currentMovementMultiplier.z * cosCurve * walkInput.x : 0f;
     }
     #endregion
 
     #region Composite Position & Rotation
-    private void UpdateCompositePositionRotation()
+    private void ApplyCompositeTransform()
     {
-        UpdateInputs();
-
-        float deltaTime = Time.deltaTime;
-        float clampedX = Mathf.Clamp(lookInput.x, -5f, 5f);
-        float clampedY = Mathf.Clamp(lookInput.y, -5f, 5f);
-
-        float enhancedYRotation = clampedX * YRotationMultiplier;
-        float enhancedZRotation = clampedX * ZRotationMultiplier;
-        float enhancedXRotation = clampedY * XRotationMultiplier;
+        float yawOffset = Mathf.Clamp(lookInput.x, -5f, 5f);
+        float rollOffset = yawOffset;
+        float pitchOffset = Mathf.Clamp(lookInput.y, -5f, 5f);
 
         float verticalAimMoveRotation = CalculateAimMoveRotation();
-
-        Quaternion combinedRotation = CalculateCombinedRotation(enhancedXRotation, verticalAimMoveRotation);
+        Quaternion combinedRotation = CalculateCombinedRotation(verticalAimMoveRotation);
         Vector3 combinedPosition = CalculateCombinedPosition();
 
         combinedRotation *= Quaternion.Euler(shakeOffset);
 
-        if (!isGrounded) ApplyAirborneState(deltaTime, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
-        else ApplyGroundedState(deltaTime, enhancedXRotation, enhancedYRotation, enhancedZRotation, combinedRotation, combinedPosition);
+        if (playerProperties.grounded)
+            ApplyGroundedTransform(pitchOffset, yawOffset, rollOffset, combinedRotation, combinedPosition);
+        else
+            ApplyAirborneTransform(yawOffset, rollOffset, combinedRotation, combinedPosition);
     }
     #endregion
 
     #region Aim Movement Rotation
     private float CalculateAimMoveRotation()
     {
-        if (!isAiming) return 0f;
+        if (!playerProperties.aiming) return 0f;
 
-        bool isMoving = !Mathf.Approximately(playerController.moveForward, 0f) ||
-                       !Mathf.Approximately(playerController.moveHorizontal, 0f);
+        if (IsPlayerStationary() ||
+            playerProperties.sprinting ||
+            playerProperties.reloading ||
+            playerProperties.roll) return 0f;
 
-        if (!isMoving || isSprinting || isReloading || isRolling) return 0f;
+        float sinTime = Mathf.Sin(Time.time * AIM_MOVE_ROTATION_SPEED);
+        float rotation = sinTime * AIM_MOVE_ROTATION_AMOUNT;
 
-        float sinTime = Mathf.Sin(Time.time * aimMoveRotationSpeed);
-        float rotation = sinTime * aimMoveRotationAmount;
-
-        if (isCrouched || isProne)
-        {
-            rotation *= 0.5f;
-        }
+        if (playerProperties.crouched || playerProperties.proned) rotation *= 0.5f;
 
         return rotation;
     }
@@ -426,90 +379,102 @@ public class SwayNBobScript : MonoBehaviour
 
     #region Combined Calculation
 
-    private Quaternion CalculateCombinedRotation(float enhancedXRotation, float verticalAimMoveRotation)
+    private Quaternion CalculateCombinedRotation(float verticalAimMoveRotation)
     {
-        Quaternion baseRotation;
-
-        if (!isAiming)
+        if (!playerProperties.aiming)
         {
-            baseRotation = sprintTargetWeaponRotation *
-                          Quaternion.Euler(swayEulerRot) *
-                          Quaternion.Euler(bobEulerRotation);
-        }
-        else
-        {
-            float divisor = isFiring ? 20f : 5f;
-
-            Vector3 aimingRotation = swayEulerRot / divisor;
-            aimingRotation.x += verticalAimMoveRotation;
-
-            baseRotation = sprintTargetWeaponRotation *
-                          Quaternion.Euler(aimingRotation) *
-                          Quaternion.Euler(bobEulerRotation / divisor);
+            return baseTargetRotation *
+                   Quaternion.Euler(swayEulerRot) *
+                   Quaternion.Euler(bobEulerRotation);
         }
 
-        return baseRotation;
+        float divisor = playerProperties.firing ? 20f : 5f;
+        Vector3 aimingRotation = swayEulerRot / divisor;
+        aimingRotation.x += verticalAimMoveRotation;
+
+        return baseTargetRotation *
+               Quaternion.Euler(aimingRotation) *
+               Quaternion.Euler(bobEulerRotation / divisor);
     }
 
     private Vector3 CalculateCombinedPosition()
     {
-        if (!isAiming) return sprintTargetWeaponPosition + swayPos + bobPosition;
+        if (!playerProperties.aiming) return baseTargetPosition + swayPos + bobPosition;
 
-        float divisor = isFiring ? 20f : 5f;
-        return sprintTargetWeaponPosition + (swayPos / divisor) + (bobPosition / divisor);
+        float divisor = playerProperties.firing ? 20f : 5f;
+        return baseTargetPosition + (swayPos / divisor) + (bobPosition / divisor);
     }
-
     #endregion
 
     #region State Application
-
-    private void ApplyAirborneState(
-        float deltaTime,
-        float enhancedYRotation,
-        float enhancedZRotation,
+    private void ApplyAirborneTransform(
+        float yawOffset,
+        float rollOffset,
         Quaternion combinedRotation,
         Vector3 combinedPosition)
     {
         float tiltAmount = InputManager.GetAxis("Horizontal") * 10f;
-        Quaternion targetRotation = Quaternion.Euler(15f, enhancedYRotation, -tiltAmount + enhancedZRotation);
-
-        myTransform.localRotation = Quaternion.Lerp(
-            myTransform.localRotation,
-            combinedRotation * targetRotation,
-            deltaTime * smoothRot
+        Quaternion targetRotation = Quaternion.Euler(15f, yawOffset, -tiltAmount + rollOffset);
+        Vector3 targetPosition = new Vector3(
+            combinedPosition.x,
+            combinedPosition.y - AIRBORNE_POSITION_OFFSET,
+            combinedPosition.z
         );
 
-        myTransform.localPosition = Vector3.Lerp(
-            myTransform.localPosition,
-            new Vector3(combinedPosition.x, combinedPosition.y - 0.01f, combinedPosition.z),
-            deltaTime * smooth
-        );
+        ApplyTransform(
+            targetPosition + visualRecoilPositionOffset,
+            combinedRotation * targetRotation * visualRecoilRotationOffset);
     }
 
-    private void ApplyGroundedState(
-        float deltaTime,
-        float enhancedXRotation,
-        float enhancedYRotation,
-        float enhancedZRotation,
+    private void ApplyGroundedTransform(
+        float pitchOffset,
+        float yawOffset,
+        float rollOffset,
         Quaternion combinedRotation,
         Vector3 combinedPosition)
     {
-        Quaternion targetRotation = isFiring
-            ? Quaternion.Euler(enhancedXRotation / 8f, enhancedYRotation, -enhancedZRotation)
-            : Quaternion.Euler(enhancedXRotation, enhancedYRotation, -enhancedZRotation);
+        Quaternion targetRotation = playerProperties.firing
+            ? Quaternion.Euler(pitchOffset / 8f, yawOffset, -rollOffset)
+            : Quaternion.Euler(pitchOffset, yawOffset, -rollOffset);
 
-        myTransform.localRotation = Quaternion.Lerp(
-            myTransform.localRotation,
-            combinedRotation * targetRotation,
-            deltaTime * smoothRot
+        ApplyTransform(
+            combinedPosition + visualRecoilPositionOffset,
+            combinedRotation * targetRotation * visualRecoilRotationOffset);
+    }
+
+    private void ApplyTransform(Vector3 targetPosition, Quaternion targetRotation)
+    {
+        transform.localRotation = Quaternion.Lerp(
+            transform.localRotation,
+            targetRotation,
+            Time.deltaTime * ROTATION_SMOOTH_SPEED
         );
 
-        myTransform.localPosition = Vector3.Lerp(
-            myTransform.localPosition,
-            combinedPosition,
-            deltaTime * smooth
+        transform.localPosition = Vector3.Lerp(
+            transform.localPosition,
+            targetPosition,
+            Time.deltaTime * POSITION_SMOOTH_SPEED
         );
+    }
+    #endregion
 
+    #region Structs
+    [System.Serializable]
+    public struct SwayAndBobValues
+    {
+        [Header("Sway Exaggeration")]
+        public float bobWalkExaggeration;
+        public float bobSprintExaggeration;
+        public float bobCrouchExaggeration;
+
+        [Header("Sway Multipliers")]
+        public Vector3 walkMultiplier;
+        public Vector3 sprintMultiplier;
+        public Vector3 crouchMultiplier;
+
+        [Header("Stored Pose")]
+        public Vector3 storePosition;
+        public Quaternion storeRotation;
     }
     #endregion
 }

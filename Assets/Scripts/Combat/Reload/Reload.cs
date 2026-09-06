@@ -9,6 +9,8 @@ namespace ProcessReload
         public class ReloadValues
         {
             public bool isSingleReload;
+            [Tooltip("Uses the special last-round reload, including extra ammunition, the Reload2 animation, and additional time.")]
+            public bool useLastBulletReload;
             public float timeToTransferAmmo;
             public float reloadTime;
             public int magCount;
@@ -24,6 +26,7 @@ namespace ProcessReload
             }
 
             public int GetCurrentMagAmmo() => mags.Count > 0 ? mags[^1] : 0;
+            public int GetCurrentMagCapacity() => bulletsPerMag + (!isSingleReload && useLastBulletReload ? 1 : 0);
             public int GetTotalReserveAmmo()
             {
                 int total = 0;
@@ -35,7 +38,7 @@ namespace ProcessReload
             }
 
             public bool IsMagazineEmpty() => GetCurrentMagAmmo() == 0;
-            public bool IsMagazineFull() => GetCurrentMagAmmo() >= bulletsPerMag;
+            public bool IsMagazineFull() => GetCurrentMagAmmo() >= GetCurrentMagCapacity();
 
             public int FindMagazineWithMostAmmo()
             {
@@ -49,6 +52,23 @@ namespace ProcessReload
                         index = i;
                     }
                 }
+                return index;
+            }
+
+            public int FindReserveMagazineWithMostAmmo()
+            {
+                int max = 0;
+                int index = -1;
+
+                for (int i = 0; i < mags.Count - 1; i++)
+                {
+                    if (mags[i] > max)
+                    {
+                        max = mags[i];
+                        index = i;
+                    }
+                }
+
                 return index;
             }
 
@@ -91,6 +111,8 @@ namespace ProcessReload
 
         public static class ReloadLogic
         {
+            public const float MIN_RELOAD_TIME = 0.01f;
+
             public struct ReloadResult
             {
                 public bool isReloading;
@@ -108,11 +130,7 @@ namespace ProcessReload
                 return true;
             }
 
-            public static ReloadResult ProcessStandardReload(
-                ReloadValues reloadValues,
-                float currentCooldown,
-                float deltaTime,
-                bool isLastBullet)
+            public static ReloadResult ProcessStandardReload(ReloadValues reloadValues, float currentCooldown, float deltaTime, bool isLastBullet)
             {
                 ReloadResult result = new ReloadResult
                 {
@@ -135,6 +153,22 @@ namespace ProcessReload
                 return result;
             }
 
+            public static void TransferMagazineAmmoSingleReload(ReloadValues reloadValues)
+            {
+                if (reloadValues.mags.Count < 2)
+                    return;
+
+                int maxIndex = reloadValues.FindReserveMagazineWithMostAmmo();
+                if (maxIndex < 0) return;
+
+                // Garante que o pente com mais munição tenha pelo menos 1 bala para transferir
+                if (reloadValues.mags[maxIndex] > 0)
+                {
+                    reloadValues.mags[maxIndex] -= 1; // Remove apenas 1 do pente com mais munição
+                    reloadValues.mags[^1] += 1;       // Adiciona apenas 1 ao pente atual
+                }
+            }
+
             public static void TransferMagazineAmmo(ReloadValues reloadValues, bool isLastBullet)
             {
                 if (reloadValues.mags.Count < 2)
@@ -151,28 +185,17 @@ namespace ProcessReload
 
                 if (!isLastBullet) reloadValues.mags[maxIndex] = temp;
                 else reloadValues.mags[maxIndex] = 0;
-                
-            }
 
-            public static bool ProcessSingleReload(
-                ReloadValues reloadValues,
-                bool isReloading,
-                bool canReload,
-                bool isFiring,
-                out bool shouldContinueReloading)
-            {
-                shouldContinueReloading = false;
-
-                if (!isReloading || !canReload || isFiring)return false;
-                if (reloadValues.IsMagazineFull()) return false;
-
-                shouldContinueReloading = true;
-                return true;
+                if (reloadValues.useLastBulletReload && !isLastBullet && reloadValues.mags[maxIndex] > 0)
+                {
+                    reloadValues.mags[maxIndex] -= 1;
+                    reloadValues.mags[^1] += 1;
+                }
             }
 
             public static void TransferBulletBetweenMags(ReloadValues reloadValues)
             {
-                if (reloadValues.mags.Count < 2)return;
+                if (reloadValues.mags.Count < 2) return;
 
                 int fromIndex = reloadValues.FindMagazineWithLeastAmmo();
                 int toIndex = reloadValues.FindMagazineWithMostSpace();
@@ -195,19 +218,19 @@ namespace ProcessReload
             public static float CalculateReloadTime(ReloadValues reloadValues, bool isEmpty)
             {
                 float totalTime = reloadValues.reloadTime;
-                if (isEmpty) totalTime += Weapon.LAST_MAG_RELOAD_TIMER_INCREASER;
-                
-                return totalTime;
+                if (reloadValues.useLastBulletReload && isEmpty)
+                    totalTime += Weapon.LAST_MAG_RELOAD_TIMER_INCREASER;
+
+                return Mathf.Max(MIN_RELOAD_TIME, totalTime);
             }
 
             public static bool IsReloadPossible(ReloadValues reloadValues)
             {
-                if (reloadValues.mags.Count < 2)return false;
+                if (reloadValues.mags.Count < 2) return false;
 
                 int reserveAmmo = reloadValues.GetTotalReserveAmmo();
-                int currentAmmo = reloadValues.GetCurrentMagAmmo();
 
-                return reserveAmmo > 0 && currentAmmo < reloadValues.bulletsPerMag;
+                return reserveAmmo > 0 && !reloadValues.IsMagazineFull();
             }
         }
     }

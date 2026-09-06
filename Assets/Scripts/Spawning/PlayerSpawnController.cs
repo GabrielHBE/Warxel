@@ -36,7 +36,9 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         Infantary,
         Vehicle,
     }
-    protected override void Awake() => StartCoroutine(FindSpawnCameraPosition());
+
+
+    protected override void Awake() { }
     private IEnumerator FindSpawnCameraPosition()
     {
         // Tenta encontrar o GameObject por alguns frames
@@ -58,11 +60,11 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         {
             transform.position = map_spawn_camera_pos.position;
             transform.rotation = map_spawn_camera_pos.rotation;
-            Debug.Log("[PlayerSpawnController] SpawnCameraPos encontrado!");
+            Debug.Log("[PlayerSpawnController] SpawnCameraPos found!");
         }
         else
         {
-            Debug.LogError("[PlayerSpawnController] SpawnCameraPos NÃO encontrado! Verifique se o GameObject existe na cena com a tag correta.");
+            Debug.LogError("[PlayerSpawnController] SpawnCameraPos NOT found! Check that the GameObject exists in the scene with the correct tag.");
             // Posição fallback
             transform.position = new Vector3(0, 50, 0);
             transform.rotation = Quaternion.identity;
@@ -72,24 +74,21 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     public override void OnStartClient()
     {
         base.OnStartClient();
-        if (IsOwner)
-        {
-            infantary_spawn_flags = GameObject.FindGameObjectsWithTag("InfantarySpawnFlags");
-            vehicle_spawn_flags = GameObject.FindGameObjectsWithTag("VehicleSpawnFlags");
+        if (IsOwner) InitializeForOwner();
+        else InitializeForNonOwner();
 
-            ToggleFlagsVisibility(vehicle_spawn_flags, false);
-
-            spawn_camera.enabled = true;
-            InitializeForOwner();
-        }
-        else
-        {
-            InitializeForNonOwner();
-        }
     }
 
     private void InitializeForOwner()
     {
+        StartCoroutine(FindSpawnCameraPosition());
+        infantary_spawn_flags = GameObject.FindGameObjectsWithTag("InfantarySpawnFlags");
+        vehicle_spawn_flags = GameObject.FindGameObjectsWithTag("VehicleSpawnFlags");
+
+        ToggleFlagsVisibility(vehicle_spawn_flags, false);
+
+        spawn_camera.enabled = true;
+
         SetInstance();
         original_spawn_delay = reespawn_delay;
         reespawn_delay = 0;
@@ -101,11 +100,7 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         }
     }
 
-    private void InitializeForNonOwner()
-    {
-        gameObject.SetActive(false);
-    }
-
+    private void InitializeForNonOwner() => gameObject.SetActive(false);
 
     private void Update()
     {
@@ -228,11 +223,11 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
         yield return StartCoroutine(TransitionCameraToSpawnPoint(spawn_point));
 
         // O Cliente lê seus próprios dados locais aqui
-        ClassManager.Class playerClass = AccountManager.Instance.selected_class;
-        FactionManager.Faction playerFaction = AccountManager.Instance.faction;
+        ClassManager.Class playerClass = AccountManager.Instance.selectedClass;
+        FactionManager.Faction playerFaction = AccountManager.Instance.selectedFaction;
 
-        if (currentSpawnType == CurrentSpawnType.Infantary) SpawnPlayer(spawn_point.position, spawn_point.rotation, playerClass, playerFaction, AccountManager.Instance.account_name);
-        else SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle, playerClass, playerFaction, AccountManager.Instance.account_name);
+        if (currentSpawnType == CurrentSpawnType.Infantary) SpawnPlayer(spawn_point.position, spawn_point.rotation, playerClass, playerFaction, AccountManager.Instance.accountName);
+        else SpawnPlayerAndVehicle(spawn_point.position, spawn_point.rotation, vehicle, playerClass, playerFaction, AccountManager.Instance.accountName);
 
         OnSpawnFinished();
     }
@@ -313,11 +308,8 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     [TargetRpc]
     private void TargetOnSpawnPlayerComplete(NetworkConnection conn, GameObject spawnedPlayer)
     {
-
         player_instantiated = spawnedPlayer;
         is_respawning = false;
-
-        PlayerController playerController = player_instantiated.GetComponent<PlayerController>();
 
         // Configurações locais do cliente
         SwitchWeapon switchWeapon = player_instantiated.GetComponentInChildren<SwitchWeapon>(true);
@@ -328,22 +320,6 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
             switchWeapon.gadget1 = InfantryLoadoutCustomization.Instance.GetCurrentGadget1();
             switchWeapon.gadget2 = InfantryLoadoutCustomization.Instance.GetCurrentGadget2();
             switchWeapon.Initialize();
-        }
-
-        if (playerController != null)
-        {
-            WeaponProperties[] weaponProperties = player_instantiated.GetComponentsInChildren<WeaponProperties>(true);
-            foreach (WeaponProperties wp in weaponProperties)
-            {
-                wp.Initialize();
-                wp.GetComponent<WeaponHolder>().Initialize();
-
-                foreach (Attatchment a in wp.GetComponentsInChildren<Attatchment>())
-                {
-                    a.Initialize();
-                }
-            }
-
         }
 
         if (spawn_camera != null)

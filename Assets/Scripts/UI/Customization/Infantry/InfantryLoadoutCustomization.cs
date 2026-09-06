@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.AddressableAssets;
+using UnityEngine.Serialization;
 
 public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoadoutCustomization>
 {
@@ -26,7 +27,6 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
     [SerializeField] public Transform currentItemParent;
 
     [Header("UI Elements")]
-    [SerializeField] public TextMeshProUGUI current_battle_coins_indicator;
     [SerializeField] public Button buy_weapon_button;
     [SerializeField] public Image class_selection_image;
     [SerializeField] public Sprite lockedItemImage;
@@ -41,12 +41,17 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
 
     [Header("Weapon Customization Buttons")]
     [SerializeField] public GameObject customizeWeaponButton;
-    [SerializeField] public GameObject customizeWeaponButtonBarrel;
-    [SerializeField] public GameObject customizeWeaponButtonSight;
-    [SerializeField] public GameObject customizeWeaponButtonMag;
-    [SerializeField] public GameObject customizeWeaponButtonGrip;
-    [SerializeField] public GameObject customizeWeaponButtonSideGrip;
-    [SerializeField] public GameObject customizeWeaponButtonErgonomics;
+    [FormerlySerializedAs("customizeWeaponButtonBarrel")]
+    public GameObject customizeWeaponButtonNozzle;
+    public GameObject customizeWeaponButtonBarrel;
+    public GameObject customizeWeaponButtonSight;
+    public GameObject customizeWeaponButtonCantedSight;
+    public GameObject customizeWeaponButtonMag;
+    public GameObject customizeWeaponButtonGrip;
+    public GameObject customizeWeaponButtonSideGrip;
+    public GameObject customizeWeaponButtonErgonomics;
+    [Tooltip("Optional. If not assigned, the attachment reset button will be created at runtime.")]
+    public GameObject resetWeaponAttachmentsButton;
 
     [Header("Layout Settings")]
     [SerializeField] public float classButtonSpacingX = 150f;
@@ -128,7 +133,7 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
         // Verifica se os dados foram carregados corretamente
         if (primaryWeapons == null || primaryWeapons.Length == 0)
         {
-            Debug.LogError("[Loadout] Falha ao carregar Addressables no build!");
+            Debug.LogError("[Loadout] Failed to load Addressables in the build!");
             // Tenta carregar novamente ou usa fallback
             await LoadAllAddressables();
         }
@@ -179,7 +184,7 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
     private void InitializeUIAfterDataLoad()
     {
         // Agora os dados estão carregados, podemos iniciar a UI
-        _selectedClass = AccountManager.Instance.selected_class;
+        _selectedClass = AccountManager.Instance.selectedClass;
 
         classSelectionManager.InitializeUI();
         classSelectionManager.ShowClassSelection();
@@ -232,19 +237,26 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
     public void UpdateWeaponStats(WeaponProperties wp)
     {
         StringBuilder allText = new StringBuilder();
+        AttatchmentManager attachmentManager = wp.GetComponent<AttatchmentManager>();
+        float attachmentPoints = attachmentManager != null
+            ? attachmentManager.CurrentAttachmentPoints
+            : Mathf.Max(0f, wp.currentAttachmentPoints);
 
         allText.AppendLine("Rate of Fire: " + wp.firing.rateOfFire.ToString("F0") + " RPM");
-        allText.AppendLine("ADS Speed: " + wp.ads_speed.ToString("F2") + "s");
-        allText.AppendLine("Player Speed Modifier: " + wp.speed_change.ToString("F0"));
-        allText.AppendLine("Zoom: x" + wp.zoom.ToString("F1"));
+        allText.AppendLine("ADS Speed: " + wp.adsSpeed.ToString("F2") + "s");
+        allText.AppendLine("Player Speed Modifier: " + wp.speedChange.ToString("F0"));
+        Sight s = wp.GetComponentsInChildren<Sight>().FirstOrDefault(sight => !(sight is CantedSight));
+        CantedSight cantedSight = wp.GetComponentInChildren<CantedSight>();
+        string zoomText = s == null ? "--" : s.zoomChanges != null && s.zoomChanges.Length > 0 ? string.Join(" / ", s.zoomChanges) : s.zoomChange.ToString("F1");
+        string cantedZoomText = cantedSight == null ? "--" : cantedSight.zoomChanges != null && cantedSight.zoomChanges.Length > 0 ? string.Join(" / ", cantedSight.zoomChanges) : cantedSight.zoomChange.ToString("F1");
+        allText.AppendLine("Zoom: " + zoomText);
+        allText.AppendLine("Canted Sight Zoom: " + cantedZoomText);
         allText.AppendLine("Fire Modes: " + string.Join(" / ", wp.firing.fireModes));
         allText.AppendLine("Destruction Force: " + wp.projectileValues.destructionRadius.ToString("F0"));
         allText.AppendLine("Damage: " + wp.projectileValues.infantryDamage.ToString("F1"));
-        allText.AppendLine("Minimum Damage: " + wp.projectileValues.minimumDamage.ToString("F1"));
         allText.AppendLine("Vehicle Base Damage: " + wp.projectileValues.vehicleDamage.ToString("F1"));
         allText.AppendLine("Headshot Multiplier: " + wp.projectileValues.headshotMultiplier.ToString("F1"));
-        allText.AppendLine("Damage Dropoff: " + wp.projectileValues.damageDropoff.ToString("F0") + "%");
-        allText.AppendLine("Damage Dropoff Timer: " + wp.projectileValues.damageDropoffTimer.ToString("F2") + "s");
+        AnimationCurve damageCurve = wp.projectileValues.CreateRuntimeDamageCurve();
         allText.AppendLine("Spread Increaser: " + wp.spreadValues.spreadIncreaser.ToString("F2"));
         allText.AppendLine("Max Spread: " + wp.spreadValues.maxSpread.ToString("F2"));
         allText.AppendLine("Horizontal Recoil: " + wp.recoilValues.recoilPattern.Average(v => v.horizontalRecoil.value).ToString("F2"));
@@ -255,10 +267,29 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
         allText.Append("Reload Speed: " + wp.reloadValues.reloadTime.ToString("F2") + "s");
 
         uIUpdateManager.UpdateItemStatusText(allText.ToString());
+        uIUpdateManager.UpdateWeaponStatSliders(wp);
+        uIUpdateManager.UpdateAttachmentPoints(attachmentPoints);
+        uIUpdateManager.UpdateDamageCurveGraph(damageCurve);
+    }
+
+    public void PreviewAttachmentStats(Attatchment attachment)
+    {
+        if (attachment == null || _weaponBeingCustomized == null) return;
+
+        WeaponProperties weaponProperties = _weaponBeingCustomized.GetComponent<WeaponProperties>();
+        if (weaponProperties != null)
+            uIUpdateManager.PreviewAttachmentStats(weaponProperties, attachment);
+    }
+
+    public void ClearAttachmentStatsPreview()
+    {
+        if (uIUpdateManager != null) uIUpdateManager.ClearAttachmentStatsPreview();
     }
 
     public GameObject GetCurrentPrimaryWeapon()
     {
+        if (primaryWeapons == null) return null;
+
         if (selected_primary != null) return selected_primary;
 
         foreach (GameObject weapon in primaryWeapons)
@@ -268,7 +299,7 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
             if (wp == null) continue;
 
-            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battle_coins_to_unlock == 0)
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battleCoinsToUnlock == 0)
             {
                 selected_primary = weapon;
                 return weapon;
@@ -280,6 +311,8 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
 
     public GameObject GetCurrentSecondaryWeapon()
     {
+        if (secondaryWeapons == null) return null;
+
         if (selected_secondary != null) return selected_secondary;
 
         foreach (GameObject weapon in secondaryWeapons)
@@ -289,7 +322,7 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
             if (wp == null) continue;
 
-            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battle_coins_to_unlock == 0)
+            if (HasClassAccessToWeapon(wp) && HasFactionAccessToWeapon(wp) && wp.battleCoinsToUnlock == 0)
             {
                 selected_secondary = weapon;
                 return weapon;
@@ -304,7 +337,7 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
 
     private bool HasClassAccessToWeapon(WeaponProperties weaponProperties)
     {
-        if (weaponProperties.class_weapon.Any(c => c == _selectedClass)) return true;
+        if (weaponProperties.classWeapon.Any(c => c == _selectedClass)) return true;
 
         return false;
     }
@@ -313,7 +346,7 @@ public class InfantryLoadoutCustomization : InMatchClientSingleton<InfantryLoado
     {
         if (AccountManager.Instance == null) return true;
 
-        if (weaponProperties.faction.Any(c => c == AccountManager.Instance.faction)) return true;
+        if (weaponProperties.faction.Any(c => c == AccountManager.Instance.selectedFaction)) return true;
 
         return false;
     }

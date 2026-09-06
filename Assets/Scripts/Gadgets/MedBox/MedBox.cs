@@ -23,28 +23,25 @@ public class MedBox : Gadget
     public GameObject owner;
     private LineRenderer circleLineRenderer;
     private GameObject circleVisual;
-    private PlayerController playerController;
     private float lastAimKeyPressTime;
     private int aimKeyPressCount;
     private bool med_box_thrown;
 
     private SwitchWeapon switchWeapon;
 
-
-    protected override void Awake()
+    public override void Initialize()
     {
-        base.Awake();
+        base.Initialize();
         
         rb.isKinematic = true;
-        playerController = GetComponentInParent<PlayerController>();
         switchWeapon = gameObject.GetComponentInParent<SwitchWeapon>();
         owner = playerController.gameObject;
     }
 
-    public override void Reestart()
+    public override void Restart()
     {
-        base.Reestart();
-        adsBehaviour.DisableUpdate();
+        base.Restart();
+        adsBehaviour.DisableAim();
     }
 
     void Update()
@@ -83,7 +80,7 @@ public class MedBox : Gadget
                 {
                     // Aplica regeneração
                     props.Regenerate(heal_rate * Time.deltaTime);
-                    Debug.Log($"Aplicando regeneração em {overlappedCollider.gameObject.name}");
+                    Debug.Log($"Applying regeneration to {overlappedCollider.gameObject.name}");
                 }
             }
         }
@@ -180,7 +177,7 @@ public class MedBox : Gadget
         int playerLayer = LayerMask.NameToLayer("Player");
         if (playerLayer == -1)
         {
-            Debug.LogError("Layer 'Player' não encontrada!");
+            Debug.LogError("Layer 'Player' was not found!");
             return;
         }
 

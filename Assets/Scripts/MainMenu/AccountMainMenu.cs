@@ -1,4 +1,3 @@
-using System.Collections;
 using TMPro;
 using UnityEngine;
 
@@ -8,11 +7,11 @@ public class AccountMainMenu : MainMenuTabs
     [SerializeField] private UnityEngine.UI.Button switch_faction_button;
 
     [Header("Accounts references")]
-    [SerializeField] private TMP_InputField account_name;
+    [SerializeField] private TMP_InputField accountName;
     [SerializeField] private TextMeshProUGUI current_battle_coins;
     [SerializeField] private TextMeshProUGUI account_level;
     [SerializeField] private TextMeshProUGUI account_faction;
-    [SerializeField] private TextMeshProUGUI selected_class;
+    [SerializeField] private TextMeshProUGUI selectedClass;
 
     [Header("Accounts Status references")]
     [SerializeField] private TextMeshProUGUI most_used_class;
@@ -30,32 +29,27 @@ public class AccountMainMenu : MainMenuTabs
 
     public override void Activate()
     {
-        account_name.text = AccountManager.Instance.account_name;
+        accountName.text = AccountManager.Instance.accountName;
         switch_faction_button.onClick.AddListener(SwitchFaction);
     }
 
     private void SwitchFaction()
     {
-        FactionManager.Faction current_faction = AccountManager.Instance.faction;
+        FactionManager.Faction current_faction = AccountManager.Instance.selectedFaction;
         if (current_faction == FactionManager.Faction.FactionA) AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionB);
         else AccountManager.Instance.SwitchFaction(FactionManager.Faction.FactionA);
     }
 
     void Update()
     {
-        // Só atualiza se o AccountManager já estiver pronto
         if (AccountManager.Instance == null) return;
 
-        // Não sobrescreva se o campo estiver vazio no início
-        if (!string.IsNullOrEmpty(account_name.text))
-        {
-            if (account_name.text != AccountManager.Instance.account_name) AccountManager.Instance.SwitchName(account_name.text);
-        }
+        if (!string.IsNullOrEmpty(accountName.text) && accountName.text != AccountManager.Instance.accountName) AccountManager.Instance.SwitchName(accountName.text);
 
-        current_battle_coins.text = "Current Battle Coins: " + AccountManager.Instance.battle_coins.ToString();
+        current_battle_coins.text = "Current Battle Coins: " + AccountManager.Instance.battleCoins.ToString();
         account_level.text = "Accont Level: " + AccountManager.Instance.level.ToString();
-        account_faction.text = "Current Faction: " + AccountManager.Instance.faction.ToString();
-        selected_class.text = "Selected Class: " + AccountManager.Instance.selected_class.ToString().Replace("_", " ");
+        account_faction.text = "Current Faction: " + AccountManager.Instance.selectedFaction.ToString();
+        selectedClass.text = "Selected Class: " + AccountManager.Instance.selectedClass.ToString().Replace("_", " ");
 
         //Account Status
         most_used_class.text = "Most Used Class: " + AccountManager.Instance.accountStatus.most_used_class.ToString().Replace("_", " ");

@@ -13,18 +13,18 @@ public class Flares : Countermeasures
     {
         if (reload_countermeasures_duration <= 0)
         {
-            is_reloading = false;
+            reloading = false;
             return;
         }
 
         if (vehicle.used_locking_countermeasure == false)
         {
-            is_reloading = true;
+            reloading = true;
             reload_countermeasures_duration -= Time.deltaTime;
         }
         else
         {
-            is_reloading = false;
+            reloading = false;
             countermeasures_duration -= Time.deltaTime;
             if (countermeasures_duration <= 0) StopCountermeasure();
             
@@ -83,7 +83,7 @@ public class Flares : Countermeasures
     {
         if (flare_effect == null)
         {
-            Debug.LogWarning("Flare effect prefab não atribuído!");
+            Debug.LogWarning("Flare effect prefab is not assigned!");
             return;
         }
 

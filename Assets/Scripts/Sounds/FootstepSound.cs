@@ -32,7 +32,7 @@ public class FootstepSound : NetworkBehaviour
     {   
         if(!IsOwner) return;
         
-        if (playerProperties.crouched || playerProperties.is_proned) original_volume = audioSource.volume / 2;
+        if (playerProperties.crouched || playerProperties.proned) original_volume = audioSource.volume / 2;
         else original_volume = audioSource.volume;
         
         RaycastHit hit;

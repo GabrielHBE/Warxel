@@ -57,7 +57,7 @@ public class SquadManager : ServerSingleton<SquadManager>
         CreateSquadsForFaction(FactionManager.Faction.FactionA);
         CreateSquadsForFaction(FactionManager.Faction.FactionB);
 
-        Debug.Log($"[SquadManager] Criados {MAX_SQUAD_PER_FACTION} squads para cada facção. Total: {MAX_SQUAD_PER_FACTION * 2}");
+        Debug.Log($"[SquadManager] Created {MAX_SQUAD_PER_FACTION} squads for each faction. Total: {MAX_SQUAD_PER_FACTION * 2}");
     }
 
     private void CreateSquadsForFaction(FactionManager.Faction faction)
@@ -131,7 +131,7 @@ public class SquadManager : ServerSingleton<SquadManager>
             {
                 if (squad.squadMembers.Length >= MAX_MEMBERS_PER_SQUAD)
                 {
-                    Debug.LogWarning($"Squad {squadName} está cheio!");
+                    Debug.LogWarning($"Squad {squadName} is full!");
                     return false;
                 }
 
@@ -162,7 +162,7 @@ public class SquadManager : ServerSingleton<SquadManager>
                 // Dispara o evento
                 OnPlayerJoinedSquad?.Invoke(faction, squadName, connection);
 
-                Debug.Log($"Jogador {playerName} entrou no squad {squadName} (Facção {faction})");
+                Debug.Log($"Player {playerName} joined squad {squadName} (Faction {faction})");
                 return true;
             }
         }

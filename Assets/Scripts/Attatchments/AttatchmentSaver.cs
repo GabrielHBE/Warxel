@@ -5,8 +5,13 @@ using UnityEngine;
 [Serializable]
 public class WeaponAttachmentSaveData
 {
+    public const int CurrentVersion = 2;
+
+    public int version;
     public string weaponName;
     public string activeSight;
+    public string activeCantedSight;
+    public string activeNozzle;
     public string activeBarrel;
     public string activeMag;
     public string activeGrip;
@@ -15,8 +20,11 @@ public class WeaponAttachmentSaveData
     
     public WeaponAttachmentSaveData(string weaponName)
     {
+        version = CurrentVersion;
         this.weaponName = weaponName;
         activeSight = "";
+        activeCantedSight = "";
+        activeNozzle = "";
         activeBarrel = "";
         activeMag = "";
         activeGrip = "";

@@ -113,15 +113,14 @@ public class Jet : Vehicle
         {
             if (moveForward > 0)
             {
-                throttle.Value += _properties.aceleration * deltaTime;
-                throttle.Value = Mathf.Min(throttle.Value, _properties.max_throttle);
+                SetThrottle(Mathf.Min(Throttle + _properties.aceleration * deltaTime, _properties.max_throttle));
             }
             else if (moveForward < 0)
             {
                 float limit = isNearGround ? -50f : 100f;
-                if (throttle.Value > limit) throttle.Value -= _properties.aceleration * deltaTime * (isNearGround ? 2f : 1f);
+                if (Throttle > limit) SetThrottle(Throttle - _properties.aceleration * deltaTime * (isNearGround ? 2f : 1f));
             }
-            else throttle.Value = Mathf.MoveTowards(throttle.Value, 0, (isNearGround ? 0.8f : 1f) * deltaTime);
+            else SetThrottle(Mathf.MoveTowards(Throttle, 0, (isNearGround ? 0.8f : 1f) * deltaTime));
             
         }
         else SlowDownEngine();
@@ -138,8 +137,8 @@ public class Jet : Vehicle
 
         if (Settings.Instance._controls.invert_vertical_jet_mouse) mouseY *= -1;
 
-        if (Math.Abs(mouseY) > 1 && throttle.Value > 0 && !isNearGround)
-            throttle.Value -= Math.Abs(mouseY) * Time.fixedDeltaTime * 10;
+        if (Math.Abs(mouseY) > 1 && Throttle > 0 && !isNearGround)
+            SetThrottle(Throttle - Math.Abs(mouseY) * Time.fixedDeltaTime * 10);
 
         UpdateTrails();
         rb.AddTorque(-transform.forward * mouseX * speed * _properties.rotation_value * (rb.mass / 100));
@@ -151,7 +150,7 @@ public class Jet : Vehicle
         float speedFactor = Mathf.Clamp01(speed / maxSpeed);
         if (Mathf.Abs(rb.angularVelocity.y) >= _properties.max_lean_speed) return;
 
-        float forceMultiplier = (isNearGround && (throttle.Value >= 20 || throttle.Value < -10) && throttle.Value <= 50) ? 70 : speedFactor;
+        float forceMultiplier = (isNearGround && (Throttle >= 20 || Throttle < -10) && Throttle <= 50) ? 70 : speedFactor;
         rb.AddTorque(transform.up * leanValue * _properties.lean_value * rb.mass * forceMultiplier);
     }
 
@@ -160,7 +159,7 @@ public class Jet : Vehicle
         rb.AddForce(Physics.gravity * _currentGravity * rb.mass);
         if (speed < maxSpeed)
         {
-            _totalThrottle = throttle.Value + _diveSpeedModifier + _afterburnerSpeedModifier;
+            _totalThrottle = Throttle + _diveSpeedModifier + _afterburnerSpeedModifier;
             rb.AddForce(transform.forward * _totalThrottle * _properties.max_throttle);
         }
     }
@@ -193,7 +192,7 @@ public class Jet : Vehicle
         if (_downwardComponent > 0.3f) targetGravity = (moveForward > 0 ? (_properties.max_throttle / (speed * 2)) : (_properties.max_throttle / speed)) * -_downwardComponent;
         else if (_downwardComponent < -0.3f) targetGravity = (moveForward > 0 ? 1.5f : (_properties.max_throttle / speed)) * -_downwardComponent;
         else if (moveForward > 0) targetGravity = 0;
-        else if (throttle.Value < 100) targetGravity = _properties.max_throttle / (speed * 10);
+        else if (Throttle < 100) targetGravity = _properties.max_throttle / (speed * 10);
 
         _currentGravity = Mathf.Clamp(Mathf.Lerp(_currentGravity, targetGravity, Time.fixedDeltaTime), 0f, 5f);
     }
@@ -215,7 +214,7 @@ public class Jet : Vehicle
     {
         _diveSpeedModifier = 0;
         _afterburnerSpeedModifier = 0;
-        throttle.Value = Mathf.Lerp(throttle.Value, 0, Time.fixedDeltaTime / 2);
+        SetThrottle(Mathf.Lerp(Throttle, 0, Time.fixedDeltaTime / 2));
     }
 
     protected void UpdateLandingGear() => retractLandingGear = !Physics.Raycast(_core.position, Vector3.down, 10, LayerMask.GetMask("Ground", "Voxel"));
@@ -226,7 +225,7 @@ public class Jet : Vehicle
     protected override void HandleVehicleInput()
     {
         base.HandleVehicleInput();
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f && throttle.Value > 10) EjectPlayer();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f && Throttle > 10) EjectPlayer();
         
     }
 
@@ -259,7 +258,7 @@ public class Jet : Vehicle
     private void UpdateEngineSound()
     {
         if (vehicle_destroyed.Value) return;
-        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 2f, throttle.Value / _properties.max_throttle) : 0f;
+        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 2f, Throttle / _properties.max_throttle) : 0f;
         _currentPitch = Mathf.Lerp(_currentPitch, targetPitch, Time.deltaTime * 2);
         
         bool shouldBePlaying = _currentPitch > 0.01f;
@@ -290,6 +289,7 @@ public class Jet : Vehicle
     public override float GetMinFov() => Settings.Instance._video.jet_fov;
     public override float GetMaxSpeed() => maxSpeed;
     public override float GetMaxThrottle() => _properties.max_throttle;
+    protected override float ClampThrottle(float value) => Mathf.Clamp(value, -50f, _properties.max_throttle);
     protected override float GetCameraSensitivity() => Settings.Instance._controls.jet_sensibility;
     #endregion
 }

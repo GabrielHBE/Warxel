@@ -15,7 +15,7 @@ public class RotateLeanFlaps : MonoBehaviour
     void Update()
     {
 
-        if (!jet.is_in_vehicle) return;
+        if (!jet.isInVehicle) return;
 
         Rotate();
 

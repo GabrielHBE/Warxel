@@ -62,14 +62,14 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     #region Fire Mode & Setup
     public void SetupFiringSystem()
     {
-        Firing.ResetState();
+        Firing.ResetState(properties?.firing.fireModes);
 
         // Garante que o modo de tiro estático atual é válido para este armamento
         if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
         {
             if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
             {
-                Firing.SwitchFireMode(properties.firing.fireModes);
+                Firing.SwitchFireMode(properties.firing);
             }
         }
     }
@@ -78,7 +78,7 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
     {
         if (properties == null || !Firing.CanSwitchFireMode(properties.firing.fireModes)) return;
 
-        Firing.SwitchFireMode(properties.firing.fireModes);
+        Firing.SwitchFireMode(properties.firing);
 
     }
     #endregion
@@ -244,14 +244,8 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
 
         if (reserveAmmo == 0 || !isReloading.Value) return;
         
-        if (!properties.reloadValues.isSingleReload)
-        {
-            HandleStandardReload();
-        }
-        else
-        {
-            HandleSingleReload();
-        }
+        if (!properties.reloadValues.isSingleReload) HandleStandardReload();
+
     }
 
     private void HandleStandardReload()
@@ -277,25 +271,6 @@ public class MissileController : NetworkBehaviour, IVehicleArmory
         }
     }
 
-    private void HandleSingleReload()
-    {
-        SyncSyncMagsToProperties();
-
-        bool shouldContinue = ProcessReload.Reload.ReloadLogic.ProcessSingleReload(
-            properties.reloadValues,
-            isReloading.Value,
-            true,
-            Firing.IsFiring(),
-            out bool shouldContinueReloading
-        );
-
-        SyncPropertiesToSyncMags();
-
-        if (!shouldContinue)
-        {
-            isReloading.Value = false;
-        }
-    }
 
     /// <summary>
     /// Mapeia os dados do SyncList da rede para a lista interna que o ProcessStandardReload/ProcessSingleReload esperam (mags[^1] sendo o pente atual).

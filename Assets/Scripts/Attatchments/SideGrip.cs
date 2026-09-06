@@ -6,7 +6,7 @@ public class SideGrip : Attatchment
 
     [Header("Configurations")]
     [SerializeField] private GameObject Object;
-    [SerializeField] private bool show_in_third_person;
+    [SerializeField] private bool showInThirdPerson;
     
     bool state = true;
     private Weapon weapon;

@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class WeatherStateManager : ServerSingleton<WeatherStateManager>
 {
-    public readonly SyncVar<float> NetworkTime = new SyncVar<float>(43200f);
-    public readonly SyncVar<string> NetworkWeather = new SyncVar<string>("clear-day");
+    public readonly SyncVar<float> NetworkTime = new SyncVar<float>() {Value = 43200f};
+    public readonly SyncVar<string> NetworkWeather = new SyncVar<string>() { Value = "clear-day" };
 
     [Header("Current Time")]
     public float CurrentTime;
@@ -33,6 +33,6 @@ public class WeatherStateManager : ServerSingleton<WeatherStateManager>
         return WeatherType.Clear;
     }
 
-    public enum WeatherType {Clear, Rain, Snow, Overcast, Storm, Windy, Hurricane}
+    public enum WeatherType { Clear, Rain, Snow, Overcast, Storm, Windy, Hurricane }
 
 }

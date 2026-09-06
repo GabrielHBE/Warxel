@@ -92,7 +92,7 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
 
     private void OnSquadsChanged(SyncDictionaryOperation op, FactionManager.Faction key, List<SquadManager.SquadData> value, bool asServer)
     {
-        if (accountManager != null && key == accountManager.faction) RefreshSquadList();
+        if (accountManager != null && key == accountManager.selectedFaction) RefreshSquadList();
     }
 
     private void StartPolling()
@@ -136,14 +136,14 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
     {
         if (!isInitialized || squadManager == null || accountManager == null) return;
 
-        var faction = accountManager.faction;
+        var faction = accountManager.selectedFaction;
         
         CheckPlayerSquadStatus(faction);
         ClearSquadList();
 
         if (!squadManager.squads.ContainsKey(faction) || squadManager.squads[faction].Count == 0)
         {
-            UpdateUIStatus("Nenhum squad disponível para sua facção.", false);
+            UpdateUIStatus("No squads are available for your faction.", false);
             return;
         }
 
@@ -156,7 +156,7 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
             itemIndex++;
         }
 
-        UpdateUIStatus($"Mostrando {squadsList.Count} squads da facção {faction}", true);
+        UpdateUIStatus($"Showing {squadsList.Count} squads for faction {faction}", true);
     }
 
     private void ClearSquadList()
@@ -256,14 +256,14 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
 
         if (isInSquad)
         {
-            UpdateUIStatus("Você já está em um squad. Saia primeiro para entrar em outro.", false);
+            UpdateUIStatus("You are already in a squad. Leave it before joining another one.", false);
             return;
         }
 
-        var faction = accountManager.faction;
+        var faction = accountManager.selectedFaction;
         var playerConn = GetPlayerConnection();
 
-        bool success = squadManager.AddMemberToSquad(faction, squadName, playerConn, accountManager.account_name);
+        bool success = squadManager.AddMemberToSquad(faction, squadName, playerConn, accountManager.accountName);
         if (success)
         {
             isInSquad = true;
@@ -277,7 +277,7 @@ public class SquadSelecionUI : InMatchClientSingleton<SquadSelecionUI>
         if (!isInitialized || !isInSquad || accountManager == null || squadManager == null) return;
 
         var playerConn = GetPlayerConnection();
-        bool success = squadManager.RemoveMemberFromSquad(accountManager.faction, playerConn);
+        bool success = squadManager.RemoveMemberFromSquad(accountManager.selectedFaction, playerConn);
         
         if (success)
         {

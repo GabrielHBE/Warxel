@@ -1,32 +1,32 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class WeaponProperties : MonoBehaviour, UpgradeLevel
 {
     #region Variables
-
     [Header("Progression & Economy")]
-    public string weapon_name;
-    public ClassManager.Class[] class_weapon;
+    public string weaponName;
+    public ClassManager.Class[] classWeapon;
     public FactionManager.Faction[] faction;
     public WeaponCategory category;
-    public int battle_coins_to_unlock;
-    public int weapon_kills;
-    public float current_attachment_points;
- 
+    public int battleCoinsToUnlock;
+    public int weaponKills;
+    public float currentAttachmentPoints;
+
     [Header("Core Settings")]
-    public GameObject third_person_prefab;
-    public Sprite icon_hud;
-    public float ads_speed;
-    public float speed_change;
-    public float zoom = 1;
+    public GameObject thirdPersonPrefab;
+    public Sprite iconHud;
+    public float adsSpeed;
+    public float speedChange;
+    [HideInInspector] public float zoom = 0;
 
     [Header("Handling")]
-    public float pick_up_weapon_speed;
-    public float store_weapon_speed;
+    public float drawWeaponSpeed = 0.5f;
+    public float storeWeaponSpeed = 0.5f;
     public bool canReloadAiming;
-    
+
     [Header("Shooting & Reloading")]
-    public float delay_to_shoot_animation;
+    public float delayToShootAnimation;
     public bool changeShootAnimationSpeed;
     public ProcessReload.Reload.ReloadValues reloadValues;
 
@@ -41,30 +41,16 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
     [Header("Recoil Settings")]
     public Recoil.RecoilValues recoilValues;
-  
-    [Header("Sway & Bobbing Exaggeration")]
-    public float bob_walk_exageration;
-    public float bob_sprint_exageration;
-    public float bob_crouch_exageration;
-    public float bob_aim_exageration;
 
-    [Header("Sway Multipliers")]
-    public Vector3 walk_multiplier;
-    public Vector3 sprint_multiplier;
-    public Vector3 aim_multiplier;
-    public Vector3 crouch_multiplier;
-
-    [Header("Sway Transforms")]
-    public Vector3 initial_potiion; // Mantido o erro de digitação original para não quebrar referências externamente
-    public Quaternion initial_rotation;
-    public float[] vector3Values = new float[3];
-    public float[] quaternionValues = new float[3];
-    #endregion
+    [Header("Sway and Bob")]
+    public SwayNBobScript.SwayAndBobValues swayAndBobValues;
 
     [Header("References & Effects")]
-    public WeaponSounds weapon_sound;
-    public GameObject barrel;
+    public Transform shootPos;
+    public EquippableItemAudio weaponSound;
     private BulletExtractor bulletExtractor;
+    [HideInInspector] public EquippableItemAnimator weaponAnimation;
+    #endregion
 
     #region Enums
     public enum WeaponCategory
@@ -81,19 +67,45 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #endregion
 
     #region Initialization & Setup
+    private void Awake() => DisableRendererShadows();
+    private void OnTransformChildrenChanged() => DisableRendererShadows();
+
+#if UNITY_EDITOR
+    private void OnValidate() => DisableRendererShadows();
+#endif
+
     public void Initialize()
     {
-        weapon_kills = PlayerPrefs.GetInt($"WeaponProperties_weapon_kills_{weapon_name}");
+        DisableRendererShadows();
+        recoilValues.CalculateRecoilSpeed(firing.interval);
+        GetComponents();
         SetClassBenefits();
-        bulletExtractor = GetComponentInChildren<BulletExtractor>();
+        weaponKills = PlayerPrefs.GetInt($"WeaponProperties_weapon_kills_{weaponName}");
         reloadValues.PopulateMags();
-        Restart();
+        weaponAnimation.Setup(delayToShootAnimation, reloadValues, changeShootAnimationSpeed, firing);
+    }
+
+    public void DisableRendererShadows()
+    {
+        foreach (Renderer childRenderer in GetComponentsInChildren<Renderer>())
+        {
+            childRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            childRenderer.receiveShadows = false;
+        }
+    }
+
+    private void GetComponents()
+    {
+        bulletExtractor = GetComponentInChildren<BulletExtractor>();
+        weaponAnimation = GetComponent<EquippableItemAnimator>();
     }
 
     private void SetClassBenefits()
     {
-        if (AccountManager.Instance.selected_class == ClassManager.Class.Assault)
+        if (AccountManager.Instance.selectedClass == ClassManager.Class.Assault)
         {
+            reloadValues.magCount += 2;
+
             reloadValues.reloadTime *= 1.2f;
             recoilValues.firstShootRecoilMultiplier *= 0.9f;
 
@@ -105,8 +117,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
 
         }
     }
-
-    public void Restart() => recoilValues.CalculateRecoilSpeed(firing.interval);
     #endregion
 
     #region Logic & Calculations
@@ -117,12 +127,12 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #endregion
 
     #region Progression Systems
-    public void AddKill() => weapon_kills += 1;
-    
+    public void AddKill() => weaponKills += 1;
+
     public void ResetWeaponlevel()
     {
-        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weapon_name}", 0);
-        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weapon_name}", 0);
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_progression_{weaponName}", 0);
+        PlayerPrefs.SetFloat($"WeaponProperties_weapon_level_{weaponName}", 0);
         PlayerPrefs.Save();
     }
     #endregion

@@ -43,19 +43,19 @@ public abstract class Vehicle : NetworkBehaviour,
     [SerializeField] protected SoundManager.SoundComponents crashSound;
 
     [Header("Vehicle State")]
-    [HideInInspector] public bool is_in_vehicle = false;
+    [HideInInspector] public bool isInVehicle = false;
     [HideInInspector] public bool ignore_damage;
     [HideInInspector] public bool used_locking_countermeasure;
-    [HideInInspector] public readonly SyncVar<float> throttle = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    [HideInInspector] public readonly SyncVar<bool> startEngine = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    [HideInInspector] public readonly SyncVar<bool> vehicle_destroyed = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    private readonly SyncVar<float> throttle = new SyncVar<float>();
+    [HideInInspector] public readonly SyncVar<bool> startEngine = new SyncVar<bool>();
+    [HideInInspector] public readonly SyncVar<bool> vehicle_destroyed = new SyncVar<bool>();
     private bool did_explode = false;
     protected float exit_cooldown;
 
     [Header("Health & Damage")]
     protected float original_hp;
-    public readonly SyncVar<float> hp = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    public readonly SyncVar<float> resistance = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    public readonly SyncVar<float> hp = new SyncVar<float>();
+    public readonly SyncVar<float> resistance = new SyncVar<float>();
 
     [Header("Physics & Collision")]
     [SerializeField] protected LayerMask collisionLayers;
@@ -65,6 +65,7 @@ public abstract class Vehicle : NetworkBehaviour,
     protected float _destructionTimer = 0f;
     protected float _lastSentThrottle = -1f;
     protected float _throttleUpdateTimer = 0f;
+    private float _controlledThrottle;
     protected const float THROTTLE_THRESHOLD = 0.05f;
     protected const float THROTTLE_UPDATE_INTERVAL = 0.1f;
 
@@ -82,10 +83,10 @@ public abstract class Vehicle : NetworkBehaviour,
 
         speed = rb.linearVelocity.magnitude;
 
-        if (is_in_vehicle)
+        if (isInVehicle)
         {
             // Validação de jogador
-            if (currentSeat == null || currentSeat.playerGameObject == null || (currentSeat.playerProperties != null && currentSeat.playerProperties.is_dead.Value))
+            if (currentSeat == null || currentSeat.playerGameObject == null || (currentSeat.playerProperties != null && currentSeat.playerProperties.isDead.Value))
             {
                 ExitVehicle();
                 return;
@@ -99,27 +100,26 @@ public abstract class Vehicle : NetworkBehaviour,
     }
     protected virtual void FixedUpdate()
     {
-        if (!Owner.IsValid && IsServerInitialized)
-        {
-            if (vehicle_destroyed.Value) HandleDestructionSequence();
-            else HandleEmptyVehicle();
-            return;
-        }
-
-        if (!IsOwner) return;
+        if (!IsController) return;
 
         if (vehicle_destroyed.Value)
         {
             HandleDestructionSequence();
-            return;
+        }
+        else if (!Owner.IsValid)
+        {
+            HandleEmptyVehicle();
+        }
+        else if (!startEngine.Value)
+        {
+            HandleEngineOff();
+        }
+        else
+        {
+            HandleEngineOn();
         }
 
-        //if (!is_in_vehicle)
-        //    HandleEmptyVehicle();
-        if (!startEngine.Value)
-            HandleEngineOff();
-        else
-            HandleEngineOn();
+        SyncOwnerThrottle();
     }
     protected virtual void OnCollisionEnter(Collision collision)
     {
@@ -182,12 +182,12 @@ public abstract class Vehicle : NetworkBehaviour,
     }
     protected virtual void HandleEmptyVehicle()
     {
-        throttle.Value = 0;
+        SetThrottle(0f);
         AddForceDown();
     }
     protected virtual void HandleEngineOff()
     {
-        throttle.Value = 0;
+        SetThrottle(0f);
         AddForceDown();
     }
     protected void AddForceDown(float multiplier = 1) => rb.AddForce(Vector3.down * rb.mass * multiplier, ForceMode.Force);
@@ -349,7 +349,7 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         playerSeatIndex = seatIndex;
         currentSeat = vehicleSeats[seatIndex];
-        is_in_vehicle = true;
+        isInVehicle = true;
         exit_cooldown = 0f;
 
         currentSeat.EnterSeat(
@@ -363,11 +363,11 @@ public abstract class Vehicle : NetworkBehaviour,
 
     protected virtual void ExitVehicle()
     {
-        if (!is_in_vehicle) return;
+        if (!isInVehicle) return;
 
         int currentIndex = playerSeatIndex;
         VehicleSeats seat = vehicleSeats[currentIndex];
-        is_in_vehicle = false;
+        isInVehicle = false;
 
         if (seat != null)
         {
@@ -474,6 +474,54 @@ public abstract class Vehicle : NetworkBehaviour,
     #endregion
 
     #region Network Status & Ownership
+    protected float Throttle => IsController ? _controlledThrottle : throttle.Value;
+
+    public override void OnOwnershipClient(NetworkConnection previousOwner)
+    {
+        base.OnOwnershipClient(previousOwner);
+
+        if (IsOwner)
+            _controlledThrottle = throttle.Value;
+    }
+
+    public override void OnOwnershipServer(NetworkConnection previousOwner)
+    {
+        base.OnOwnershipServer(previousOwner);
+
+        if (!Owner.IsValid)
+            _controlledThrottle = throttle.Value;
+    }
+
+    protected void SetThrottle(float value)
+    {
+        if (!IsController) return;
+
+        _controlledThrottle = ClampThrottle(value);
+
+        // Em host ou em veiculo sem owner, o servidor publica o valor diretamente.
+        if (IsServerInitialized)
+            throttle.Value = _controlledThrottle;
+    }
+
+    protected virtual float ClampThrottle(float value) => value;
+
+    private void SyncOwnerThrottle()
+    {
+        // Um owner remoto controla localmente e o servidor apenas replica o valor recebido.
+        if (!IsOwner || IsServerInitialized) return;
+
+        _throttleUpdateTimer += Time.fixedDeltaTime;
+        float throttleDiff = Mathf.Abs(_controlledThrottle - _lastSentThrottle);
+        if (throttleDiff <= THROTTLE_THRESHOLD || _throttleUpdateTimer < THROTTLE_UPDATE_INTERVAL) return;
+
+        CmdUpdateThrottle(_controlledThrottle);
+        _lastSentThrottle = _controlledThrottle;
+        _throttleUpdateTimer = 0f;
+    }
+
+    [ServerRpc]
+    private void CmdUpdateThrottle(float value) => throttle.Value = ClampThrottle(value);
+
     [ServerRpc] private void RemoveArmoryOwnership(NetworkObject obj) => obj?.RemoveOwnership();
     [ServerRpc(RequireOwnership = true)] private void RemoveOwnershipFromPlayer() => NetworkObject.RemoveOwnership();
 
@@ -540,7 +588,7 @@ public abstract class Vehicle : NetworkBehaviour,
     [TargetRpc]
     private void TargetForceExitAndDamage(NetworkConnection conn)
     {
-        if (is_in_vehicle && currentSeat?.playerController != null)
+        if (isInVehicle && currentSeat?.playerController != null)
             currentSeat.playerController.TakeDamage(100);
         ExitVehicle();
     }
@@ -575,7 +623,7 @@ public abstract class Vehicle : NetworkBehaviour,
     private void CountermeasuresUpdate()
     {
         countermeasures?.LocalUpdate();
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_countermeasureKey) && is_in_vehicle && countermeasures.IsCooldownFinished() && currentSeat.seatType == VehicleSeats.SeatType.Pilot) countermeasures.UseCountermeasure();
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_countermeasureKey) && isInVehicle && countermeasures.IsCooldownFinished() && currentSeat.seatType == VehicleSeats.SeatType.Pilot) countermeasures.UseCountermeasure();
     }
     protected void SetupRigidBody()
     {
@@ -643,14 +691,14 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (countermeasures == null) return CountermeasuresStatusUI.CountermeasuresStatus.Ready;
         if (countermeasures.is_active) return CountermeasuresStatusUI.CountermeasuresStatus.InUse;
-        if (countermeasures.is_reloading) return CountermeasuresStatusUI.CountermeasuresStatus.Reloading;
+        if (countermeasures.reloading) return CountermeasuresStatusUI.CountermeasuresStatus.Reloading;
         return CountermeasuresStatusUI.CountermeasuresStatus.Ready;
     }
     public virtual string GetCountermeasuresStatusText()
     {
         if (countermeasures == null) return "Ready";
         if (countermeasures.is_active) return "In Use";
-        if (countermeasures.is_reloading) return $"Reloading... [{countermeasures.reload_countermeasures_duration:F0}]";
+        if (countermeasures.reloading) return $"Reloading... [{countermeasures.reload_countermeasures_duration:F0}]";
         return "Ready";
     }
     public virtual float GetMaxHeat() => currentSeat?.currentArmory?.GetMaxOverheat() ?? 0;
@@ -670,7 +718,7 @@ public abstract class Vehicle : NetworkBehaviour,
     }
     public virtual float GetCurrentSpeed() => rb.linearVelocity.magnitude;
     public virtual float GetMaxSpeed() => float.MaxValue;
-    public virtual float GetCurrentThrottle() => throttle.Value;
+    public virtual float GetCurrentThrottle() => Throttle;
     public virtual float GetMaxThrottle() => float.MaxValue;
     #endregion
 

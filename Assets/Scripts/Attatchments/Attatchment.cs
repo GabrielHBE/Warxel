@@ -1,5 +1,5 @@
-using System.Runtime.Remoting.Messaging;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public abstract class Attatchment : MonoBehaviour
 {   
@@ -7,27 +7,23 @@ public abstract class Attatchment : MonoBehaviour
 
     [Header("Attatchment Settings")]
     public string attachmentName;
-    public float attatchment_points;
-    public float weapon_level_to_unlock;
-    public Sprite icon_hud;
-    protected WeaponProperties weaponProperties;
+    [FormerlySerializedAs("attatchment_points")]
+    [Tooltip("Cost of this attachment. The total equipped on the weapon cannot exceed 100 points.")]
+    [Min(0f)]
+    public float attatchmentPoints;
+    public float weaponLevelToUnlock;
+    public Sprite iconHud;
+    [SerializeField] protected WeaponProperties weaponProperties;
+    public bool isStandardAttatchment;
 
     public bool IsAttatchmentUnlocked()
     {
         InitializeWeaponProperties();
-        return weaponProperties != null && weaponProperties.weapon_kills >= weapon_level_to_unlock;
+        return weaponProperties != null && weaponProperties.weaponKills >= weaponLevelToUnlock;
     }
 
-    public virtual void Initialize()
-    {
-        InitializeWeaponProperties();
-    }
-
-    protected void InitializeWeaponProperties()
-    {
-        weaponProperties = GetComponentInParent<WeaponProperties>();
-    }
-
+    public virtual void Initialize() => InitializeWeaponProperties();
+    protected void InitializeWeaponProperties() =>  weaponProperties = GetComponentInParent<WeaponProperties>();
     public string GetAttatchmentDescription() => attatchmentDescription;
 
 }

@@ -4,6 +4,9 @@ using System.Collections.Generic;
 
 public class AttatchmentManager : MonoBehaviour
 {
+    public const float MaxAttachmentPoints = 100f;
+    private const float AttachmentPointsTolerance = 0.001f;
+
     [Serializable]
     public class AttachmentData
     {
@@ -11,44 +14,45 @@ public class AttatchmentManager : MonoBehaviour
         public float points;
 
         // Grip
-        public float vertical_recoil_change;
-        public float horizontal_recoil_change;
-        public float first_shoot_change;
-        public float reload_speed_change;
-        public float ads_speed_change;
-        public float pick_up_weapon_speed_change;
-        public float store_weapon_speed_change;
+        public float verticalRecoilChange;
+        public float horizontalRecoilChange;
+        public float firstShootChange;
+        public float reloadSpeedChange;
+        public float adsSpeedChange;
+        public float drawWeaponSpeed;
+        public float storeWeaponSpeedChange;
 
-        // Barrel
-        public float muzzle_lightning_change;
-        public int muzzle_velocity_change;
-        public float shoot_pith_change;
-        public float shoot_volume_change;
-        public float spread_change;
+        // Nozzle
+        public float muzzleLightningChange;
+        public int muzzleVelocityChange;
+        public float shootPithChange;
+        public float shootVolumeChange;
+        public float spreadChange;
 
         // Sight
-        public float zoom_change;
-        public float sway_change;
+        public float zoomChange;
 
         // Mag
-        public int bullet_per_mag_change;
-        public int mag_count_change;
-        public float reload_speed_changer;
-        public float time_to_transfer_ammo_change;
-        public int bullets_per_shot_change;
+        public int bulletPerMagChange;
+        public int magCountChange;
+        public float reloadSpeedChanger;
+        public float timeToTransferAmmoChange;
+        public int bulletsPerShotChange;
 
         // Ergonomics
-        public Vector3 visual_recoil_change;
-        public List<Firing.FireMode> fire_modes_change = new List<Firing.FireMode>();
-        public int rate_of_fire_change;
-        public int burst_bullets_per_tap_change;
-        public float burst_time_between_bursts_change;
-        public bool can_reload_aiming;
+        public Vector3 visualRecoilPositionChange;
+        public Vector3 visualRecoilRotationChange;
+        public List<Firing.FireMode> fireModesChange = new List<Firing.FireMode>();
+        public int rateOfFireChange;
+        public int burstBulletsPerTapChange;
+        public bool canReloadAiming;
     }
 
     private AttachmentData currentGrip;
+    private AttachmentData currentNozzle;
     private AttachmentData currentBarrel;
     private AttachmentData currentSight;
+    private AttachmentData currentCantedSight;
     private AttachmentData currentMag;
     private AttachmentData currentSideGrip;
     private AttachmentData currentErgonomics;
@@ -56,16 +60,90 @@ public class AttatchmentManager : MonoBehaviour
 
     private string weaponName;
 
+    public bool CanEquipAttachment(Attatchment attachment)
+    {
+        if (attachment == null) return false;
+
+        if (weaponProperties == null) weaponProperties = GetComponent<WeaponProperties>();
+        if (weaponProperties == null) return false;
+
+        SynchronizeAttachmentPoints(weaponProperties);
+        return GetProjectedAttachmentPoints(attachment) <= MaxAttachmentPoints + AttachmentPointsTolerance;
+    }
+
+    public float GetProjectedAttachmentPoints(Attatchment attachment)
+    {
+        if (attachment == null) return CurrentAttachmentPoints;
+
+        AttachmentData currentSlotAttachment = GetCurrentAttachmentForSlot(attachment);
+        float currentSlotPoints = currentSlotAttachment != null ? currentSlotAttachment.points : 0f;
+        float newAttachmentPoints = Mathf.Max(0f, attachment.attatchmentPoints);
+
+        return Mathf.Max(0f, CurrentAttachmentPoints - currentSlotPoints + newAttachmentPoints);
+    }
+
+    public float CurrentAttachmentPoints
+    {
+        get
+        {
+            if (weaponProperties == null) weaponProperties = GetComponent<WeaponProperties>();
+            return SynchronizeAttachmentPoints(weaponProperties);
+        }
+    }
+
+    private AttachmentData GetCurrentAttachmentForSlot(Attatchment attachment)
+    {
+        if (attachment is CantedSight) return currentCantedSight;
+        if (attachment is Sight) return currentSight;
+        if (attachment is Nozzle) return currentNozzle;
+        if (attachment is Barrel) return currentBarrel;
+        if (attachment is Mag) return currentMag;
+        if (attachment is Grip) return currentGrip;
+        if (attachment is SideGrip) return currentSideGrip;
+        if (attachment is Ergonomics) return currentErgonomics;
+        return null;
+    }
+
+    private float SynchronizeAttachmentPoints(WeaponProperties targetWeaponProperties)
+    {
+        float total = GetAttachmentPoints(currentGrip) +
+                      GetAttachmentPoints(currentNozzle) +
+                      GetAttachmentPoints(currentBarrel) +
+                      GetAttachmentPoints(currentSight) +
+                      GetAttachmentPoints(currentCantedSight) +
+                      GetAttachmentPoints(currentMag) +
+                      GetAttachmentPoints(currentSideGrip) +
+                      GetAttachmentPoints(currentErgonomics);
+
+        if (targetWeaponProperties != null) targetWeaponProperties.currentAttachmentPoints = total;
+        return total;
+    }
+
+    private static float GetAttachmentPoints(AttachmentData attachment)
+    {
+        return attachment != null ? Mathf.Max(0f, attachment.points) : 0f;
+    }
+
     public void InitializeAttachments()
     {
         weaponProperties = GetComponent<WeaponProperties>();
         if (weaponProperties != null)
-            weaponName = weaponProperties.weapon_name;
+        {
+            weaponName = weaponProperties.weaponName;
+            RemoveAllAttachmentsWithoutSaving();
+            SynchronizeAttachmentPoints(weaponProperties);
+        }
 
         Grip[] grips = GetComponentsInChildren<Grip>(true);
         foreach (Grip grip in grips)
         {
             grip.gameObject.SetActive(false);
+        }
+
+        Nozzle[] nozzles = GetComponentsInChildren<Nozzle>(true);
+        foreach (Nozzle nozzle in nozzles)
+        {
+            nozzle.gameObject.SetActive(false);
         }
 
         Barrel[] barrels = GetComponentsInChildren<Barrel>(true);
@@ -107,30 +185,45 @@ public class AttatchmentManager : MonoBehaviour
         return new AttachmentData
         {
             attachmentName = g.gameObject.name,
-            points = g.attatchment_points,
-            vertical_recoil_change = g.vertical_recoil_change,
-            horizontal_recoil_change = g.horizontal_recoil_change,
-            first_shoot_change = g.first_shoot_change,
-            reload_speed_change = g.reload_speed_change,
-            ads_speed_change = g.ads_speed_change,
-            pick_up_weapon_speed_change = g.pick_up_weapon_speed_change,
-            store_weapon_speed_change = g.store_weapon_speed_change
+            points = g.attatchmentPoints,
+            verticalRecoilChange = g.verticalRecoilChange,
+            horizontalRecoilChange = g.horizontalRecoilChange,
+            firstShootChange = g.firstShootChange,
+            reloadSpeedChange = g.reloadSpeedChange,
+            adsSpeedChange = g.adsSpeedChange,
+            drawWeaponSpeed = g.drawWeaponSpeedChange,
+            storeWeaponSpeedChange = g.storeWeaponSpeedChange
         };
     }
 
-    private AttachmentData CreateBarrelData(Barrel b)
+    private AttachmentData CreateNozzleData(Nozzle nozzle)
     {
         return new AttachmentData
         {
-            attachmentName = b.gameObject.name,
-            points = b.attatchment_points,
-            horizontal_recoil_change = b.horizontal_recoil_change,
-            vertical_recoil_change = b.vertical_recoil_change,
-            first_shoot_change = b.first_shoot_recoil_change,
-            muzzle_lightning_change = b.muzzle_lightning_change,
-            muzzle_velocity_change = b.muzzle_velocity_change,
-            shoot_pith_change = b.shoot_pith_change,
-            spread_change = b.spread_change
+            attachmentName = nozzle.gameObject.name,
+            points = nozzle.attatchmentPoints,
+            horizontalRecoilChange = nozzle.horizontalRecoilChange,
+            verticalRecoilChange = nozzle.verticalRecoilChange,
+            firstShootChange = nozzle.firstShootRecoilChange,
+            muzzleLightningChange = nozzle.muzzleLightningChange,
+            muzzleVelocityChange = nozzle.muzzleVelocityChange,
+            shootPithChange = nozzle.shootPithChange,
+            shootVolumeChange = nozzle.shootVolumeChange,
+            spreadChange = nozzle.spreadChange
+        };
+    }
+
+    private AttachmentData CreateBarrelData(Barrel barrel)
+    {
+        return new AttachmentData
+        {
+            attachmentName = barrel.gameObject.name,
+            points = barrel.attatchmentPoints,
+            horizontalRecoilChange = barrel.horizontalRecoilChange,
+            verticalRecoilChange = barrel.verticalRecoilChange,
+            firstShootChange = barrel.firstShootRecoilChange,
+            muzzleVelocityChange = barrel.muzzleVelocityChange,
+            adsSpeedChange = barrel.adsSpeedChange
         };
     }
 
@@ -139,10 +232,8 @@ public class AttatchmentManager : MonoBehaviour
         return new AttachmentData
         {
             attachmentName = s.gameObject.name,
-            points = s.attatchment_points,
-            zoom_change = s.zoom_change,
-            ads_speed_change = s.ads_speed_change,
-            sway_change = s.sway_change,
+            points = s.attatchmentPoints,
+            zoomChange = s.zoomChange,
         };
     }
 
@@ -150,14 +241,14 @@ public class AttatchmentManager : MonoBehaviour
     {
         return new AttachmentData
         {
-            bullets_per_shot_change = m.bulletsPerSHotChange,
+            bulletsPerShotChange = m.bulletsPerShotChange,
             attachmentName = m.gameObject.name,
-            points = m.attatchment_points,
-            bullet_per_mag_change = m.reloadValues.bulletsPerMag,
-            ads_speed_change = m.adsSpeedChange,
-            reload_speed_changer = m.reloadValues.reloadTime,
-            mag_count_change = m.reloadValues.magCount,
-            time_to_transfer_ammo_change = m.reloadValues.timeToTransferAmmo
+            points = m.attatchmentPoints,
+            bulletPerMagChange = m.reloadValues.bulletsPerMag,
+            adsSpeedChange = m.adsSpeedChange,
+            reloadSpeedChanger = m.reloadValues.reloadTime,
+            magCountChange = m.reloadValues.magCount,
+            timeToTransferAmmoChange = m.reloadValues.timeToTransferAmmo
         };
     }
 
@@ -166,7 +257,7 @@ public class AttatchmentManager : MonoBehaviour
         return new AttachmentData
         {
             attachmentName = sg.gameObject.name,
-            points = sg.attatchment_points
+            points = sg.attatchmentPoints
         };
     }
 
@@ -175,17 +266,17 @@ public class AttatchmentManager : MonoBehaviour
         return new AttachmentData
         {
             attachmentName = e.gameObject.name,
-            points = e.attatchment_points,
-            visual_recoil_change = e.visualRecoilChange,
-            reload_speed_change = e.reloadSpeedChange,
-            ads_speed_change = e.adsSpeedChange,
-            pick_up_weapon_speed_change = e.pickupWeaponSpeedChange,
-            store_weapon_speed_change = e.storeWeaponSpeedChange,
-            fire_modes_change = new List<Firing.FireMode>(e.fireModesChange),
-            rate_of_fire_change = e.rafeOfFireChange,
-            burst_bullets_per_tap_change = e.burstBulletsPerTapChange,
-            burst_time_between_bursts_change = e.burstTimeBetweenBurstsChange,
-            can_reload_aiming = e.canReloadAiming
+            points = e.attatchmentPoints,
+            visualRecoilPositionChange = e.visualRecoilPositionChange,
+            visualRecoilRotationChange = e.visualRecoilRotationChange,
+            reloadSpeedChange = e.reloadSpeedChange,
+            adsSpeedChange = e.adsSpeedChange,
+            drawWeaponSpeed = e.pickupWeaponSpeedChange,
+            storeWeaponSpeedChange = e.storeWeaponSpeedChange,
+            fireModesChange = new List<Firing.FireMode>(e.fireModesChange),
+            rateOfFireChange = e.rafeOfFireChange,
+            burstBulletsPerTapChange = e.burstBulletsPerTapChange,
+            canReloadAiming = e.canReloadAiming
         };
     }
     #endregion
@@ -197,86 +288,108 @@ public class AttatchmentManager : MonoBehaviour
         {
             //Vertical Recoil
 
-            wp.recoilValues.recoilPattern[i].verticalRecoil.value += grip.vertical_recoil_change;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value += grip.verticalRecoilChange;
             wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            wp.recoilValues.recoilPattern[i].horizontalRecoil.value += grip.horizontal_recoil_change;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value += grip.horizontalRecoilChange;
             wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
-        wp.current_attachment_points += grip.points;
-        wp.recoilValues.firstShootRecoilMultiplier += grip.first_shoot_change;
-        wp.pick_up_weapon_speed += grip.pick_up_weapon_speed_change;
-        wp.store_weapon_speed += grip.store_weapon_speed_change;
-        wp.reloadValues.reloadTime += grip.reload_speed_change;
-        wp.ads_speed += grip.ads_speed_change;
+        wp.currentAttachmentPoints += grip.points;
+        wp.recoilValues.firstShootRecoilMultiplier += grip.firstShootChange;
+        wp.drawWeaponSpeed += grip.drawWeaponSpeed;
+        wp.storeWeaponSpeed += grip.storeWeaponSpeedChange;
+        wp.reloadValues.reloadTime += grip.reloadSpeedChange;
+        wp.adsSpeed += grip.adsSpeedChange;
+    }
+
+    private void AddRecoilStats(WeaponProperties wp, AttachmentData attachment)
+    {
+        if (wp == null || attachment == null) return;
+
+        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
+        {
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value += attachment.verticalRecoilChange;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value += attachment.horizontalRecoilChange;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+    }
+
+    private void AddNozzleStats(WeaponProperties wp, AttachmentData nozzle)
+    {
+        if (wp == null || nozzle == null) return;
+
+        AddRecoilStats(wp, nozzle);
+        wp.currentAttachmentPoints += nozzle.points;
+        wp.recoilValues.firstShootRecoilMultiplier += nozzle.firstShootChange;
+        wp.projectileValues.muzzleVelocity += nozzle.muzzleVelocityChange;
+        wp.weaponSound.shootSoundProperties.pitch += nozzle.shootPithChange;
+        wp.weaponSound.shootSoundProperties.volume += nozzle.shootVolumeChange;
+        wp.spreadValues.spreadIncreaser += nozzle.spreadChange;
     }
 
     private void AddBarrelStats(WeaponProperties wp, AttachmentData barrel)
     {
         if (wp == null || barrel == null) return;
 
-        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
-        {
-            //Vertical Recoil
-            wp.recoilValues.recoilPattern[i].verticalRecoil.value += barrel.vertical_recoil_change;
-            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-            wp.recoilValues.recoilPattern[i].horizontalRecoil.value += barrel.horizontal_recoil_change;
-            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-
-        wp.current_attachment_points += barrel.points;
-        wp.recoilValues.firstShootRecoilMultiplier += barrel.first_shoot_change;
-        wp.projectileValues.muzzleVelocity += barrel.muzzle_velocity_change;
-        wp.weapon_sound.shootSound.properties.pitch += barrel.shoot_pith_change;
-        wp.weapon_sound.shootSound.properties.volume += barrel.shoot_volume_change;
-        wp.spreadValues.spreadIncreaser += barrel.spread_change;
+        AddRecoilStats(wp, barrel);
+        wp.currentAttachmentPoints += barrel.points;
+        wp.recoilValues.firstShootRecoilMultiplier += barrel.firstShootChange;
+        wp.projectileValues.muzzleVelocity += barrel.muzzleVelocityChange;
+        wp.adsSpeed += barrel.adsSpeedChange;
     }
 
     private void AddSightStats(WeaponProperties wp, AttachmentData sight)
     {
-        wp.current_attachment_points += sight.points;
-        wp.zoom += sight.zoom_change;
-        wp.ads_speed += sight.ads_speed_change;
+        wp.currentAttachmentPoints += sight.points;
+        wp.zoom += sight.zoomChange;
+        wp.adsSpeed += sight.adsSpeedChange;
+    }
+
+    private void AddCantedSightStats(WeaponProperties wp, AttachmentData sight)
+    {
+        wp.currentAttachmentPoints += sight.points;
+        wp.adsSpeed += sight.adsSpeedChange;
     }
 
     private void AddMagStats(WeaponProperties wp, AttachmentData mag)
     {
-        wp.current_attachment_points += mag.points;
-        wp.firing.bulletsPerShot += mag.bullets_per_shot_change;
-        wp.reloadValues.bulletsPerMag = mag.bullet_per_mag_change;
-        wp.reloadValues.magCount += mag.mag_count_change;
-        wp.reloadValues.timeToTransferAmmo += mag.time_to_transfer_ammo_change;
-        wp.ads_speed += mag.ads_speed_change;
-        wp.reloadValues.reloadTime += mag.reload_speed_changer;
+        wp.currentAttachmentPoints += mag.points;
+        wp.firing.bulletsPerShot += mag.bulletsPerShotChange;
+        wp.reloadValues.bulletsPerMag = mag.bulletPerMagChange;
+        wp.reloadValues.magCount += mag.magCountChange;
+        wp.reloadValues.timeToTransferAmmo += mag.timeToTransferAmmoChange;
+        wp.adsSpeed += mag.adsSpeedChange;
+        wp.reloadValues.reloadTime += mag.reloadSpeedChanger;
     }
 
     private void AddSideGripStats(WeaponProperties wp, AttachmentData sideGrip)
     {
-        wp.current_attachment_points += sideGrip.points;
+        wp.currentAttachmentPoints += sideGrip.points;
     }
 
     private void AddErgonomicsStats(WeaponProperties wp, AttachmentData ergo)
     {
         if (wp == null || ergo == null) return;
 
-        wp.current_attachment_points += ergo.points;
-        wp.recoilValues.firstShootRecoilMultiplier += ergo.first_shoot_change;
-        wp.reloadValues.reloadTime += ergo.reload_speed_change;
-        wp.ads_speed += ergo.ads_speed_change;
-        wp.pick_up_weapon_speed += ergo.pick_up_weapon_speed_change;
-        wp.store_weapon_speed += ergo.store_weapon_speed_change;
+        wp.currentAttachmentPoints += ergo.points;
+        wp.recoilValues.firstShootRecoilMultiplier += ergo.firstShootChange;
+        wp.reloadValues.reloadTime += ergo.reloadSpeedChange;
+        wp.adsSpeed += ergo.adsSpeedChange;
+        wp.drawWeaponSpeed += ergo.drawWeaponSpeed;
+        wp.storeWeaponSpeed += ergo.storeWeaponSpeedChange;
 
-        wp.recoilValues.visual_recoil += ergo.visual_recoil_change;
-        wp.firing.rateOfFire += ergo.rate_of_fire_change;
-        wp.firing.burstModeSettings.bulletsPerTap += ergo.burst_bullets_per_tap_change;
-        wp.firing.burstModeSettings.timeBetweenBursts += ergo.burst_time_between_bursts_change;
-        wp.canReloadAiming = ergo.can_reload_aiming;
+        wp.recoilValues.visualPositionRecoil += ergo.visualRecoilPositionChange;
+        wp.recoilValues.maxRotationRecoil += ergo.visualRecoilRotationChange;
+        wp.firing.rateOfFire += ergo.rateOfFireChange;
+        wp.firing.BurstModeBulletsPerTap += ergo.burstBulletsPerTapChange;
+        wp.canReloadAiming = ergo.canReloadAiming;
 
-        if (ergo.fire_modes_change != null && ergo.fire_modes_change.Count > 0)
+        if (ergo.fireModesChange != null && ergo.fireModesChange.Count > 0)
         {
-            foreach (var fm in ergo.fire_modes_change)
+            foreach (var fm in ergo.fireModesChange)
             {
                 if (!wp.firing.fireModes.Contains(fm)) wp.firing.fireModes.Add(fm);
             }
@@ -291,27 +404,27 @@ public class AttatchmentManager : MonoBehaviour
 
         attachment.attachmentName = "";
         attachment.points = 0;
-        attachment.vertical_recoil_change = 0;
-        attachment.horizontal_recoil_change = 0;
-        attachment.first_shoot_change = 0;
-        attachment.reload_speed_change = 0;
-        attachment.ads_speed_change = 0;
-        attachment.pick_up_weapon_speed_change = 0;
-        attachment.store_weapon_speed_change = 0;
-        attachment.muzzle_lightning_change = 0;
-        attachment.muzzle_velocity_change = 0;
-        attachment.shoot_pith_change = 0;
-        attachment.spread_change = 0;
-        attachment.zoom_change = 0;
-        attachment.sway_change = 0;
-        attachment.bullet_per_mag_change = 0;
-        attachment.reload_speed_changer = 0;
-        attachment.visual_recoil_change = Vector3.zero;
-        if (attachment.fire_modes_change != null) attachment.fire_modes_change.Clear();
-        attachment.rate_of_fire_change = 0;
-        attachment.burst_bullets_per_tap_change = 0;
-        attachment.burst_time_between_bursts_change = 0;
-        attachment.can_reload_aiming = false;
+        attachment.verticalRecoilChange = 0;
+        attachment.horizontalRecoilChange = 0;
+        attachment.firstShootChange = 0;
+        attachment.reloadSpeedChange = 0;
+        attachment.adsSpeedChange = 0;
+        attachment.drawWeaponSpeed = 0;
+        attachment.storeWeaponSpeedChange = 0;
+        attachment.muzzleLightningChange = 0;
+        attachment.muzzleVelocityChange = 0;
+        attachment.shootPithChange = 0;
+        attachment.shootVolumeChange = 0;
+        attachment.spreadChange = 0;
+        attachment.zoomChange = 0;
+        attachment.bulletPerMagChange = 0;
+        attachment.reloadSpeedChanger = 0;
+        attachment.visualRecoilPositionChange = Vector3.zero;
+        attachment.visualRecoilRotationChange = Vector3.zero;
+        if (attachment.fireModesChange != null) attachment.fireModesChange.Clear();
+        attachment.rateOfFireChange = 0;
+        attachment.burstBulletsPerTapChange = 0;
+        attachment.canReloadAiming = false;
     }
 
     private void RemoveGripStats(WeaponProperties wp, AttachmentData grip)
@@ -321,46 +434,61 @@ public class AttatchmentManager : MonoBehaviour
         for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
         {
             //Vertical Recoil
-            wp.recoilValues.recoilPattern[i].verticalRecoil.value -= grip.vertical_recoil_change;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value -= grip.verticalRecoilChange;
             wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
 
             //Horizontal Recoil
-            wp.recoilValues.recoilPattern[i].horizontalRecoil.value -= grip.horizontal_recoil_change;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value -= grip.horizontalRecoilChange;
             wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
         }
 
-        wp.current_attachment_points -= grip.points;
-        wp.recoilValues.firstShootRecoilMultiplier -= grip.first_shoot_change;
-        wp.pick_up_weapon_speed -= grip.pick_up_weapon_speed_change;
-        wp.store_weapon_speed -= grip.store_weapon_speed_change;
-        wp.reloadValues.reloadTime -= grip.reload_speed_change;
-        wp.ads_speed -= grip.ads_speed_change;
+        wp.currentAttachmentPoints -= grip.points;
+        wp.recoilValues.firstShootRecoilMultiplier -= grip.firstShootChange;
+        wp.drawWeaponSpeed -= grip.drawWeaponSpeed;
+        wp.storeWeaponSpeed -= grip.storeWeaponSpeedChange;
+        wp.reloadValues.reloadTime -= grip.reloadSpeedChange;
+        wp.adsSpeed -= grip.adsSpeedChange;
 
         ResetAttachmentDataToZero(grip);
+    }
+
+    private void RemoveRecoilStats(WeaponProperties wp, AttachmentData attachment)
+    {
+        if (wp == null || attachment == null) return;
+
+        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
+        {
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value -= attachment.verticalRecoilChange;
+            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value -= attachment.horizontalRecoilChange;
+            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
+        }
+    }
+
+    private void RemoveNozzleStats(WeaponProperties wp, AttachmentData nozzle)
+    {
+        if (wp == null || nozzle == null) return;
+
+        RemoveRecoilStats(wp, nozzle);
+        wp.currentAttachmentPoints -= nozzle.points;
+        wp.recoilValues.firstShootRecoilMultiplier -= nozzle.firstShootChange;
+        wp.projectileValues.muzzleVelocity -= nozzle.muzzleVelocityChange;
+        wp.weaponSound.shootSoundProperties.pitch -= nozzle.shootPithChange;
+        wp.weaponSound.shootSoundProperties.volume -= nozzle.shootVolumeChange;
+        wp.spreadValues.spreadIncreaser -= nozzle.spreadChange;
+
+        ResetAttachmentDataToZero(nozzle);
     }
 
     private void RemoveBarrelStats(WeaponProperties wp, AttachmentData barrel)
     {
         if (wp == null || barrel == null) return;
 
-        for (int i = 0; i < wp.recoilValues.recoilPattern.Length; i++)
-        {
-            //Vertical Recoil
-            wp.recoilValues.recoilPattern[i].verticalRecoil.value -= barrel.vertical_recoil_change;
-            wp.recoilValues.recoilPattern[i].verticalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].verticalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-
-            //Horizontal Recoil
-            wp.recoilValues.recoilPattern[i].horizontalRecoil.value -= barrel.horizontal_recoil_change;
-
-            wp.recoilValues.recoilPattern[i].horizontalRecoil.value = Math.Clamp(wp.recoilValues.recoilPattern[i].horizontalRecoil.value, Recoil.MIN_RECOIL_VALUE, Recoil.MAX_RECOIL_VALUE);
-        }
-
-        wp.current_attachment_points -= barrel.points;
-        wp.recoilValues.firstShootRecoilMultiplier -= barrel.first_shoot_change;
-        wp.projectileValues.muzzleVelocity -= barrel.muzzle_velocity_change;
-        wp.weapon_sound.shootSound.properties.pitch -= barrel.shoot_pith_change;
-        wp.weapon_sound.shootSound.properties.volume -= barrel.shoot_volume_change;
-        wp.spreadValues.spreadIncreaser -= barrel.spread_change;
+        RemoveRecoilStats(wp, barrel);
+        wp.currentAttachmentPoints -= barrel.points;
+        wp.recoilValues.firstShootRecoilMultiplier -= barrel.firstShootChange;
+        wp.projectileValues.muzzleVelocity -= barrel.muzzleVelocityChange;
+        wp.adsSpeed -= barrel.adsSpeedChange;
 
         ResetAttachmentDataToZero(barrel);
     }
@@ -369,9 +497,19 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || sight == null) return;
 
-        wp.current_attachment_points -= sight.points;
-        wp.zoom -= sight.zoom_change;
-        wp.ads_speed -= sight.ads_speed_change;
+        wp.currentAttachmentPoints -= sight.points;
+        wp.zoom -= sight.zoomChange;
+        wp.adsSpeed -= sight.adsSpeedChange;
+
+        ResetAttachmentDataToZero(sight);
+    }
+
+    private void RemoveCantedSightStats(WeaponProperties wp, AttachmentData sight)
+    {
+        if (wp == null || sight == null) return;
+
+        wp.currentAttachmentPoints -= sight.points;
+        wp.adsSpeed -= sight.adsSpeedChange;
 
         ResetAttachmentDataToZero(sight);
     }
@@ -380,13 +518,13 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || mag == null) return;
 
-        wp.current_attachment_points -= mag.points;
-        wp.firing.bulletsPerShot -= mag.bullets_per_shot_change;
-        wp.reloadValues.bulletsPerMag -= mag.bullet_per_mag_change;
-        wp.ads_speed -= mag.ads_speed_change;
-        wp.reloadValues.magCount -= mag.mag_count_change;
-        wp.reloadValues.timeToTransferAmmo -= mag.time_to_transfer_ammo_change;
-        wp.reloadValues.reloadTime -= mag.reload_speed_changer;
+        wp.currentAttachmentPoints -= mag.points;
+        wp.firing.bulletsPerShot -= mag.bulletsPerShotChange;
+        wp.reloadValues.bulletsPerMag -= mag.bulletPerMagChange;
+        wp.adsSpeed -= mag.adsSpeedChange;
+        wp.reloadValues.magCount -= mag.magCountChange;
+        wp.reloadValues.timeToTransferAmmo -= mag.timeToTransferAmmoChange;
+        wp.reloadValues.reloadTime -= mag.reloadSpeedChanger;
 
         ResetAttachmentDataToZero(mag);
     }
@@ -395,7 +533,7 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || sideGrip == null) return;
 
-        wp.current_attachment_points -= sideGrip.points;
+        wp.currentAttachmentPoints -= sideGrip.points;
         ResetAttachmentDataToZero(sideGrip);
     }
 
@@ -403,21 +541,21 @@ public class AttatchmentManager : MonoBehaviour
     {
         if (wp == null || ergo == null) return;
 
-        wp.current_attachment_points -= ergo.points;
-        wp.reloadValues.reloadTime -= ergo.reload_speed_change;
-        wp.ads_speed -= ergo.ads_speed_change;
-        wp.pick_up_weapon_speed -= ergo.pick_up_weapon_speed_change;
-        wp.store_weapon_speed -= ergo.store_weapon_speed_change;
+        wp.currentAttachmentPoints -= ergo.points;
+        wp.reloadValues.reloadTime -= ergo.reloadSpeedChange;
+        wp.adsSpeed -= ergo.adsSpeedChange;
+        wp.drawWeaponSpeed -= ergo.drawWeaponSpeed;
+        wp.storeWeaponSpeed -= ergo.storeWeaponSpeedChange;
 
-        wp.recoilValues.visual_recoil -= ergo.visual_recoil_change;
-        wp.firing.rateOfFire -= ergo.rate_of_fire_change;
-        wp.firing.burstModeSettings.bulletsPerTap -= ergo.burst_bullets_per_tap_change;
-        wp.firing.burstModeSettings.timeBetweenBursts -= ergo.burst_time_between_bursts_change;
-        wp.canReloadAiming = ergo.can_reload_aiming;
+        wp.recoilValues.visualPositionRecoil -= ergo.visualRecoilPositionChange;
+        wp.recoilValues.maxRotationRecoil -= ergo.visualRecoilRotationChange;
+        wp.firing.rateOfFire -= ergo.rateOfFireChange;
+        wp.firing.BurstModeBulletsPerTap -= ergo.burstBulletsPerTapChange;
+        wp.canReloadAiming = ergo.canReloadAiming;
 
-        if (ergo.fire_modes_change != null && ergo.fire_modes_change.Count > 0)
+        if (ergo.fireModesChange != null && ergo.fireModesChange.Count > 0)
         {
-            foreach (var fm in ergo.fire_modes_change)
+            foreach (var fm in ergo.fireModesChange)
             {
                 wp.firing.fireModes.Remove(fm);
             }
@@ -430,7 +568,7 @@ public class AttatchmentManager : MonoBehaviour
     #region Update Methods - APENAS SETACTIVE
     public void UpdateGrip(Grip g, WeaponProperties weaponProperties, bool shouldSave = true)
     {
-        if (g == null || weaponProperties == null) return;
+        if (g == null || weaponProperties == null || !CanEquipAttachment(g)) return;
 
         DisableAllOfType<Grip>();
 
@@ -442,13 +580,33 @@ public class AttatchmentManager : MonoBehaviour
         currentGrip = CreateGripData(g);
         AddGripStats(weaponProperties, currentGrip);
         g.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
 
         if (shouldSave) SaveAttachmentsToPlayerPrefs();
     }
 
-    public void UpdateBarrel(Barrel b, WeaponProperties weaponProperties, bool shouldSave = true)
+    public void UpdateNozzle(Nozzle nozzle, WeaponProperties weaponProperties, bool shouldSave = true)
     {
-        if (b == null || weaponProperties == null) return;
+        if (nozzle == null || weaponProperties == null || !CanEquipAttachment(nozzle)) return;
+
+        DisableAllOfType<Nozzle>();
+
+        if (currentNozzle != null)
+        {
+            RemoveNozzleStats(weaponProperties, currentNozzle);
+        }
+
+        currentNozzle = CreateNozzleData(nozzle);
+        AddNozzleStats(weaponProperties, currentNozzle);
+        nozzle.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
+
+        if (shouldSave) SaveAttachmentsToPlayerPrefs();
+    }
+
+    public void UpdateBarrel(Barrel barrel, WeaponProperties weaponProperties, bool shouldSave = true)
+    {
+        if (barrel == null || weaponProperties == null || !CanEquipAttachment(barrel)) return;
 
         DisableAllOfType<Barrel>();
 
@@ -457,16 +615,17 @@ public class AttatchmentManager : MonoBehaviour
             RemoveBarrelStats(weaponProperties, currentBarrel);
         }
 
-        currentBarrel = CreateBarrelData(b);
+        currentBarrel = CreateBarrelData(barrel);
         AddBarrelStats(weaponProperties, currentBarrel);
-        b.gameObject.SetActive(true);
+        barrel.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
 
         if (shouldSave) SaveAttachmentsToPlayerPrefs();
     }
 
     public void UpdateSight(Sight s, WeaponProperties weaponProperties, bool shouldSave = true)
     {
-        if (s == null || weaponProperties == null) return;
+        if (s == null || s is CantedSight || weaponProperties == null || !CanEquipAttachment(s)) return;
 
         DisableAllOfType<Sight>();
 
@@ -478,13 +637,52 @@ public class AttatchmentManager : MonoBehaviour
         currentSight = CreateSightData(s);
         AddSightStats(weaponProperties, currentSight);
         s.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
 
         if (shouldSave) SaveAttachmentsToPlayerPrefs();
     }
 
+    public void UpdateCantedSight(CantedSight sight, WeaponProperties weaponProperties, bool shouldSave = true)
+    {
+        if (sight == null || weaponProperties == null || !CanEquipAttachment(sight)) return;
+
+        DisableAllOfType<CantedSight>();
+
+        if (currentCantedSight != null)
+        {
+            RemoveCantedSightStats(weaponProperties, currentCantedSight);
+        }
+
+        currentCantedSight = CreateSightData(sight);
+        AddCantedSightStats(weaponProperties, currentCantedSight);
+        sight.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
+
+        if (shouldSave) SaveAttachmentsToPlayerPrefs();
+    }
+
+    public bool TryUpdateCurrentSightZoom(Sight sight, float newZoomChange)
+    {
+        if (sight == null || weaponProperties == null) return false;
+
+        if (sight is CantedSight)
+        {
+            if (currentCantedSight == null || currentCantedSight.attachmentName != sight.gameObject.name) return false;
+            currentCantedSight.zoomChange = newZoomChange;
+            return true;
+        }
+
+        if (currentSight == null) return false;
+        if (currentSight.attachmentName != sight.gameObject.name) return false;
+
+        weaponProperties.zoom += newZoomChange - currentSight.zoomChange;
+        currentSight.zoomChange = newZoomChange;
+        return true;
+    }
+
     public void UpdateMag(Mag m, WeaponProperties weaponProperties, bool shouldSave = true)
     {
-        if (weaponProperties == null) return;
+        if (m == null || weaponProperties == null || !CanEquipAttachment(m)) return;
 
         DisableAllOfType<Mag>();
 
@@ -496,13 +694,14 @@ public class AttatchmentManager : MonoBehaviour
         currentMag = CreateMagData(m);
         AddMagStats(weaponProperties, currentMag);
         m.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
 
         if (shouldSave) SaveAttachmentsToPlayerPrefs();
     }
 
     public void UpdateSideGrip(SideGrip sg, WeaponProperties weaponProperties, bool shouldSave = true)
     {
-        if (sg == null || weaponProperties == null) return;
+        if (sg == null || weaponProperties == null || !CanEquipAttachment(sg)) return;
 
         DisableAllOfType<SideGrip>();
 
@@ -514,6 +713,7 @@ public class AttatchmentManager : MonoBehaviour
         currentSideGrip = CreateSideGripData(sg);
         AddSideGripStats(weaponProperties, currentSideGrip);
         sg.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
 
         if (shouldSave) SaveAttachmentsToPlayerPrefs();
     }
@@ -521,7 +721,7 @@ public class AttatchmentManager : MonoBehaviour
     // NOVO
     public void UpdateErgonomics(Ergonomics e, WeaponProperties weaponProperties, bool shouldSave = true)
     {
-        if (e == null || weaponProperties == null) return;
+        if (e == null || weaponProperties == null || !CanEquipAttachment(e)) return;
 
         DisableAllOfType<Ergonomics>();
 
@@ -533,6 +733,7 @@ public class AttatchmentManager : MonoBehaviour
         currentErgonomics = CreateErgonomicsData(e);
         AddErgonomicsStats(weaponProperties, currentErgonomics);
         e.gameObject.SetActive(true);
+        SynchronizeAttachmentPoints(weaponProperties);
 
         if (shouldSave) SaveAttachmentsToPlayerPrefs();
     }
@@ -543,20 +744,100 @@ public class AttatchmentManager : MonoBehaviour
         T[] components = GetComponentsInChildren<T>(true);
         foreach (T comp in components)
         {
+            if (comp.GetType() != typeof(T)) continue;
             comp.gameObject.SetActive(false);
         }
     }
     #endregion
 
     #region Remove Methods (Public)
+    public void ResetToStandardAttachments()
+    {
+        if (weaponProperties == null)
+        {
+            weaponProperties = GetComponent<WeaponProperties>();
+            if (weaponProperties == null) return;
+        }
+
+        if (string.IsNullOrEmpty(weaponName)) weaponName = weaponProperties.weaponName;
+
+        RemoveAllAttachmentsWithoutSaving();
+
+        Grip grip = GetStandardAttachment<Grip>();
+        if (grip != null) UpdateGrip(grip, weaponProperties, false);
+        else
+        {
+            RemoveGrip(false);
+            DisableAllOfType<Grip>();
+        }
+
+        Nozzle nozzle = GetStandardAttachment<Nozzle>();
+        if (nozzle != null) UpdateNozzle(nozzle, weaponProperties, false);
+        else
+        {
+            RemoveNozzle(false);
+            DisableAllOfType<Nozzle>();
+        }
+
+        Barrel barrel = GetStandardAttachment<Barrel>() ?? GetFirstAvailableBarrel();
+        if (barrel != null) UpdateBarrel(barrel, weaponProperties, false);
+
+        Sight sight = GetStandardAttachment<Sight>();
+        if (sight != null) UpdateSight(sight, weaponProperties, false);
+        else
+        {
+            RemoveSight(false);
+            DisableAllOfType<Sight>();
+        }
+
+        CantedSight cantedSight = GetStandardAttachment<CantedSight>();
+        if (cantedSight != null) UpdateCantedSight(cantedSight, weaponProperties, false);
+        else
+        {
+            RemoveCantedSight(false);
+            DisableAllOfType<CantedSight>();
+        }
+
+        Mag mag = GetStandardAttachment<Mag>() ?? GetFirstAvailableMag();
+        if (mag != null) UpdateMag(mag, weaponProperties, false);
+
+        SideGrip sideGrip = GetStandardAttachment<SideGrip>();
+        if (sideGrip != null) UpdateSideGrip(sideGrip, weaponProperties, false);
+        else
+        {
+            RemoveSideGrip(false);
+            DisableAllOfType<SideGrip>();
+        }
+
+        Ergonomics ergonomics = GetStandardAttachment<Ergonomics>();
+        if (ergonomics != null) UpdateErgonomics(ergonomics, weaponProperties, false);
+        else
+        {
+            RemoveErgonomics(false);
+            DisableAllOfType<Ergonomics>();
+        }
+
+        SynchronizeAttachmentPoints(weaponProperties);
+        SaveAttachmentsToPlayerPrefs();
+    }
+
     public void RemoveAllAttatchments()
     {
-        RemoveGrip(true);
-        RemoveBarrel(true);
-        RemoveMag_(true);
-        RemoveSight(true);
-        RemoveSideGrip(true);
-        RemoveErgonomics(true); // NOVO
+        RemoveAllAttachmentsWithoutSaving();
+        SaveAttachmentsToPlayerPrefs();
+    }
+
+    private void RemoveAllAttachmentsWithoutSaving()
+    {
+        RemoveGrip(false);
+        RemoveNozzle(false);
+        RemoveBarrel(false);
+        RemoveMag_(false);
+        RemoveSight(false);
+        RemoveCantedSight(false);
+        RemoveSideGrip(false);
+        RemoveErgonomics(false);
+        SynchronizeAttachmentPoints(weaponProperties);
     }
 
     public void RemoveGrip(bool shouldSave = true)
@@ -566,8 +847,22 @@ public class AttatchmentManager : MonoBehaviour
             RemoveGripStats(weaponProperties, currentGrip);
             DisableAllOfType<Grip>();
             currentGrip = null;
+            SynchronizeAttachmentPoints(weaponProperties);
 
             if (shouldSave)SaveAttachmentsToPlayerPrefs();
+        }
+    }
+
+    public void RemoveNozzle(bool shouldSave = true)
+    {
+        if (currentNozzle != null && weaponProperties != null)
+        {
+            RemoveNozzleStats(weaponProperties, currentNozzle);
+            DisableAllOfType<Nozzle>();
+            currentNozzle = null;
+            SynchronizeAttachmentPoints(weaponProperties);
+
+            if (shouldSave) SaveAttachmentsToPlayerPrefs();
         }
     }
 
@@ -578,6 +873,7 @@ public class AttatchmentManager : MonoBehaviour
             RemoveBarrelStats(weaponProperties, currentBarrel);
             DisableAllOfType<Barrel>();
             currentBarrel = null;
+            SynchronizeAttachmentPoints(weaponProperties);
 
             if (shouldSave) SaveAttachmentsToPlayerPrefs();
         }
@@ -590,6 +886,20 @@ public class AttatchmentManager : MonoBehaviour
             RemoveSightStats(weaponProperties, currentSight);
             DisableAllOfType<Sight>();
             currentSight = null;
+            SynchronizeAttachmentPoints(weaponProperties);
+
+            if (shouldSave) SaveAttachmentsToPlayerPrefs();
+        }
+    }
+
+    public void RemoveCantedSight(bool shouldSave = true)
+    {
+        if (currentCantedSight != null && weaponProperties != null)
+        {
+            RemoveCantedSightStats(weaponProperties, currentCantedSight);
+            DisableAllOfType<CantedSight>();
+            currentCantedSight = null;
+            SynchronizeAttachmentPoints(weaponProperties);
 
             if (shouldSave) SaveAttachmentsToPlayerPrefs();
         }
@@ -602,6 +912,7 @@ public class AttatchmentManager : MonoBehaviour
             RemoveMagStats(weaponProperties, currentMag);
             DisableAllOfType<Mag>();
             currentMag = null;
+            SynchronizeAttachmentPoints(weaponProperties);
 
             if (shouldSave) SaveAttachmentsToPlayerPrefs();
         }
@@ -614,6 +925,7 @@ public class AttatchmentManager : MonoBehaviour
             RemoveSideGripStats(weaponProperties, currentSideGrip);
             DisableAllOfType<SideGrip>();
             currentSideGrip = null;
+            SynchronizeAttachmentPoints(weaponProperties);
 
             if (shouldSave)SaveAttachmentsToPlayerPrefs();
         }
@@ -627,6 +939,7 @@ public class AttatchmentManager : MonoBehaviour
             RemoveErgonomicsStats(weaponProperties, currentErgonomics);
             DisableAllOfType<Ergonomics>();
             currentErgonomics = null;
+            SynchronizeAttachmentPoints(weaponProperties);
 
             if (shouldSave) SaveAttachmentsToPlayerPrefs();
         }
@@ -634,6 +947,18 @@ public class AttatchmentManager : MonoBehaviour
     #endregion
 
     #region Helper Methods
+    private T GetStandardAttachment<T>() where T : Attatchment
+    {
+        T[] attachments = GetComponentsInChildren<T>(true);
+        foreach (T attachment in attachments)
+        {
+            if (attachment.GetType() == typeof(T) && attachment.isStandardAttatchment)
+                return attachment;
+        }
+
+        return null;
+    }
+
     private T FindAttachmentByName<T>(string name) where T : Component
     {
         if (string.IsNullOrEmpty(name)) return null;
@@ -648,9 +973,23 @@ public class AttatchmentManager : MonoBehaviour
 
     private Mag GetFirstAvailableMag()
     {
+        Mag standardMag = GetStandardAttachment<Mag>();
+        if (standardMag != null) return standardMag;
+
         Mag[] mags = GetComponentsInChildren<Mag>(true);
         if (mags != null && mags.Length > 0) return mags[0];
         
+        return null;
+    }
+
+    private Barrel GetFirstAvailableBarrel()
+    {
+        Barrel standardBarrel = GetStandardAttachment<Barrel>();
+        if (standardBarrel != null) return standardBarrel;
+
+        Barrel[] barrels = GetComponentsInChildren<Barrel>(true);
+        if (barrels != null && barrels.Length > 0) return barrels[0];
+
         return null;
     }
     #endregion
@@ -664,6 +1003,8 @@ public class AttatchmentManager : MonoBehaviour
         var saveData = new WeaponAttachmentSaveData(weaponName);
 
         if (currentSight != null) saveData.activeSight = currentSight.attachmentName;
+        if (currentCantedSight != null) saveData.activeCantedSight = currentCantedSight.attachmentName;
+        if (currentNozzle != null) saveData.activeNozzle = currentNozzle.attachmentName;
         if (currentBarrel != null) saveData.activeBarrel = currentBarrel.attachmentName;
         if (currentMag != null) saveData.activeMag = currentMag.attachmentName;
         if (currentGrip != null) saveData.activeGrip = currentGrip.attachmentName;
@@ -684,19 +1025,7 @@ public class AttatchmentManager : MonoBehaviour
 
         if (!PlayerPrefs.HasKey(saveKey))
         {
-            var defaultSaveData = new WeaponAttachmentSaveData(weaponName);
-
-            Mag firstMag = GetFirstAvailableMag();
-            if (firstMag != null)
-            {
-                defaultSaveData.activeMag = firstMag.gameObject.name;
-            }
-
-            string defaultJson = JsonUtility.ToJson(defaultSaveData);
-            PlayerPrefs.SetString(saveKey, defaultJson);
-            PlayerPrefs.Save();
-
-            LoadAttachmentsFromPlayerPrefs();
+            ResetToStandardAttachments();
             return;
         }
 
@@ -705,27 +1034,54 @@ public class AttatchmentManager : MonoBehaviour
 
         if (saveData == null)
         {
-            Debug.LogError($"[{weaponName}] Falha ao desserializar save");
+            Debug.LogError($"[{weaponName}] Failed to deserialize saved data");
             return;
         }
+
+        ApplySavedAttachments(saveData);
+    }
+
+    private void ApplySavedAttachments(WeaponAttachmentSaveData saveData)
+    {
+        if (saveData == null || weaponProperties == null) return;
 
         if (!string.IsNullOrEmpty(saveData.activeSight))
         {
             Sight sight = FindAttachmentByName<Sight>(saveData.activeSight);
-            if (sight != null) UpdateSight(sight, weaponProperties, false);
+            if (sight is CantedSight legacyCantedSight) UpdateCantedSight(legacyCantedSight, weaponProperties, false);
+            else if (sight != null) UpdateSight(sight, weaponProperties, false);
         }
 
-        if (!string.IsNullOrEmpty(saveData.activeBarrel))
+        if (!string.IsNullOrEmpty(saveData.activeCantedSight))
         {
-            Barrel barrel = FindAttachmentByName<Barrel>(saveData.activeBarrel);
-            if (barrel != null) UpdateBarrel(barrel, weaponProperties, false);
+            CantedSight cantedSight = FindAttachmentByName<CantedSight>(saveData.activeCantedSight);
+            if (cantedSight != null) UpdateCantedSight(cantedSight, weaponProperties, false);
         }
 
-        if (!string.IsNullOrEmpty(saveData.activeMag))
+        string nozzleName = saveData.activeNozzle;
+        string barrelName = saveData.activeBarrel;
+
+        // Saves anteriores separavam o antigo Barrel usando apenas activeBarrel.
+        // Esse attachment agora e um Nozzle; a versao evita confundi-lo com o novo Barrel.
+        if (saveData.version < WeaponAttachmentSaveData.CurrentVersion)
         {
-            Mag mag = FindAttachmentByName<Mag>(saveData.activeMag);
-            if (mag != null) UpdateMag(mag, weaponProperties, false);
+            nozzleName = saveData.activeBarrel;
+            barrelName = "";
         }
+
+        if (!string.IsNullOrEmpty(nozzleName))
+        {
+            Nozzle nozzle = FindAttachmentByName<Nozzle>(nozzleName);
+            if (nozzle != null) UpdateNozzle(nozzle, weaponProperties, false);
+        }
+
+        Barrel barrel = FindAttachmentByName<Barrel>(barrelName);
+        if (barrel == null) barrel = GetFirstAvailableBarrel();
+        if (barrel != null) UpdateBarrel(barrel, weaponProperties, false);
+
+        Mag mag = FindAttachmentByName<Mag>(saveData.activeMag);
+        if (mag == null) mag = GetFirstAvailableMag();
+        if (mag != null) UpdateMag(mag, weaponProperties, false);
 
         if (!string.IsNullOrEmpty(saveData.activeGrip))
         {
@@ -754,57 +1110,26 @@ public class AttatchmentManager : MonoBehaviour
         var weaponData = saveData.GetWeaponData(weaponName);
         if (weaponData == null) return;
 
-        if (!string.IsNullOrEmpty(weaponData.activeSight))
-        {
-            Sight sight = FindAttachmentByName<Sight>(weaponData.activeSight);
-            if (sight != null) UpdateSight(sight, weaponProperties, false);
-        }
-
-        if (!string.IsNullOrEmpty(weaponData.activeBarrel))
-        {
-            Barrel barrel = FindAttachmentByName<Barrel>(weaponData.activeBarrel);
-            if (barrel != null) UpdateBarrel(barrel, weaponProperties, false);
-        }
-
-        if (!string.IsNullOrEmpty(weaponData.activeMag))
-        {
-            Mag mag = FindAttachmentByName<Mag>(weaponData.activeMag);
-            if (mag != null) UpdateMag(mag, weaponProperties, false);
-        }
-
-        if (!string.IsNullOrEmpty(weaponData.activeGrip))
-        {
-            Grip grip = FindAttachmentByName<Grip>(weaponData.activeGrip);
-            if (grip != null) UpdateGrip(grip, weaponProperties, false);
-        }
-
-        if (!string.IsNullOrEmpty(weaponData.activeSideGrip))
-        {
-            SideGrip sideGrip = FindAttachmentByName<SideGrip>(weaponData.activeSideGrip);
-            if (sideGrip != null) UpdateSideGrip(sideGrip, weaponProperties, false);
-        }
-
-        // NOVO
-        if (!string.IsNullOrEmpty(weaponData.activeErgonomics))
-        {
-            Ergonomics ergonomics = FindAttachmentByName<Ergonomics>(weaponData.activeErgonomics);
-            if (ergonomics != null) UpdateErgonomics(ergonomics, weaponProperties, false);
-        }
+        ApplySavedAttachments(weaponData);
     }
     #endregion
 
     #region Public Getters
     public AttachmentData GetCurrentGrip() => currentGrip;
+    public AttachmentData GetCurrentNozzle() => currentNozzle;
     public AttachmentData GetCurrentBarrel() => currentBarrel;
     public AttachmentData GetCurrentSight() => currentSight;
+    public AttachmentData GetCurrentCantedSight() => currentCantedSight;
     public AttachmentData GetCurrentMag() => currentMag;
     public AttachmentData GetCurrentSideGrip() => currentSideGrip;
-    public AttachmentData GetCurrentErgonomics() => currentErgonomics; // NOVO
+    public AttachmentData GetCurrentErgonomics() => currentErgonomics;
     public bool HasGrip() => currentGrip != null;
+    public bool HasNozzle() => currentNozzle != null;
     public bool HasBarrel() => currentBarrel != null;
     public bool HasSight() => currentSight != null;
+    public bool HasCantedSight() => currentCantedSight != null;
     public bool HasMag() => currentMag != null;
     public bool HasSideGrip() => currentSideGrip != null;
-    public bool HasErgonomics() => currentErgonomics != null; // NOVO
+    public bool HasErgonomics() => currentErgonomics != null;
     #endregion
 }

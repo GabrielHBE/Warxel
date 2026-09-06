@@ -6,6 +6,8 @@ using UnityEngine.Rendering;
 
 public class SkinApplier : NetworkBehaviour
 {
+    [SerializeField] private FirstPersonSkinApplier firstPersonSkinApplier;
+
     [Header("Core")]
     public Transform headParent;
     public Transform torsoParent;
@@ -30,19 +32,30 @@ public class SkinApplier : NetworkBehaviour
     public Transform rightLowerLegParent;
     public Transform rightFootParent;
 
-    private readonly SyncVar<PlayerController> playerController = new SyncVar<PlayerController>();
+    public SkinPart instantiatedHead { get; private set; }
+    public SkinPart instantiatedTorso { get; private set; }
+    public SkinPart instantiatedLeftUpperArm { get; private set; }
+    public SkinPart instantiatedLeftLowerArm { get; private set; }
+    public SkinPart instantiatedLeftHand { get; private set; }
+    public SkinPart instantiatedRightUpperArm { get; private set; }
+    public SkinPart instantiatedRightLowerArm { get; private set; }
+    public SkinPart instantiatedRightHand { get; private set; }
+    public SkinPart instantiatedLeftUpperLeg { get; private set; }
+    public SkinPart instantiatedLeftLowerLeg { get; private set; }
+    public SkinPart instantiatedLeftFoot { get; private set; }
+    public SkinPart instantiatedRightUpperLeg { get; private set; }
+    public SkinPart instantiatedRightLowerLeg { get; private set; }
+    public SkinPart instantiatedRightFoot { get; private set; }
 
     public void ApplySkin(PlayerController pc)
     {
-        SetPlayerController(pc);
-        Skin skin = SkinsManager.GetSkin(SkinSelectionManager.LoadCurrentSkinForClass(AccountManager.Instance.selected_class), AccountManager.Instance.selected_class);
+
+        Skin skin = SkinsManager.GetSkin(SkinSelectionManager.LoadCurrentSkinForClass(AccountManager.Instance.selectedClass), AccountManager.Instance.selectedClass);
         if (skin == null) return;
         SpawnSkinParts(skin, pc);
-        RequestCreateSkin(GetSelectedSkinNameForClass(AccountManager.Instance.selected_class), AccountManager.Instance.selected_class, pc);
+        RequestCreateSkin(GetSelectedSkinNameForClass(AccountManager.Instance.selectedClass), AccountManager.Instance.selectedClass, pc);
     }
 
-    [ServerRpc]
-    private void SetPlayerController(PlayerController pc) => playerController.Value = pc;
 
     [ServerRpc]
     private void RequestCreateSkin(string skinName, ClassManager.Class skinClass, PlayerController pc) => CmdCreateSkin(skinName, skinClass, pc);
@@ -61,44 +74,71 @@ public class SkinApplier : NetworkBehaviour
         try
         {
             // Core
-            ProcessInfantryDamage head = InstantiatePart(skin.head, headParent).GetComponent<ProcessInfantryDamage>();
-            head.SetPlayerController(pc);
-            if (IsOwner) head.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            instantiatedHead = InstantiatePart(skin.head, headParent);
+            instantiatedHead.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            if (IsOwner) instantiatedHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
 
-            InstantiatePart(skin.torso, torsoParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            instantiatedTorso = InstantiatePart(skin.torso, torsoParent);
+            instantiatedTorso.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
             // Left Arm
-            InstantiatePart(skin.leftUpperArm, leftUpperArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.leftLowerArm, leftLowerArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.leftHand, leftHandParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            instantiatedLeftUpperArm = InstantiatePart(skin.leftUpperArm, leftUpperArmParent);
+            if (IsOwner) firstPersonSkinApplier.InstantiateLeftUpperArm(skin.leftUpperArm);
+            instantiatedLeftUpperArm.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedLeftLowerArm = InstantiatePart(skin.leftLowerArm, leftLowerArmParent);
+            if (IsOwner) firstPersonSkinApplier.InstantiateLeftLowerArm(skin.leftLowerArm);
+            instantiatedLeftLowerArm.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedLeftHand = InstantiatePart(skin.leftHand, leftHandParent);
+            if (IsOwner) firstPersonSkinApplier.InstantiateLeftHand(skin.leftHand);
+            instantiatedLeftHand.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
             // Right Arm
-            InstantiatePart(skin.rightUpperArm, rightUpperArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.rightLowerArm, rightLowerArmParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.rightHand, rightHandParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            instantiatedRightUpperArm = InstantiatePart(skin.rightUpperArm, rightUpperArmParent);
+            if (IsOwner) firstPersonSkinApplier.InstantiateRightUpperArm(skin.rightUpperArm);
+            instantiatedRightUpperArm.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedRightLowerArm = InstantiatePart(skin.rightLowerArm, rightLowerArmParent);
+            if (IsOwner) firstPersonSkinApplier.InstantiateRightLowerArm(skin.rightLowerArm);
+            instantiatedRightLowerArm.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedRightHand = InstantiatePart(skin.rightHand, rightHandParent);
+            if (IsOwner) firstPersonSkinApplier.InstantiateRightHand(skin.rightHand);
+            instantiatedRightHand.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
             // Left Leg
-            InstantiatePart(skin.leftUpperLeg, leftUpperLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.leftLowerLeg, leftLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.leftFoot, leftFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            instantiatedLeftUpperLeg = InstantiatePart(skin.leftUpperLeg, leftUpperLegParent);
+            instantiatedLeftUpperLeg.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedLeftLowerLeg = InstantiatePart(skin.leftLowerLeg, leftLowerLegParent);
+            instantiatedLeftLowerLeg.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedLeftFoot = InstantiatePart(skin.leftFoot, leftFootParent);
+            instantiatedLeftFoot.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
             // Right Leg
-            InstantiatePart(skin.rightUpperLeg, rightUpperLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.rightLowerLeg, rightLowerLegParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            InstantiatePart(skin.rightFoot, rightFootParent).GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+            instantiatedRightUpperLeg = InstantiatePart(skin.rightUpperLeg, rightUpperLegParent);
+            instantiatedRightUpperLeg.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedRightLowerLeg = InstantiatePart(skin.rightLowerLeg, rightLowerLegParent);
+            instantiatedRightLowerLeg.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
+
+            instantiatedRightFoot = InstantiatePart(skin.rightFoot, rightFootParent);
+            instantiatedRightFoot.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
         }
         catch (Exception) { }
     }
 
-    private GameObject InstantiatePart(GameObject prefab, Transform parent)
+    private SkinPart InstantiatePart(GameObject prefab, Transform parent)
     {
         GameObject instance = Instantiate(prefab, parent, false);
         if (!instance.activeSelf) instance.SetActive(true);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localScale = Vector3.one * 1.2f;
 
-        return instance;
+        return instance.GetComponent<SkinPart>();
     }
 
     private string GetSelectedSkinNameForClass(ClassManager.Class classType) => PlayerPrefs.GetString($"Skin_Selected_{classType}", "");

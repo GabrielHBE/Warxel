@@ -14,7 +14,7 @@ public class CurrentSpreadUI : MonoBehaviour
         currentspreadUIValues = transform.root.GetComponentInChildren<ICurrentSpreadUIValues>(true);
         if (currentspreadUIValues == null)
         {
-            Debug.LogError("CurrentspreadUI: Não foi possível encontrar um componente que implemente ICurrentspreadUIValues no objeto pai.");
+            Debug.LogError("CurrentspreadUI: Could not find a component implementing ICurrentspreadUIValues on the parent object.");
             return;
         }
     }

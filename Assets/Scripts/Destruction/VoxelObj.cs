@@ -5,6 +5,10 @@ using System.Linq;
 [RequireComponent(typeof(Rigidbody)), RequireComponent(typeof(MeshCollider)), RequireComponent(typeof(MeshFilter)), RequireComponent(typeof(MeshRenderer))]
 public class VoxelObj : NetworkBehaviour
 {
+    public static bool IsVoxelLayer(int objectLayer) =>
+        objectLayer == LayerMask.NameToLayer("Voxel") ||
+        objectLayer == LayerMask.NameToLayer("VoxelDebris");
+
     public VoxelMaterialType voxelMaterialType;
     protected LayerMask layer => LayerMask.NameToLayer("Voxel");
 

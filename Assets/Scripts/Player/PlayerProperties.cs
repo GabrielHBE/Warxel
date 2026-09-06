@@ -1,41 +1,37 @@
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
-using UnityEngine;
 
 public class PlayerProperties : NetworkBehaviour
 {
+    private const float INFANTRY_HP = 100;
+
     public readonly SyncVar<string> playerName = new SyncVar<string>();
     public readonly SyncVar<ClassManager.Class> selectedClass = new SyncVar<ClassManager.Class>();
     public readonly SyncVar<FactionManager.Faction> faction = new SyncVar<FactionManager.Faction>();
+    public readonly SyncVar<bool> isDead = new SyncVar<bool>() { Value = false };
+    public readonly SyncVar<float> hp = new SyncVar<float>() { Value = INFANTRY_HP };
+    public readonly SyncVar<float> resistance = new SyncVar<float>();
+    public readonly SyncVar<bool> spotted = new SyncVar<bool>();
     public bool crouched;
     public bool sprinting;
-    public bool is_aiming;
-    public bool is_reloading;
-    public bool is_firing;
-    public bool isGrounded;
-    public bool is_proned;
+    public bool aiming;
+    public bool reloading;
+    public bool firing;
+    public bool grounded;
+    public bool proned;
     public bool isProneTransition;
     public bool applyProneImpulse;
     public bool roll;
-    public bool is_composing_bullets;
+    public bool isComposingBullets;
     public float proneImpulseLockTime;
-    public readonly SyncVar<bool> is_dead = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    public readonly SyncVar<float> hp = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    public readonly SyncVar<float> resistance = new SyncVar<float>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
-    public float max_hp;
-    public bool is_in_vehicle;
-    public float death_timer;
-    public readonly SyncVar<bool> spotted = new SyncVar<bool>(new SyncTypeSettings(WritePermission.ClientUnsynchronized));
+    public float maxHp => INFANTRY_HP;
+    public bool isInVehicle;
+    public float deathTimer => 15;
 
     public override void OnStartClient()
     {
         base.OnStartClient();
 
-        hp.Value = 100;
-        is_dead.Value = false;
-        if (IsOwner && AccountManager.Instance.selected_class == ClassManager.Class.Support) resistance.Value = 25;
-
+        if (IsOwner && AccountManager.Instance.selectedClass == ClassManager.Class.Support) resistance.Value = 25;
     }
-
 }
-

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHpUIValues
+public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHpUIValues, IGunHeatLevelUIValues
 {
 
     [Header("References")]
@@ -11,7 +11,7 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
     public FireModeUI fire_mode_hud;
     public ScreenBlood screenBlood;
     public DeadPlayerHud deadPlayerHud;
-    private string currentAmmo;
+    
 
     [Header("Canvas")]
     [SerializeField] private Canvas ammoCanvas;
@@ -20,16 +20,14 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
     [SerializeField] private Canvas deadPlayerCanvas;
     [SerializeField] private Canvas hpCanvas;
 
+    public float currentHeat;
+    private string currentAmmo;
+
     void Update()
     {
-        if (playerProperties.sprinting && !playerProperties.is_in_vehicle) center_screen_dot.enabled = true;
-        else center_screen_dot.enabled = false; 
+        if (playerProperties.sprinting && !playerProperties.isInVehicle) center_screen_dot.enabled = true;
+        else center_screen_dot.enabled = false;
     }
-
-    public void SetCurrentAmmo(string ammo) => currentAmmo = ammo;
-    public string GetCurrentAmmo() => currentAmmo;
-    public float GetCurrentHp() => playerProperties.hp.Value;
-    public float GetMaxHp() => playerProperties.max_hp;
 
     public void ActivateInVehicleHUD()
     {
@@ -56,5 +54,16 @@ public class SoldierHudManager : MonoBehaviour, ICurrentAmmoUIValues, ICurrentHp
         deadPlayerCanvas.gameObject.SetActive(false);
         hpCanvas.gameObject.SetActive(true);
     }
+
+    #region  Interface Implementations
+    public void SetCurrentAmmo(string ammo) => currentAmmo = ammo;
+    public string GetCurrentAmmo() => currentAmmo;
+    public float GetCurrentHp() => playerProperties.hp.Value;
+    public float GetMaxHp() => playerProperties.maxHp;
+    public float GetMaxHeat() => playerProperties.maxHp;
+
+    public float GetCurrentHeat() => currentHeat;
+    #endregion
+
 
 }

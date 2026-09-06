@@ -5,7 +5,7 @@ public class RollTransitionState : StateMachineBehaviour
     public override void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
         PlayerProperties playerProperties = animator.GetComponentInParent<PlayerProperties>();
-        if (!playerProperties.crouched && !playerProperties.is_proned)
+        if (!playerProperties.crouched && !playerProperties.proned)
         {
             PlayerController playerController = playerProperties.GetComponent<PlayerController>();
 

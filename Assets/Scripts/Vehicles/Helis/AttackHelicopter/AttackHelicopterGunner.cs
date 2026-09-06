@@ -38,7 +38,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
     void Awake()
     {
         // ATUALIZADO: sem stateId, apenas reseta o estado
-        Firing.ResetState();
+        Firing.ResetState(properties.firing.fireModes);
         // Garante que o estado de superaquecimento comece falso
         properties.heatValues.heatState.isOverheated = false;
     }
@@ -175,7 +175,7 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
             vr,
             hr,
             properties.recoilValues.firstShootRecoilMultiplier,
-            is_first_shot,
+            !is_first_shot,
             2
         );
 
@@ -296,14 +296,14 @@ public class AttackHelicopterGunner : NetworkBehaviour, IVehicleArmory
 
     public void SetupFiringSystem()
     {
-        Firing.ResetState();
+        Firing.ResetState(properties?.firing.fireModes);
 
         // Garante que o modo de tiro estático atual é válido para este armamento
         if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
         {
             if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
             {
-                Firing.SwitchFireMode(properties.firing.fireModes);
+                Firing.SwitchFireMode(properties.firing);
             }
         }
     }

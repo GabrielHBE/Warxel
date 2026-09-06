@@ -87,7 +87,7 @@ public class SkinButtonComponents : MonoBehaviour
 
     private void OnBuyButtonClicked()
     {
-        if (AccountManager.Instance.battle_coins < _skin.battleCoinsToUnlock)
+        if (AccountManager.Instance.battleCoins < _skin.battleCoinsToUnlock)
         {
             SoundManager.Play2dSoundLocal(
                 InfantryLoadoutCustomization.reference_purchase_denial_item_sfx.clip,

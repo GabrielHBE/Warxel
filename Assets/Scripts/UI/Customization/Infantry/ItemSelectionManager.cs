@@ -4,11 +4,21 @@ using UnityEngine;
 
 public class ItemSelectionManager : MonoBehaviour
 {
+    [Header("Mouse Wheel Settings")]
+    [SerializeField, Min(0f)] private float mouseWheelScrollSensitivity = 0.1f;
+
     private InfantryLoadoutCustomization infantryLoadoutCustomization;
     private readonly List<GameObject> _buttonsList = new List<GameObject>();
     private Vector3 _originalWeaponsGadgetsPosition;
     private float _maxSliderY;
     private float _minScrollY;
+    private bool _canScroll;
+
+
+    private void Update()
+    {
+        HandleMouseWheelScroll();
+    }
 
 
     public void Initialize(InfantryLoadoutCustomization parent)
@@ -18,6 +28,13 @@ public class ItemSelectionManager : MonoBehaviour
         _minScrollY = infantryLoadoutCustomization.minScrollY;
 
         InitializeSlider();
+    }
+
+    public void RefreshLayoutOrigin()
+    {
+        _originalWeaponsGadgetsPosition = infantryLoadoutCustomization.weaponsGadgetsParent.localPosition;
+        infantryLoadoutCustomization.minScrollY = _originalWeaponsGadgetsPosition.y;
+        _minScrollY = infantryLoadoutCustomization.minScrollY;
     }
 
     private void InitializeSlider()
@@ -30,11 +47,32 @@ public class ItemSelectionManager : MonoBehaviour
         infantryLoadoutCustomization.weaponsGadgetsSlider.onValueChanged.AddListener(OnSliderValueChanged);
     }
 
+    private void HandleMouseWheelScroll()
+    {
+        if (!_canScroll || infantryLoadoutCustomization == null) return;
+
+        UnityEngine.UI.Slider slider = infantryLoadoutCustomization.weaponsGadgetsSlider;
+        if (slider == null || !slider.isActiveAndEnabled ||
+            !infantryLoadoutCustomization.weaponsGadgetsParent.gameObject.activeInHierarchy) return;
+
+        InfantryLoadoutCustomization.SelectionStage stage = infantryLoadoutCustomization.GetCurrentStage();
+        if (stage != InfantryLoadoutCustomization.SelectionStage.ItemSelection &&
+            stage != InfantryLoadoutCustomization.SelectionStage.WeaponCustomization &&
+            stage != InfantryLoadoutCustomization.SelectionStage.SkinSelection) return;
+
+        float scrollDelta = Input.mouseScrollDelta.y;
+        if (Mathf.Approximately(scrollDelta, 0f)) return;
+
+        // Rolar para baixo aumenta o valor do slider e revela os itens inferiores.
+        slider.normalizedValue = Mathf.Clamp01(
+            slider.normalizedValue - scrollDelta * mouseWheelScrollSensitivity);
+    }
+
     public void ShowAvailableItems(LoadoutOptionManager.LoadoutOption option)
     {
         // LIMPA COMPLETAMENTE todos os botões e filhos do weaponsGadgetsParent
         ClearAllWeaponsGadgetsChildren();
-        
+
         infantryLoadoutCustomization.weaponsGadgetsParent.gameObject.SetActive(true);
         _maxSliderY = _minScrollY;
 
@@ -51,6 +89,7 @@ public class ItemSelectionManager : MonoBehaviour
                 break;
         }
 
+        ConfigureScrollForItemCount(_buttonsList.Count);
         UpdateAllButtonOutlines();
     }
 
@@ -99,29 +138,26 @@ public class ItemSelectionManager : MonoBehaviour
 
     private bool HasClassAccessToWeapon(WeaponProperties weaponProperties)
     {
-        return weaponProperties.class_weapon.Any(c => c == infantryLoadoutCustomization._selectedClass);
+        if (AccountManager.Instance.selectedClass == ClassManager.Class.SquadLeader) return true;
+
+        return weaponProperties.classWeapon.Any(c => c == infantryLoadoutCustomization._selectedClass);
     }
 
     private bool HasFactionAccessToWeapon(WeaponProperties weaponProperties)
     {
         if (AccountManager.Instance == null) return true;
-        return weaponProperties.faction.Any(c => c == AccountManager.Instance.faction);
+        return weaponProperties.faction.Any(c => c == AccountManager.Instance.selectedFaction);
     }
 
-    private bool HasClassAccessToGadget(Gadget gadget)
-    {
-        return gadget.class_gadget.Any(c => c == infantryLoadoutCustomization._selectedClass);
-    }
+    private bool HasClassAccessToGadget(Gadget gadget) => gadget.class_gadget.Any(c => c == infantryLoadoutCustomization._selectedClass);
 
     private void CreateWeaponButton(GameObject weapon, WeaponProperties wp, int index)
     {
-        _maxSliderY += infantryLoadoutCustomization.maxScrollYIncreaser;
-
         GameObject weaponButton = Instantiate(infantryLoadoutCustomization.buttonPrefab, infantryLoadoutCustomization.weaponsGadgetsParent);
         ApplyVerticalSpacing(weaponButton, index);
 
         var component = weaponButton.AddComponent<WeaponButtonComponents>();
-        component.Initialize(wp.icon_hud, weapon, wp, infantryLoadoutCustomization);
+        component.Initialize(wp.iconHud, weapon, wp, infantryLoadoutCustomization);
 
         _buttonsList.Add(weaponButton);
     }
@@ -132,7 +168,7 @@ public class ItemSelectionManager : MonoBehaviour
         ApplyVerticalSpacing(gadgetButton, index);
 
         var component = gadgetButton.AddComponent<GadgetButtonComponents>();
-        component.Initialize(gd.icon_hud, gadget, gd, infantryLoadoutCustomization);
+        component.Initialize(gd.iconHud, gadget, gd, infantryLoadoutCustomization);
 
         _buttonsList.Add(gadgetButton);
     }
@@ -149,50 +185,107 @@ public class ItemSelectionManager : MonoBehaviour
 
     public void OnButtonMouseEnter(GameObject item)
     {
+        GameObject comparisonWeapon = CreateEquippedWeaponComparison(item);
         if (infantryLoadoutCustomization._currentItemSelected != null) Destroy(infantryLoadoutCustomization._currentItemSelected);
 
-        infantryLoadoutCustomization._currentItemSelected = Instantiate(item, infantryLoadoutCustomization.currentItemParent);
+        infantryLoadoutCustomization._currentItemSelected = InstantiateCurrentItem(item);
         SetupItemForCustomization(infantryLoadoutCustomization._currentItemSelected);
 
-        infantryLoadoutCustomization._currentItemSelected.GetComponent<AttatchmentManager>().InitializeAttachments();
+        InitializeAttachments(infantryLoadoutCustomization._currentItemSelected);
 
         WeaponProperties wp = infantryLoadoutCustomization._currentItemSelected.GetComponent<WeaponProperties>();
         if (wp != null)
         {
             infantryLoadoutCustomization.UpdateWeaponStats(wp);
+
+            WeaponProperties equippedWeaponProperties = comparisonWeapon != null
+                ? comparisonWeapon.GetComponent<WeaponProperties>()
+                : null;
+            if (equippedWeaponProperties != null)
+                infantryLoadoutCustomization.uIUpdateManager.PreviewWeaponStats(equippedWeaponProperties, wp);
         }
+
+        if (comparisonWeapon != null) Destroy(comparisonWeapon);
+
     }
 
     public void OnButtonClicked(GameObject item)
     {
         if (infantryLoadoutCustomization._currentItemSelected != null) Destroy(infantryLoadoutCustomization._currentItemSelected);
 
-        infantryLoadoutCustomization._currentItemSelected = Instantiate(item, infantryLoadoutCustomization.currentItemParent);
+        infantryLoadoutCustomization._currentItemSelected = InstantiateCurrentItem(item);
         SetupItemForCustomization(infantryLoadoutCustomization._currentItemSelected);
 
-        infantryLoadoutCustomization._currentItemSelected.GetComponent<AttatchmentManager>().InitializeAttachments();
+        InitializeAttachments(infantryLoadoutCustomization._currentItemSelected);
 
         WeaponProperties wp = infantryLoadoutCustomization._currentItemSelected.GetComponent<WeaponProperties>();
         if (wp != null) infantryLoadoutCustomization.UpdateWeaponStats(wp);
-        
+
 
         EquipItem(item);
         UpdateAllButtonOutlines();
     }
 
+    private GameObject CreateEquippedWeaponComparison(GameObject hoveredItem)
+    {
+        GameObject equippedWeapon = GetEquippedWeaponForCurrentOption();
+        if (equippedWeapon == null || equippedWeapon == hoveredItem) return null;
+
+        GameObject comparisonWeapon = InstantiateCurrentItem(equippedWeapon);
+        comparisonWeapon.name = $"{equippedWeapon.name} Comparison";
+        comparisonWeapon.SetActive(false);
+        InitializeAttachments(comparisonWeapon);
+        return comparisonWeapon;
+    }
+
+    private GameObject GetEquippedWeaponForCurrentOption()
+    {
+        return infantryLoadoutCustomization.loadoutOptionManager.GetCurrentOption() switch
+        {
+            LoadoutOptionManager.LoadoutOption.PrimaryWeapon => infantryLoadoutCustomization.GetCurrentPrimaryWeapon(),
+            LoadoutOptionManager.LoadoutOption.SecondaryWeapon => infantryLoadoutCustomization.GetCurrentSecondaryWeapon(),
+            _ => null
+        };
+    }
+
+    private static void InitializeAttachments(GameObject item)
+    {
+        AttatchmentManager attachmentManager = item != null ? item.GetComponent<AttatchmentManager>() : null;
+        if (attachmentManager != null) attachmentManager.InitializeAttachments();
+    }
+
+    private GameObject InstantiateCurrentItem(GameObject item)
+    {
+        GameObject instance = Instantiate(
+            item,
+            infantryLoadoutCustomization.currentItemParent,
+            false
+        );
+
+        // O Animator de algumas armas possui curvas no Transform raiz e restaura
+        // a posicao gravada no prefab depois da instanciação. No preview ele nao
+        // precisa executar, portanto deve ser desativado antes de aplicar o zero.
+        foreach (Animator animator in instance.GetComponentsInChildren<Animator>(true))
+            animator.enabled = false;
+
+        instance.transform.localPosition = Vector3.zero;
+        return instance;
+    }
+
     private void SetupItemForCustomization(GameObject item)
     {
-        item.layer = LayerMask.NameToLayer("LoadoutCustomization");
+        int previewLayer = LayerMask.NameToLayer("LoadoutCustomization");
+        if (previewLayer < 0) return;
 
-        foreach (MeshRenderer renderer in item.GetComponentsInChildren<MeshRenderer>(true))
-        {
-            renderer.gameObject.layer = LayerMask.NameToLayer("LoadoutCustomization");
-        }
+        // Apply the preview layer to every child, including objects without a
+        // MeshRenderer and equipment rendered by a SkinnedMeshRenderer.
+        foreach (Transform child in item.GetComponentsInChildren<Transform>(true))
+            child.gameObject.layer = previewLayer;
     }
 
     private void EquipItem(GameObject item)
     {
-        if (infantryLoadoutCustomization.selectItemSfx != null) SoundManager.Play2dSoundLocal(infantryLoadoutCustomization.selectItemSfx.clip, infantryLoadoutCustomization.selectItemSfx.properties);
+        if (infantryLoadoutCustomization.selectItemSfx != null && infantryLoadoutCustomization.selectItemSfx.clip != null) SoundManager.Play2dSoundLocal(infantryLoadoutCustomization.selectItemSfx.clip, infantryLoadoutCustomization.selectItemSfx.properties);
 
         LoadoutOptionManager.LoadoutOption currentOption = infantryLoadoutCustomization.loadoutOptionManager.GetCurrentOption();
 
@@ -226,17 +319,16 @@ public class ItemSelectionManager : MonoBehaviour
             }
 
             var gadgetComponent = button.GetComponent<GadgetButtonComponents>();
-            if (gadgetComponent != null)
-            {
-                gadgetComponent.UpdateOutlineState();
-            }
+            if (gadgetComponent != null) gadgetComponent.UpdateOutlineState();
+
         }
     }
 
     private void OnSliderValueChanged(float value)
     {
         if (infantryLoadoutCustomization.GetCurrentStage() != InfantryLoadoutCustomization.SelectionStage.ItemSelection &&
-            infantryLoadoutCustomization.GetCurrentStage() != InfantryLoadoutCustomization.SelectionStage.WeaponCustomization) return;
+            infantryLoadoutCustomization.GetCurrentStage() != InfantryLoadoutCustomization.SelectionStage.WeaponCustomization &&
+            infantryLoadoutCustomization.GetCurrentStage() != InfantryLoadoutCustomization.SelectionStage.SkinSelection) return;
 
         float scrollY = Mathf.Lerp(infantryLoadoutCustomization.minScrollY, _maxSliderY, value);
         Vector3 newPosition = _originalWeaponsGadgetsPosition;
@@ -248,10 +340,26 @@ public class ItemSelectionManager : MonoBehaviour
     {
         if (infantryLoadoutCustomization.weaponsGadgetsSlider != null)
         {
-            infantryLoadoutCustomization.weaponsGadgetsSlider.gameObject.SetActive(true);
-            infantryLoadoutCustomization.weaponsGadgetsSlider.value = 0f;
+            infantryLoadoutCustomization.weaponsGadgetsSlider.gameObject.SetActive(_canScroll);
+            infantryLoadoutCustomization.weaponsGadgetsSlider.SetValueWithoutNotify(0f);
         }
         infantryLoadoutCustomization.weaponsGadgetsParent.localPosition = _originalWeaponsGadgetsPosition;
+    }
+
+    public void ConfigureScrollForItemCount(int itemCount)
+    {
+        RectTransform contentRect = infantryLoadoutCustomization.weaponsGadgetsParent as RectTransform;
+        float viewportHeight = contentRect != null ? contentRect.rect.height : 0f;
+        float itemSpacing = Mathf.Abs(infantryLoadoutCustomization.itemButtonSpacingY);
+        float itemHeight = 104f;
+        float contentHeight = itemCount > 0 ? (itemCount - 1) * itemSpacing + itemHeight : 0f;
+        float scrollDistance = Mathf.Max(0f, contentHeight - viewportHeight);
+
+        _minScrollY = _originalWeaponsGadgetsPosition.y;
+        _maxSliderY = _minScrollY + scrollDistance;
+        _canScroll = scrollDistance > 1f;
+
+        ResetSlider();
     }
 
     public void ClearItemButtons()
@@ -276,7 +384,6 @@ public class ItemSelectionManager : MonoBehaviour
         _buttonsList.Clear();
     }
 
-    // NOVO MÉTODO: Limpa COMPLETAMENTE todos os filhos do weaponsGadgetsParent
     public void ClearAllWeaponsGadgetsChildren()
     {
         // Destroi todos os filhos
@@ -284,14 +391,10 @@ public class ItemSelectionManager : MonoBehaviour
         {
             Destroy(child.gameObject);
         }
-        
-        // Limpa a lista de botões
+
         _buttonsList.Clear();
+
+        if (infantryLoadoutCustomization.skinSelectionManager != null) infantryLoadoutCustomization.skinSelectionManager.ClearSkinButtons();
         
-        // Limpa também os botões de skin no SkinSelectionManager
-        if (infantryLoadoutCustomization.skinSelectionManager != null)
-        {
-            infantryLoadoutCustomization.skinSelectionManager.ClearSkinButtons();
-        }
     }
 }

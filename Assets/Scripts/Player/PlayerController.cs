@@ -12,49 +12,51 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     [Header("Multiplayer / Player")]
     [SerializeField] private AudioListener camera_audio;
     public GameObject first_person_player_components;
-    [SerializeField] private GameObject[] hideToOwnerItems;
     [SerializeField] private GameObject fist_person;
 
     [Header("Body")]
     public GameObject playerHead;
+    
     [Header("Colliders")]
     public CapsuleCollider stand_collider;
     public CapsuleCollider crouch_collider;
     public CapsuleCollider prone_collider;
-    public BoxCollider deah_collider;
 
     [Header("Camera Settings")]
     public Camera playerCamera;
     [SerializeField] private ProcessCameraRecoil processCameraRecoil;
     [SerializeField] private CameraRotation cameraRotation;
 
-    [Header("Movement Settings - Tutorial Style")]
+    [Header("Movement")]
     public Transform orientation;
     [SerializeField] private float walkSpeed = 14f;
     [SerializeField] private float sprintSpeed = 14f;
     [SerializeField] private float crouchSpeed = 2f;
-    [SerializeField] private float groundDrag = 5f;
-    [SerializeField] private float jumpForce = 8f;
-    [SerializeField] private float jumpCooldown = 0.25f;
-    [SerializeField] private float airMultiplier = 0.4f;
-    [SerializeField] private float playerHeight = 2f;
 
-    [Header("Legacy Movement Settings")]
+    [Header("Movement Actions")]
     [SerializeField] private float timeBetweenRolls = 2f;
     [SerializeField] private float fallMultiplier = 2.5f;
-    [SerializeField] private float jump_force_impact;
-    [SerializeField] private float jump_force_recovety_time;
     [HideInInspector] public float moveForward;
     [HideInInspector] public float moveHorizontal;
 
-    [Header("Slope Handling")]
-    public float maxSlopeAngle;
-    private RaycastHit slopeHit;
-    private bool exitingSlope;
-
     [Header("Ground Detection")]
-    [SerializeField] private float ground_detection_raycastDistance;
+    [SerializeField, Min(0.01f)] private float groundCheckDistance = 0.18f;
+    [SerializeField, Range(0f, 1f)] private float minimumGroundNormalY = 0.65f;
     public LayerMask groundLayer;
+
+    [Header("Voxel Step Climbing")]
+    [SerializeField] private bool enableVoxelStepClimbing = true;
+    [Tooltip("Maximum height in world units. The project's standard voxel is 1 unit tall.")]
+    [SerializeField, Min(0.01f)] private float maxStepHeight = 1.05f;
+    [SerializeField, Min(0.01f)] private float stepSearchDistance = 0.35f;
+    [SerializeField, Min(0.01f)] private float stepUpSpeed = 8f;
+    [SerializeField, Min(0f)] private float stepForwardAssistSpeed = 2f;
+    [SerializeField, Min(0.001f)] private float stepLandingInset = 0.08f;
+    [SerializeField, Min(0.001f)] private float collisionSkin = 0.03f;
+    [Tooltip("Layers that can be climbed. When empty, only the Voxel layer is used.")]
+    [SerializeField] private LayerMask voxelStepLayer;
+    [Tooltip("Solid layers used to validate overhead and body clearance while climbing.")]
+    [SerializeField] private LayerMask stepClearanceLayer = ~0;
 
     [Header("Private References")]
     [SerializeField] private SwitchWeapon switchWeapon;
@@ -66,6 +68,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     public SoldierHudManager soldierHudManager;
     [SerializeField] private SwayNBobScript SwayNBob;
     [SerializeField] private ThirdPersonWeaponController thirdPersonWeapon;
+    [SerializeField] private SkinApplier skinApplier;
     public PlayerProperties playerProperties;
 
     [Header("Volumes")]
@@ -78,30 +81,46 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private Vignette damageTaken_vignette;
 
+    //Consts
+    private const float groundDrag = 5f;
+    private const float jumpForce = 8f;
+    private const float jumpCooldown = 0.25f;
+    private const float airMultiplier = 0.4f;
+
     // Movement 
     [HideInInspector] public float currentMoveSpeed;
     private float original_sprint_speed;
     private float original_walk_speed;
     private float original_crouch_speed;
     private bool readyToJump;
+    private bool jumpRequested;
     private Vector3 moveDirection;
+
+    // Voxel step state.
+    private bool isStepping;
+    private float stepTargetRootY;
+    private float stepStartTime;
+    private float stepLastRootY;
+    private int stalledStepTicks;
+    private Vector3 stepDirection;
+    private Vector3 stepLandingPoint;
+    private CapsuleCollider stepCollider;
 
     // Legacy
     private float original_footstepSound_interval;
-    private float death_timer;
-    private float colliders_difference;
+    private float deathTimer;
     private float altitude;
     private float cold_damage_timer = 0;
 
     // Camera Settings & FX
     private bool is_night_vision_active = false;
-    private float applyRecoilSpeed;
     private float targetVignetteIntensity;
     private float currentVignetteIntensity;
     private float vignetteVelocity;
 
     // Ground Check
     private bool wasGroundedLastFrame;
+    private bool hasGroundContact;
     private bool grounded;
 
     // Interaction & Caching
@@ -109,15 +128,37 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     private int playerLayer;
 
     private Collider[] medicCollidersCache = new Collider[6];
+    private readonly RaycastHit[] groundCastHitsCache = new RaycastHit[12];
+    private readonly Collider[] stanceOverlapCache = new Collider[16];
 
     private enum PlayerStance { Stand, Crouch, Prone, Disabled }
-    private PlayerStance currentStance = PlayerStance.Stand;
+    private PlayerStance currentStance = PlayerStance.Disabled;
+
+    private readonly struct CapsuleGeometry
+    {
+        public readonly Vector3 PointA;
+        public readonly Vector3 PointB;
+        public readonly float Radius;
+        public readonly float FootY;
+
+        public CapsuleGeometry(Vector3 pointA, Vector3 pointB, float radius)
+        {
+            PointA = pointA;
+            PointB = pointB;
+            Radius = radius;
+            FootY = Mathf.Min(pointA.y, pointB.y) - radius;
+        }
+
+        public Vector3 Center => (PointA + PointB) * 0.5f;
+    }
     #endregion
 
     #region Unity Lifecycle
     public override void OnStartClient()
     {
         base.OnStartClient();
+
+        NormalizeStanceColliders();
 
         if (IsOwner) ConfigureOwner();
         else
@@ -127,36 +168,42 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         }
     }
 
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        NormalizeStanceColliders();
+    }
+
     void Update()
     {
         if (!IsOwner) return;
 
-        UpdateColliderStateLocal();
-
-        if (playerProperties.is_in_vehicle)
+        if (playerProperties.isInVehicle)
         {
-            playerProperties.isGrounded = true;
+            UpdateColliderStateLocal();
+            CancelVoxelStep();
+            playerProperties.grounded = true;
             return;
         }
 
-        HandleDebugInputManager();
         UpdateDamageVignette();
 
         FootstepSound();
-        UpdateGroundCheck();
-        UpdateFOV();
 
-        if (playerProperties.is_dead.Value)
+        if (playerProperties.isDead.Value)
         {
+            UpdateColliderStateLocal();
+            CancelVoxelStep();
             HandleDeathState();
             return;
         }
 
-        death_timer = 0;
+        deathTimer = 0;
 
         HandleInteractionInputManager();
         HandlePlayerInputManager();
         HandleJumpInputManager();
+        UpdateColliderStateLocal();
         HandleEnvironmentEffects();
     }
 
@@ -164,28 +211,37 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     {
         if (!IsOwner) return;
 
-        if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle)
+        if (playerProperties.isDead.Value || playerProperties.isInVehicle)
         {
             moveForward = 0;
             moveHorizontal = 0;
+            jumpRequested = false;
+            CancelVoxelStep();
             return;
         }
 
-        MovePlayer();
-        ApplyCustomGravity();
+        UpdateGroundCheck();
+        ProcessJumpRequest();
+        UpdateMovementSpeed();
+        UpdateMovementDirection();
+        UpdateVoxelStep();
+        ApplyMovementForce();
+
+        if (!isStepping) ApplyCustomGravity();
+
         ApplyWindPhysics();
+        UpdateRigidbodyDamping();
     }
     #endregion
 
     #region Initialization
     public void ConfigureOwner()
     {
-        GetComponent<SkinApplier>().ApplySkin(this);
+        skinApplier.ApplySkin(this);
 
         soldierHudManager.ActivateStandardHUD();
 
         SetInstance();
-        HideOwnerItems(true);
 
         playerCamera.enabled = true;
         playerCamera.GetComponent<AudioListener>().enabled = true;
@@ -196,22 +252,26 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         footstepSound_interval = footstepSound_interval <= 0 ? 0.45f : footstepSound_interval;
         original_footstepSound_interval = footstepSound_interval;
 
-        colliders_difference = stand_collider.height - crouch_collider.height;
         original_sprint_speed = sprintSpeed;
         original_walk_speed = walkSpeed;
         original_crouch_speed = crouchSpeed;
         currentMoveSpeed = walkSpeed;
 
+        if (rb != null)
+        {
+            rb.useGravity = true;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+        }
+
         interactivesLayer = LayerMask.GetMask("Interactives");
         playerLayer = LayerMask.GetMask("Player");
 
         InitializeVolume();
-
-        //if (cameraRotation != null) cameraRotation.Initialize(transform, playerCamera.transform, playerHead.transform, processCameraRecoil, playerProperties);
-    
         readyToJump = true;
 
         StartCoroutine(weaponIcon.Initialize());
+
+        HideOwnerItems(true);
     }
 
     private void InitializeVolume()
@@ -221,12 +281,6 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     #endregion
 
     #region InputManager Handling
-    private void HandleDebugInputManager()
-    {
-        if (InputManager.GetKeyDown(KeyCode.K)) Revive(100);
-        if (InputManager.GetKeyDown(KeyCode.G)) TakeDamage(100);
-    }
-
     private void HandleInteractionInputManager()
     {
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey)) Interact();
@@ -239,19 +293,16 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
             moveForward = 1;
             moveHorizontal = 0;
         }
-        else
-            UpdateMovementInputManager();
+        else UpdateMovementInputManager();
 
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_activateNightNision)) HandleNightVision();
 
-        if (grounded)
-        {
-            HandleRoll();
-            HandleSprint();
-            HandleCrouch();
-            HandleProne();
-            UpdateMovementSpeed();
-        }
+        if (hasGroundContact) HandleRoll();
+
+        HandleSprint();
+        HandleCrouch();
+        HandleProne();
+        UpdateMovementSpeed();
     }
 
     private void UpdateMovementInputManager()
@@ -277,101 +328,49 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private void HandleJumpInputManager()
     {
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey) && readyToJump && grounded &&
-            !playerProperties.is_proned && !playerProperties.crouched && !playerProperties.roll)
-        {
-            readyToJump = false;
-            Jump();
-            Invoke(nameof(ResetJump), jumpCooldown);
-        }
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey)) jumpRequested = true;
     }
 
     private void HandleSprint()
     {
         if (playerProperties.isProneTransition) return;
 
-        if ((moveForward == 0 && moveHorizontal == 0) || playerProperties.is_firing)
+        if ((moveForward == 0 && moveHorizontal == 0) || playerProperties.firing)
         {
             playerProperties.sprinting = false;
             return;
         }
 
-        Vector3 origin_ = playerHead.transform.position;
-        float distance = colliders_difference * 4.5f;
+        KeyCode sprintKey = Settings.Instance._keybinds.PLAYER_sprintKey;
+        bool sprintOnHold = Settings.Instance._controls.is_sprint_on_hold;
+        bool sprintInput = sprintOnHold ? InputManager.GetKey(sprintKey) : InputManager.GetKeyDown(sprintKey);
 
-        bool isSprintingKeyHit = InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_sprintKey);
-        bool isSprintOnHold = Settings.Instance._controls.is_sprint_on_hold;
-
-        if ((!isSprintOnHold && isSprintingKeyHit) || isSprintOnHold)
+        if (!sprintInput)
         {
-            if (playerProperties.crouched)
-            {
-                if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
-                {
-                    AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
-                    return;
-                }
-            }
-
-            if (isSprintOnHold) UpdateHoldSprint();
-            else ToggleSprint();
+            if (sprintOnHold) playerProperties.sprinting = false;
+            return;
         }
-    }
 
-    private void ToggleSprint()
-    {
-        playerProperties.sprinting = !playerProperties.sprinting;
+        bool wantsToSprint = sprintOnHold || !playerProperties.sprinting;
+        if (wantsToSprint && !TryPrepareStandingStance()) return;
 
-        if (playerProperties.sprinting)
-        {
-            playerProperties.crouched = false;
-            playerProperties.is_proned = false;
-        }
-    }
-
-    private void UpdateHoldSprint()
-    {
-        playerProperties.sprinting = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_sprintKey);
-
-        if (playerProperties.sprinting)
-        {
-            playerProperties.crouched = false;
-            playerProperties.is_proned = false;
-        }
+        playerProperties.sprinting = wantsToSprint;
     }
 
     private void HandleProne()
     {
-        Vector3 origin_ = transform.position;
-        float distance = 7f;
+        KeyCode proneKey = Settings.Instance._keybinds.PLAYER_proneKey;
+        bool proneOnHold = Settings.Instance._controls.is_prone_on_hold;
+        bool proneInput = proneOnHold ? InputManager.GetKey(proneKey) : InputManager.GetKeyDown(proneKey);
 
-        bool isProneKeyHit = InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_proneKey);
-        bool isProneOnHold = Settings.Instance._controls.is_prone_on_hold;
-
-        if ((!isProneOnHold && isProneKeyHit) || isProneOnHold)
+        if (!proneInput)
         {
-            if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer) && playerProperties.is_proned)
-            {
-                AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
-                return;
-            }
-
-            if (isProneOnHold) UpdateHoldProne();
-            else ToggleProne();
+            if (proneOnHold && playerProperties.proned) TrySetProne(false);
+            return;
         }
-    }
 
-    private void ToggleProne()
-    {
-        playerProperties.is_proned = !playerProperties.is_proned;
-
-        if (playerProperties.is_proned)
-        {
-            if (playerProperties.sprinting) ApplyProneTransitionImpulse();
-
-            playerProperties.sprinting = false;
-            playerProperties.crouched = false;
-        }
+        bool wantsToProne = proneOnHold || !playerProperties.proned;
+        TrySetProne(wantsToProne);
     }
 
     private void ApplyProneTransitionImpulse()
@@ -380,64 +379,72 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         playerProperties.proneImpulseLockTime = 0.25f;
     }
 
-    private void UpdateHoldProne()
+    private bool TrySetProne(bool wantsToProne)
     {
-        playerProperties.is_proned = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_proneKey);
+        if (wantsToProne == playerProperties.proned) return true;
 
-        if (playerProperties.is_proned)
+        if (wantsToProne)
         {
+            if (isStepping || !hasGroundContact || !HasClearanceForCollider(prone_collider)) return false;
+
+            if (playerProperties.sprinting) ApplyProneTransitionImpulse();
+
+            playerProperties.proned = true;
             playerProperties.sprinting = false;
             playerProperties.crouched = false;
+            return true;
         }
+
+        if (!HasClearanceForCollider(stand_collider))
+        {
+            ShowNotEnoughSpaceMessage();
+            return false;
+        }
+
+        playerProperties.proned = false;
+        return true;
     }
 
     private void HandleCrouch()
     {
-        bool crouchInputManager = InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_crouchKey);
+        KeyCode crouchKey = Settings.Instance._keybinds.PLAYER_crouchKey;
+        bool crouchOnHold = Settings.Instance._controls.is_crouch_on_hold;
         bool jumpWhileCrouched = playerProperties.crouched && InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_jumpKey);
-        bool isCrouchOnHold = Settings.Instance._controls.is_crouch_on_hold;
+        bool crouchInput = crouchOnHold ? InputManager.GetKey(crouchKey) : InputManager.GetKeyDown(crouchKey) || jumpWhileCrouched;
 
-        Vector3 origin_ = playerProperties.is_proned ? transform.position : playerHead.transform.position;
-        float distance = playerProperties.is_proned ? 3f : colliders_difference * 4.5f;
-
-        if ((!isCrouchOnHold && (crouchInputManager || jumpWhileCrouched)) || isCrouchOnHold)
+        if (!crouchInput)
         {
-            if (playerProperties.crouched || playerProperties.is_proned || isCrouchOnHold)
-            {
-                if (Physics.SphereCast(origin_, stand_collider.radius, Vector3.up, out RaycastHit hit, distance, groundLayer))
-                {
-                    AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
-                    return;
-                }
-            }
-
-            if (isCrouchOnHold) UpdateHoldCrouch();
-            else ToggleCrouch();
+            if (crouchOnHold && playerProperties.crouched) TrySetCrouched(false);
+            return;
         }
+
+        bool wantsToCrouch = crouchOnHold || !playerProperties.crouched;
+        TrySetCrouched(wantsToCrouch);
     }
 
-    private void ToggleCrouch()
+    private bool TrySetCrouched(bool wantsToCrouch)
     {
-        if (playerProperties.is_aiming) StartCoroutine(SwayNBob.CrouchWeaponShake());
-        cameraShake.RequestShake(0.8f, 0.2f);
-        playerProperties.crouched = !playerProperties.crouched;
+        if (wantsToCrouch == playerProperties.crouched && !playerProperties.proned) return true;
 
-        if (playerProperties.crouched)
+        CapsuleCollider targetCollider = wantsToCrouch ? crouch_collider : stand_collider;
+        if ((wantsToCrouch && (isStepping || !hasGroundContact)) || !HasClearanceForCollider(targetCollider))
         {
-            playerProperties.sprinting = false;
-            playerProperties.is_proned = false;
+            if (!wantsToCrouch || playerProperties.proned) ShowNotEnoughSpaceMessage();
+            return false;
         }
-    }
 
-    private void UpdateHoldCrouch()
-    {
-        playerProperties.crouched = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_crouchKey);
+        playerProperties.crouched = wantsToCrouch;
 
-        if (playerProperties.crouched)
+        if (wantsToCrouch)
         {
+            if (playerProperties.aiming && SwayNBob != null) StartCoroutine(SwayNBob.CrouchWeaponShake());
+            if (cameraShake != null) cameraShake.RequestShake(0.8f, 0.2f);
+
             playerProperties.sprinting = false;
-            playerProperties.is_proned = false;
+            playerProperties.proned = false;
         }
+
+        return true;
     }
 
     private void HandleRoll()
@@ -446,13 +453,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         if (CanRoll() && InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_rollKey)) ExecuteRoll();
     }
 
-    private bool CanRoll()
-    {
-        return !playerProperties.is_proned &&
-               !playerProperties.roll &&
-               !playerProperties.is_reloading &&
-               timeBetweenRolls <= 0;
-    }
+    private bool CanRoll() => !playerProperties.proned && !playerProperties.roll && !isStepping && !playerProperties.reloading && timeBetweenRolls <= 0;
 
     private void ExecuteRoll()
     {
@@ -468,52 +469,33 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     {
         if (playerProperties.roll) return;
 
-        if (playerProperties.crouched || playerProperties.is_proned)
-        {
-            currentMoveSpeed = crouchSpeed;
-        }
-        else if (playerProperties.sprinting && !playerProperties.is_aiming &&
-                 !playerProperties.is_proned && !playerProperties.isProneTransition)
-        {
-            currentMoveSpeed = sprintSpeed;
-        }
-        else
-        {
-            currentMoveSpeed = walkSpeed;
-        }
+        if (playerProperties.crouched || playerProperties.proned) currentMoveSpeed = crouchSpeed;
+        else if (playerProperties.sprinting && !playerProperties.aiming && !playerProperties.proned && !playerProperties.isProneTransition) currentMoveSpeed = sprintSpeed;
+        else currentMoveSpeed = walkSpeed;
     }
 
-    private void MovePlayer()
+    private void UpdateMovementDirection()
     {
-        moveDirection = orientation.forward * moveForward + orientation.right * moveHorizontal;
-
-        if (OnSlope() && !exitingSlope)
-        {
-            float state_multiplier = 10;
-
-            if (!playerProperties.sprinting && !playerProperties.crouched && !playerProperties.is_proned)
-                state_multiplier = 18.5f;
-            else if (playerProperties.sprinting && !playerProperties.crouched && !playerProperties.is_proned)
-                state_multiplier = 12;
-            else if (!playerProperties.sprinting && playerProperties.crouched && !playerProperties.is_proned)
-                state_multiplier = 20;
-
-            rb.AddForce(GetSlopeMoveDirection() * currentMoveSpeed * state_multiplier * rb.mass, ForceMode.Force);
-
-            if (rb.linearVelocity.y > 0) rb.AddForce(Vector3.down * 80f * rb.mass, ForceMode.Force);
-        }
-        else if (grounded)
-        {
-            rb.AddForce(moveDirection.normalized * currentMoveSpeed * 10 * rb.mass, ForceMode.Force);
-        }
-        else if (!grounded)
-        {
-            rb.AddForce(moveDirection.normalized * currentMoveSpeed * 10 * airMultiplier * rb.mass, ForceMode.Force);
-        }
-
-        rb.useGravity = !OnSlope();
+        Transform movementReference = orientation != null ? orientation : transform;
+        moveDirection = movementReference.forward * moveForward + movementReference.right * moveHorizontal;
     }
 
+    private void ApplyMovementForce()
+    {
+        // Calcula a velocidade alvo nos eixos X e Z (ignorando o Y para não quebrar a gravidade/pulo)
+        Vector3 targetVelocity = moveDirection.normalized * currentMoveSpeed;
+
+        // Isola a velocidade horizontal atual
+        Vector3 currentVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+
+        // Calcula exatamente o quanto de velocidade falta para atingir o movimento desejado
+        Vector3 velocityDifference = targetVelocity - currentVelocity;
+
+        float controlMultiplier = grounded || isStepping ? 1f : airMultiplier;
+
+        // Aplica apenas a diferença, resultando em uma aceleração suave e controlada
+        rb.AddForce(velocityDifference * controlMultiplier, ForceMode.VelocityChange);
+    }
     private void ApplyCustomGravity()
     {
         if (rb.linearVelocity.y < 0) rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
@@ -530,7 +512,8 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private void HandleEnvironmentEffects()
     {
-        if (WeatherStateManager.Instance.ActiveWeatherType.Value == WeatherStateManager.WeatherType.Snow)
+        if (WeatherStateManager.Instance != null &&
+            WeatherStateManager.Instance.ActiveWeatherType.Value == WeatherStateManager.WeatherType.Snow)
         {
             cold_damage_timer += Time.deltaTime;
             if (cold_damage_timer > 5)
@@ -539,13 +522,13 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
                 TakeDamage(5);
             }
         }
-
-        rb.linearDamping = grounded ? groundDrag : 1;
     }
+
+    private void UpdateRigidbodyDamping() => rb.linearDamping = grounded || isStepping ? groundDrag : 1f;
 
     private void FootstepSound()
     {
-        if ((moveForward != 0 || moveHorizontal != 0) && !playerProperties.is_proned && !playerProperties.roll && grounded)
+        if ((moveForward != 0 || moveHorizontal != 0) && !playerProperties.proned && !playerProperties.roll && grounded)
         {
             if (playerProperties.sprinting) footstepSound_interval -= Time.deltaTime * 2f;
             else if (playerProperties.crouched) footstepSound_interval -= Time.deltaTime * 0.5f;
@@ -565,11 +548,29 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private void Jump()
     {
+        CancelVoxelStep();
         cameraShake.RequestShake(3, 0.15f);
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(transform.up * jumpForce * rb.mass, ForceMode.Impulse);
         grounded = false;
-        playerProperties.isGrounded = false;
+        playerProperties.grounded = false;
+    }
+
+    private void ProcessJumpRequest()
+    {
+        if (!jumpRequested) return;
+
+        jumpRequested = false;
+
+        if (!readyToJump || !hasGroundContact || isStepping || playerProperties.proned ||
+            playerProperties.crouched || playerProperties.roll)
+        {
+            return;
+        }
+
+        readyToJump = false;
+        Jump();
+        Invoke(nameof(ResetJump), jumpCooldown);
     }
 
     private void ResetJump() => readyToJump = true;
@@ -577,22 +578,48 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     private void UpdateGroundCheck()
     {
         bool is_holding_roll = InputManager.GetKey(Settings.Instance._keybinds.PLAYER_rollKey);
-        Vector3 rayOrigin = transform.position + Vector3.up;
+        CapsuleCollider activeCollider = GetActiveCapsuleCollider();
+        bool detectedGround = false;
 
-        grounded = Physics.SphereCast(
-            rayOrigin,
-            stand_collider.radius,
-            Vector3.down,
-            out RaycastHit hitInfo,
-            ground_detection_raycastDistance,
-            groundLayer
-        );
+        if (activeCollider != null)
+        {
+            CapsuleGeometry capsule = GetCapsuleGeometry(activeCollider);
+            float probeRadius = Mathf.Max(0.01f, capsule.Radius - collisionSkin);
+            Vector3 probeOrigin = new Vector3(capsule.Center.x, capsule.FootY + probeRadius + collisionSkin, capsule.Center.z);
 
-        playerProperties.isGrounded = grounded;
+            int hitCount = Physics.SphereCastNonAlloc(
+                probeOrigin,
+                probeRadius,
+                Vector3.down,
+                groundCastHitsCache,
+                groundCheckDistance + collisionSkin,
+                groundLayer,
+                QueryTriggerInteraction.Ignore
+            );
+
+            // Um contato lateral pode ser retornado antes do chao. Avaliamos todos
+            // os resultados para nao alternar grounded ao encostar em uma parede.
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit hit = groundCastHitsCache[i];
+                groundCastHitsCache[i] = default;
+
+                if (hit.collider == null || hit.collider.transform.IsChildOf(transform)) continue;
+                if (hit.normal.y < minimumGroundNormalY) continue;
+
+                detectedGround = true;
+                break;
+            }
+        }
+
+        hasGroundContact = detectedGround;
+        grounded = hasGroundContact || isStepping;
+
+        playerProperties.grounded = grounded;
 
         if (wasGroundedLastFrame && !grounded)
         {
-            altitude = transform.position.y;
+            altitude = rb.position.y;
         }
 
         if (!wasGroundedLastFrame && grounded)
@@ -615,23 +642,267 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private float HandleFallDamage()
     {
-        float distance = altitude - transform.position.y;
+        float distance = altitude - rb.position.y;
         return distance < 10 ? 0 : distance * 2;
     }
 
-    private bool OnSlope()
+    private void UpdateVoxelStep()
     {
-        if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
+        if (!isStepping && !TryStartVoxelStep()) return;
+
+        if (stepCollider == null || stepCollider != GetActiveCapsuleCollider() ||
+            playerProperties.proned || playerProperties.roll)
         {
-            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
-            return angle < maxSlopeAngle && angle != 0;
+            CancelVoxelStep();
+            return;
         }
-        return false;
+
+        bool madeVerticalProgress = rb.position.y > stepLastRootY + 0.001f;
+        stalledStepTicks = madeVerticalProgress ? 0 : stalledStepTicks + 1;
+        stepLastRootY = rb.position.y;
+
+        float maximumStepDuration = maxStepHeight / Mathf.Max(stepUpSpeed, 0.01f) + 0.35f;
+        if (stalledStepTicks >= 4 || Time.fixedTime - stepStartTime > maximumStepDuration ||
+            !IsStepLandingStillValid())
+        {
+            CancelVoxelStep();
+            return;
+        }
+
+        float remainingHeight = stepTargetRootY - rb.position.y;
+        if (remainingHeight <= collisionSkin * 0.5f)
+        {
+            Vector3 completedVelocity = rb.linearVelocity;
+            if (completedVelocity.y > 0f) completedVelocity.y = 0f;
+            rb.linearVelocity = completedVelocity;
+            CancelVoxelStep(false);
+            return;
+        }
+
+        float verticalSpeed = Mathf.Min(stepUpSpeed, remainingHeight / Time.fixedDeltaTime);
+        Vector3 velocity = rb.linearVelocity;
+
+        float forwardSpeed = Vector3.Dot(Vector3.ProjectOnPlane(velocity, Vector3.up), stepDirection);
+        if (forwardSpeed < stepForwardAssistSpeed)
+            velocity += stepDirection * (stepForwardAssistSpeed - forwardSpeed);
+
+        velocity.y = Mathf.Max(velocity.y, verticalSpeed);
+        rb.linearVelocity = velocity;
+
+        grounded = true;
+        playerProperties.grounded = true;
     }
 
-    private Vector3 GetSlopeMoveDirection()
+    private bool TryStartVoxelStep()
     {
-        return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
+        if (!enableVoxelStepClimbing || !hasGroundContact || playerProperties.proned ||
+            playerProperties.roll || moveDirection.sqrMagnitude < 0.0001f ||
+            rb.linearVelocity.y > 0.5f)
+        {
+            return false;
+        }
+
+        CapsuleCollider activeCollider = GetActiveCapsuleCollider();
+        if (activeCollider == null) return false;
+
+        CapsuleGeometry capsule = GetCapsuleGeometry(activeCollider);
+        float castRadius = Mathf.Max(0.01f, capsule.Radius - collisionSkin);
+        Vector3 direction = Vector3.ProjectOnPlane(moveDirection, Vector3.up).normalized;
+        Vector3 planarVelocity = Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up);
+        float forwardSpeed = Mathf.Max(0f, Vector3.Dot(planarVelocity, direction));
+        float minimumProbeDistance = Mathf.Min(stepSearchDistance, Mathf.Max(collisionSkin * 2f, capsule.Radius * 0.2f));
+        float forwardDistance = Mathf.Clamp(
+            forwardSpeed * Time.fixedDeltaTime + collisionSkin * 2f,
+            minimumProbeDistance,
+            stepSearchDistance
+        );
+
+        if (!Physics.CapsuleCast(
+                capsule.PointA,
+                capsule.PointB,
+                castRadius,
+                direction,
+                out RaycastHit obstacleHit,
+                forwardDistance,
+                VoxelStepMask,
+                QueryTriggerInteraction.Ignore) ||
+            obstacleHit.normal.y >= minimumGroundNormalY)
+        {
+            return false;
+        }
+
+        Vector3 inwardDirection = Vector3.ProjectOnPlane(-obstacleHit.normal, Vector3.up).normalized;
+        if (inwardDirection.sqrMagnitude < 0.0001f) inwardDirection = direction;
+
+        Vector3 landingProbeOrigin = obstacleHit.point + inwardDirection * stepLandingInset;
+        landingProbeOrigin.y = capsule.FootY + maxStepHeight + groundCheckDistance + collisionSkin;
+
+        if (!Physics.Raycast(
+                landingProbeOrigin,
+                Vector3.down,
+                out RaycastHit landingHit,
+                maxStepHeight + groundCheckDistance + collisionSkin * 2f,
+                VoxelStepMask,
+                QueryTriggerInteraction.Ignore) ||
+            landingHit.normal.y < minimumGroundNormalY)
+        {
+            return false;
+        }
+
+        float stepHeight = landingHit.point.y - capsule.FootY;
+        if (stepHeight <= collisionSkin || stepHeight > maxStepHeight) return false;
+
+        Vector3 raisedOffset = Vector3.up * (stepHeight + collisionSkin);
+        if (Physics.CapsuleCast(
+                capsule.PointA,
+                capsule.PointB,
+                castRadius,
+                Vector3.up,
+                out _,
+                stepHeight + collisionSkin,
+                BodyClearanceMask,
+                QueryTriggerInteraction.Ignore))
+        {
+            return false;
+        }
+
+        if (Physics.CheckCapsule(
+                capsule.PointA + raisedOffset,
+                capsule.PointB + raisedOffset,
+                castRadius,
+                BodyClearanceMask,
+                QueryTriggerInteraction.Ignore))
+        {
+            return false;
+        }
+
+        float elevatedForwardDistance = Mathf.Max(forwardDistance, obstacleHit.distance + stepLandingInset);
+        if (Physics.CapsuleCast(
+                capsule.PointA + raisedOffset,
+                capsule.PointB + raisedOffset,
+                castRadius,
+                direction,
+                out _,
+                elevatedForwardDistance,
+                BodyClearanceMask,
+                QueryTriggerInteraction.Ignore))
+        {
+            return false;
+        }
+
+        Vector3 landingOffset = raisedOffset + direction * (obstacleHit.distance + stepLandingInset);
+        if (Physics.CheckCapsule(
+                capsule.PointA + landingOffset,
+                capsule.PointB + landingOffset,
+                castRadius,
+                BodyClearanceMask,
+                QueryTriggerInteraction.Ignore))
+        {
+            return false;
+        }
+
+        isStepping = true;
+        stepTargetRootY = rb.position.y + stepHeight + collisionSkin;
+        stepStartTime = Time.fixedTime;
+        stepLastRootY = rb.position.y;
+        stalledStepTicks = 0;
+        stepDirection = direction;
+        stepLandingPoint = landingHit.point;
+        stepCollider = activeCollider;
+        return true;
+    }
+
+    private bool IsStepLandingStillValid()
+    {
+        Vector3 probeOrigin = stepLandingPoint + Vector3.up * (groundCheckDistance + collisionSkin);
+        float probeDistance = groundCheckDistance + collisionSkin * 2f;
+
+        return Physics.Raycast(
+                   probeOrigin,
+                   Vector3.down,
+                   out RaycastHit hit,
+                   probeDistance,
+                   VoxelStepMask,
+                   QueryTriggerInteraction.Ignore) &&
+               hit.normal.y >= minimumGroundNormalY &&
+               Mathf.Abs(hit.point.y - stepLandingPoint.y) <= collisionSkin * 2f;
+    }
+
+    private void CancelVoxelStep(bool stopVerticalMotion = true)
+    {
+        bool wasStepping = isStepping;
+        isStepping = false;
+        stepTargetRootY = 0f;
+        stepStartTime = 0f;
+        stepLastRootY = 0f;
+        stalledStepTicks = 0;
+        stepDirection = Vector3.zero;
+        stepLandingPoint = Vector3.zero;
+        stepCollider = null;
+
+        if (wasStepping && stopVerticalMotion && rb != null && !rb.isKinematic)
+        {
+            Vector3 velocity = rb.linearVelocity;
+            if (velocity.y > 0f) velocity.y = 0f;
+            rb.linearVelocity = velocity;
+        }
+
+        grounded = hasGroundContact;
+        if (playerProperties != null) playerProperties.grounded = grounded;
+    }
+
+    private int VoxelStepMask => voxelStepLayer.value != 0
+        ? voxelStepLayer.value
+        : LayerMask.GetMask("Voxel");
+
+    private int BodyClearanceMask => stepClearanceLayer.value & ~(1 << gameObject.layer);
+
+    private CapsuleCollider GetActiveCapsuleCollider()
+    {
+        if (stand_collider != null && stand_collider.enabled) return stand_collider;
+        if (crouch_collider != null && crouch_collider.enabled) return crouch_collider;
+        if (prone_collider != null && prone_collider.enabled) return prone_collider;
+        return null;
+    }
+
+    private static CapsuleGeometry GetCapsuleGeometry(CapsuleCollider collider)
+    {
+        Transform capsuleTransform = collider.transform;
+        Vector3 scale = capsuleTransform.lossyScale;
+        Rigidbody attachedBody = collider.attachedRigidbody;
+        bool colliderIsOnBodyRoot = attachedBody != null && attachedBody.transform == capsuleTransform;
+        Quaternion worldRotation = colliderIsOnBodyRoot ? attachedBody.rotation : capsuleTransform.rotation;
+        Vector3 axis;
+        float axisScale;
+        float radiusScale;
+
+        switch (collider.direction)
+        {
+            case 0:
+                axis = worldRotation * Vector3.right;
+                axisScale = Mathf.Abs(scale.x);
+                radiusScale = Mathf.Max(Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+                break;
+            case 2:
+                axis = worldRotation * Vector3.forward;
+                axisScale = Mathf.Abs(scale.z);
+                radiusScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y));
+                break;
+            default:
+                axis = worldRotation * Vector3.up;
+                axisScale = Mathf.Abs(scale.y);
+                radiusScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+                break;
+        }
+
+        float radius = collider.radius * radiusScale;
+        float height = Mathf.Max(collider.height * axisScale, radius * 2f);
+        float halfSegment = Mathf.Max(0f, height * 0.5f - radius);
+        Vector3 center = colliderIsOnBodyRoot
+            ? attachedBody.position + worldRotation * Vector3.Scale(collider.center, scale)
+            : capsuleTransform.TransformPoint(collider.center);
+
+        return new CapsuleGeometry(center + axis * halfSegment, center - axis * halfSegment, radius);
     }
     #endregion
 
@@ -646,7 +917,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     {
         if (damageTaken_vignette == null) return;
 
-        float hpPercentage = playerProperties.hp.Value / playerProperties.max_hp;
+        float hpPercentage = playerProperties.hp.Value / playerProperties.maxHp;
         targetVignetteIntensity = 1f - hpPercentage;
 
         currentVignetteIntensity = Mathf.SmoothDamp(
@@ -659,14 +930,6 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         damageTaken_vignette.intensity.value = currentVignetteIntensity;
     }
 
-    void UpdateFOV()
-    {
-        if (!playerProperties.is_aiming)
-        {
-            float targetFov = Settings.Instance._video.infantary_fov;
-            if (Mathf.Abs(playerCamera.fieldOfView - targetFov) > 0.1f) playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFov, 10f * Time.deltaTime);
-        }
-    }
     #endregion
 
     #region Interaction
@@ -675,7 +938,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         Vector3 origin = playerCamera.transform.position;
         Vector3 direction = playerCamera.transform.forward;
 
-        if (!playerProperties.is_in_vehicle) TryInteractWithButton(origin, direction);
+        if (!playerProperties.isInVehicle) TryInteractWithButton(origin, direction);
     }
 
     private void TryInteractWithButton(Vector3 origin, Vector3 direction)
@@ -689,45 +952,96 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     #endregion
 
     #region State Management
-
     public void ResetWeaponAnimation()
     {
-        if (weapon.weaponProperties != null)
+        if (weapon != null)
         {
             weapon.can_shoot = true;
-            weapon.weaponProperties.transform.localPosition = weapon.weaponProperties.initial_potiion;
-            weapon.weaponProperties.transform.localRotation = weapon.weaponProperties.initial_rotation;
             weapon.weaponAnimation.FinishReloadAnimation();
         }
     }
 
+    private void NormalizeStanceColliders()
+    {
+        if (stand_collider == null || crouch_collider == null) return;
+
+        crouch_collider.radius = Mathf.Min(crouch_collider.radius, stand_collider.radius);
+    }
+
+    private bool TryPrepareStandingStance()
+    {
+        if (!playerProperties.crouched && !playerProperties.proned) return true;
+
+        if (!HasClearanceForCollider(stand_collider))
+        {
+            ShowNotEnoughSpaceMessage();
+            playerProperties.sprinting = false;
+            return false;
+        }
+
+        playerProperties.crouched = false;
+        playerProperties.proned = false;
+        return true;
+    }
+
+    private bool HasClearanceForCollider(CapsuleCollider targetCollider)
+    {
+        if (targetCollider == null) return false;
+
+        CapsuleCollider activeCollider = GetActiveCapsuleCollider();
+        if (activeCollider == targetCollider) return true;
+
+        CapsuleGeometry targetCapsule = GetCapsuleGeometry(targetCollider);
+        float currentFootY = activeCollider != null
+            ? GetCapsuleGeometry(activeCollider).FootY
+            : targetCapsule.FootY;
+
+        Vector3 feetAlignment = Vector3.up * (currentFootY - targetCapsule.FootY + collisionSkin);
+        float queryRadius = Mathf.Max(0.01f, targetCapsule.Radius - collisionSkin);
+        int overlapCount = Physics.OverlapCapsuleNonAlloc(
+            targetCapsule.PointA + feetAlignment,
+            targetCapsule.PointB + feetAlignment,
+            queryRadius,
+            stanceOverlapCache,
+            BodyClearanceMask,
+            QueryTriggerInteraction.Ignore
+        );
+
+        for (int i = 0; i < overlapCount; i++)
+        {
+            Collider overlap = stanceOverlapCache[i];
+            stanceOverlapCache[i] = null;
+
+            if (overlap == null || overlap.transform.IsChildOf(transform)) continue;
+            return false;
+        }
+
+        return overlapCount < stanceOverlapCache.Length;
+    }
+
+    private static void ShowNotEnoughSpaceMessage()
+    {
+        if (AlertMessages.Instance != null) AlertMessages.Instance.CreateMessage("Not Enough Space", 2);
+    }
+
     private void UpdateColliderStateLocal()
     {
-        PlayerStance targetStance;
-
-        if (playerProperties.is_dead.Value || playerProperties.is_in_vehicle)
-            targetStance = PlayerStance.Disabled;
-        else if (playerProperties.is_proned)
-            targetStance = PlayerStance.Prone;
-        else if (playerProperties.crouched || playerProperties.roll)
-            targetStance = PlayerStance.Crouch;
-        else
-            targetStance = PlayerStance.Stand;
+        PlayerStance targetStance = GetTargetStance();
 
         if (targetStance != currentStance)
         {
-            if (targetStance == PlayerStance.Disabled)
-                DisableColliders();
-            else if (targetStance == PlayerStance.Prone)
-                EnableProneCollider();
-            else if (targetStance == PlayerStance.Crouch)
-                EnableCrouchCollider();
-            else
-                EnableStandCollider();
-
+            ApplyColliderStance(targetStance);
             currentStance = targetStance;
             CmdUpdateColliderStateRemote(targetStance);
         }
+    }
+
+    private PlayerStance GetTargetStance()
+    {
+        if (playerProperties.isDead.Value || playerProperties.isInVehicle) return PlayerStance.Disabled;
+        if (playerProperties.proned) return PlayerStance.Prone;
+        if (playerProperties.crouched || playerProperties.roll) return PlayerStance.Crouch;
+        return PlayerStance.Stand;
     }
 
     [ServerRpc(RequireOwnership = true)]
@@ -735,6 +1049,12 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     [ObserversRpc(ExcludeOwner = true)]
     private void RpcUpdateColliderStateRemote(PlayerStance playerStance)
+    {
+        ApplyColliderStance(playerStance);
+        currentStance = playerStance;
+    }
+
+    private void ApplyColliderStance(PlayerStance playerStance)
     {
         switch (playerStance)
         {
@@ -781,32 +1101,21 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         if (crouch_collider.enabled) crouch_collider.enabled = false;
     }
 
-    private void DisableDeathCollier()
-    {
-        if (deah_collider.enabled) deah_collider.enabled = false;
-    }
-
-    private void EnableDeathCollier()
-    {
-        DisableColliders();
-        if (!deah_collider.enabled) deah_collider.enabled = true;
-    }
 
     [Client]
     public void SetCollidersState(bool enabled)
     {
-        if (stand_collider != null) stand_collider.enabled = enabled;
-        if (crouch_collider != null) crouch_collider.enabled = enabled;
-        if (prone_collider != null) prone_collider.enabled = enabled;
-        if (deah_collider != null && !enabled) deah_collider.enabled = false;
+        PlayerStance targetStance = enabled ? GetTargetStance() : PlayerStance.Disabled;
+        ApplyColliderStance(targetStance);
+        currentStance = targetStance;
     }
 
     private void HandleDeathState()
     {
         HandleMecidProximity();
-        death_timer += Time.deltaTime;
+        deathTimer += Time.deltaTime;
 
-        float deathProgress = Mathf.Clamp01(death_timer / playerProperties.death_timer);
+        float deathProgress = Mathf.Clamp01(deathTimer / playerProperties.deathTimer);
 
         if (deathProgress >= 1)
         {
@@ -819,8 +1128,6 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
             return;
         }
-
-        HideOwnerItems(false);
 
         Quaternion targetRotation = new Quaternion(0, 0, 0, playerHead.transform.localRotation.w);
         playerHead.transform.localRotation = Quaternion.Lerp(playerHead.transform.localRotation, targetRotation, Time.deltaTime * 2);
@@ -862,28 +1169,19 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
             this.distance = distance;
         }
     }
-
-    void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, 50);
-    }
-
-    [ServerRpc]
-    public void RequestUpdateServerHP(float hp) => playerProperties.hp.Value = hp;
-
-    [ServerRpc]
-    private void CmdUpdateServerIsDead(bool is_dead) => playerProperties.is_dead.Value = is_dead;
     #endregion
 
     #region Damage / Kill and Revive
     public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
     {
-        this.applyRecoilSpeed = applyRecoilSpeed;
         if (processCameraRecoil != null)
         {
             processCameraRecoil.SetApplyRecoilSpeed(applyRecoilSpeed);
+
+            if (cameraRotation != null) cameraRotation.ResetRecoilPreservingAim();
+            else processCameraRecoil.ResetState();
         }
+
         walkSpeed = original_walk_speed + speedModifier;
         sprintSpeed = original_sprint_speed + speedModifier;
         crouchSpeed = original_crouch_speed + speedModifier;
@@ -892,75 +1190,115 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     public void TakeDamage(float rawDamage)
     {
-        if (playerProperties.is_dead.Value) return;
-        CmdApplyDamage(rawDamage);
+        if (playerProperties.isDead.Value) return;
+
+        if (IsServerStarted) ServerApplyDamage(rawDamage);
+        else CmdApplyDamage(rawDamage);
+
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void CmdApplyDamage(float rawDamage) => TargetReceiveDamage(Owner, rawDamage);
+    private void CmdApplyDamage(float rawDamage) => ServerApplyDamage(rawDamage);
+
+    [Server]
+    private void ServerApplyDamage(float rawDamage)
+    {
+        if (playerProperties.isDead.Value) return;
+
+        playerProperties.hp.Value = Mathf.Clamp(playerProperties.hp.Value - rawDamage, 0, playerProperties.maxHp);
+
+        if (Owner.IsValid) TargetOnDamageReceived(Owner, rawDamage);
+
+        if (playerProperties.hp.Value <= 0)
+        {
+            CmdSetKnematicRb(true);
+            playerProperties.isDead.Value = true;
+            TargetProcessDeadPlayer(Owner);
+        }
+    }
 
     [TargetRpc]
-    private void TargetReceiveDamage(NetworkConnection conn, float dmg)
+    private void TargetOnDamageReceived(NetworkConnection conn, float dmg)
     {
-        playerProperties.hp.Value -= dmg;
+        // Executado apenas na máquina do jogador que tomou dano (visuais e HUD)
+        if (cameraShake != null) cameraShake.RequestShake(dmg / 2f, 0.1f);
+        if (dmg > 40 && soldierHudManager != null && soldierHudManager.screenBlood != null) soldierHudManager.screenBlood.TriggerBlood();
 
-        RequestUpdateServerHP(playerProperties.hp.Value);
-
-        cameraShake.RequestShake(dmg / 2, 0.1f);
-        if (dmg > 40) soldierHudManager.screenBlood.TriggerBlood();
-        if (playerProperties.hp.Value <= 0) ProcessDeadPlayer();
     }
+
+    [TargetRpc]
+    private void TargetProcessDeadPlayer(NetworkConnection conn) => ProcessDeadPlayer();
 
     public void ProcessDeadPlayer()
     {
-        if (playerProperties.is_in_vehicle) playerProperties.is_in_vehicle = false;
-        if (playerProperties.hp.Value != 0) RequestUpdateServerHP(0);
-        if (!playerProperties.is_dead.Value) CmdUpdateServerIsDead(true);
+        if (playerProperties.isInVehicle) playerProperties.isInVehicle = false;
+
         soldierHudManager.ActivateDeadHUD();
-        EnableDeathCollier();
     }
 
     public void Revive(float hp)
     {
-        RequestUpdateServerHP(hp);
-        CmdUpdateServerIsDead(false);
+        UpdateColliderStateLocal();
+
+        if (IsServerStarted) ServerRevive(hp);
+        else RequestRevive(hp);
+    }
+
+    public void Revive(float hp, Vector3 position)
+    {
+        transform.position = position;
+        Revive(hp);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestRevive(float hp) => ServerRevive(hp);
+
+    [Server]
+    private void ServerRevive(float hp)
+    {
+        CmdSetKnematicRb(false);
+        playerProperties.hp.Value = hp;
+        playerProperties.isDead.Value = false;
+        if (Owner.IsValid) TargetRevive(Owner);
+    }
+
+    [TargetRpc]
+    private void TargetRevive(NetworkConnection conn)
+    {
         HideOwnerItems(true);
 
-        playerProperties.is_dead.Value = false;
-        playerProperties.hp.Value = hp;
+        if (soldierHudManager != null) soldierHudManager.ActivateStandardHUD();
 
-        transform.rotation = new Quaternion(transform.rotation.z, transform.rotation.y, 0, transform.rotation.w);
-        DisableDeathCollier();
+        transform.rotation = Quaternion.Euler(0, transform.rotation.eulerAngles.y, 0);
+        if (cameraRotation != null) cameraRotation.SynchronizeYawWithBody();
     }
 
     public void Regenerate(float hp)
     {
-        playerProperties.hp.Value += hp;
-        if (playerProperties.hp.Value > playerProperties.max_hp) playerProperties.hp.Value = playerProperties.max_hp;
+        if (!IsServerStarted) return;
+        playerProperties.hp.Value = Mathf.Min(playerProperties.hp.Value + hp, playerProperties.maxHp);
     }
+
+    [ObserversRpc]
+    private void CmdSetKnematicRb(bool state) => SetKnematicRb(state);
+    private void SetKnematicRb(bool state) => rb.isKinematic = state;
     #endregion
 
     #region Utility
     public void HideOwnerItems(bool hide)
     {
-        if (!IsOwner)
-        {
-            thirdPersonWeapon.ShowWeapon();
-            return;
-        }
+        if (skinApplier.instantiatedLeftUpperArm != null) skinApplier.instantiatedLeftUpperArm.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+        if (skinApplier.instantiatedLeftLowerArm != null) skinApplier.instantiatedLeftLowerArm.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+        if (skinApplier.instantiatedLeftHand != null) skinApplier.instantiatedLeftHand.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+        if (skinApplier.instantiatedRightUpperArm != null) skinApplier.instantiatedRightUpperArm.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+        if (skinApplier.instantiatedRightLowerArm != null) skinApplier.instantiatedRightLowerArm.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+        if (skinApplier.instantiatedRightHand != null) skinApplier.instantiatedRightHand.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
 
-        foreach (GameObject item in hideToOwnerItems)
-        {
-            if (item == null) continue;
-
-            MeshRenderer mesh = item.GetComponentInChildren<MeshRenderer>();
-            if (mesh != null) mesh.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
-        }
-
-        if (!hide) thirdPersonWeapon.ShowWeapon();
-        else thirdPersonWeapon.HideWeapon();
+        if (hide) thirdPersonWeapon.HideWeapon();
+        else thirdPersonWeapon.ShowWeapon();
     }
     public FactionManager.Faction GetFaction() => playerProperties.faction.Value;
     public Transform GetSpotPosition() => spot_position;
+    public Vector3 GetVelocoty() => rb.linearVelocity;
     #endregion
 }

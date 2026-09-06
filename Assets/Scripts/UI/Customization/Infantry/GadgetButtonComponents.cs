@@ -26,8 +26,16 @@ public class GadgetButtonComponents : MonoBehaviour
     private void SetupImage()
     {
         Image[] allImages = GetComponentsInChildren<Image>(true);
-        if (allImages != null && allImages.Length > 0) allImages[allImages.Length - 1].sprite = _imageHud;
-        
+        if (allImages == null || allImages.Length == 0) return;
+
+        Image gadgetImage = allImages[allImages.Length - 1];
+        if (_imageHud == null)
+        {
+            Destroy(gadgetImage);
+            return;
+        }
+
+        gadgetImage.sprite = _imageHud;
     }
 
     private void SetupOutline()

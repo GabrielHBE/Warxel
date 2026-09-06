@@ -1,9 +1,8 @@
-using System.Collections;
 using UnityEngine;
 
-public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
+public class Weapon : MonoBehaviour, ICurrentSpreadUIValues, IReloadContext
 {
-    public const float LAST_MAG_RELOAD_TIMER_INCREASER = 1;
+    public const float LAST_MAG_RELOAD_TIMER_INCREASER = 1.5f;
 
     [Header("State")]
     public bool is_active;
@@ -17,133 +16,161 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     [SerializeField] private GameObject bullet;
 
     [Header("Instances")]
+    [SerializeField] private MuzzleController muzzleController;
     [SerializeField] private PlayerProperties playerProperties;
-    [SerializeField] private Camera player_camera;
-    [SerializeField] private SwitchWeapon switchWeapon;
     [SerializeField] private ProcessCameraRecoil processCameraRecoil;
-
-    [Header("Sounds")]
-    public AudioSource switch_fire_mode_sound;
 
     [Header("Variables")]
     [HideInInspector] public bool can_aim = true;
     [HideInInspector] public bool can_shoot = true;
-    private Coroutine applyRotationRecoilCoroutine;
-    private AdsBehaviour adsBehaviour;
-    private bool can_reload;
-    private float reload_cooldown;
-    [HideInInspector] public bool did_shoot = false;
-    private WeaponSounds weaponSounds;
-    [HideInInspector] public WeaponProperties weaponProperties;
-    private Shell shell;
-    [HideInInspector] public WeaponAnimation weaponAnimation;
+    private Coroutine visualRecoilCoroutine;
+    private EquippableItemAudio equippableItemAudio;
+    private WeaponProperties weaponProperties;
+    [HideInInspector] public EquippableItemAnimator weaponAnimation;
     private Sight sight_attatchment;
+    private CantedSight cantedSightAttatchment;
     private float current_spread;
-    private bool restarted;
-    private int reserve_ammo;
+    private bool restarted = false;
     private float time_to_contatenate = 0;
-    private string ammo;
-    private Quaternion initialRotation;
-
+    private ReloadController reloadController;
+    private SwayNBobScript swayAndBob;
+    private Vector3 visualRecoilPositionOffset;
+    private Quaternion visualRecoilRotationOffset = Quaternion.identity;
+    private Vector3 fallbackInitialLocalPosition;
+    private Quaternion fallbackInitialLocalRotation;
 
     #region Unity Lifecycle Methods
-    void Awake()
+    private void Awake()
     {
-        initialRotation = transform.localRotation;
-        restarted = false;
-        adsBehaviour = GetComponent<AdsBehaviour>();
+        swayAndBob = GetComponent<SwayNBobScript>();
+        fallbackInitialLocalPosition = transform.localPosition;
+        fallbackInitialLocalRotation = transform.localRotation;
     }
+
+    private void OnDisable() => ResetVisualRecoil();
 
     void Update()
     {
-        if (weaponProperties != null)
-            Reload();
-
-        if (!restarted || !is_active)
-        {
-            playerProperties.is_firing = false;
-            return;
-        }
-
-        if (adsBehaviour == null) adsBehaviour = GetComponent<AdsBehaviour>();
+        if (!restarted || !is_active) return;
 
         ConcatenateBullets();
 
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_reloadKey))
-        {
-            HandleReload();
-        }
+        if (weaponProperties != null) UpdateAmmoHUD();
 
-        if (weaponProperties != null)
-        {
-            UpdateAmmoHUD();
-        }
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_reloadKey) && reloadController != null) reloadController.TryStartReload();
 
-        // ATUALIZADO: sem stateId
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey) && playerProperties.reloading && weaponProperties.reloadValues.isSingleReload) reloadController.StopSingleReload();
+
         Firing.UpdateTimeToFire(Time.deltaTime);
 
-        if (can_shoot && !playerProperties.is_reloading)
-        {
-            ProcessShooting();
-        }
+        if (can_shoot && !playerProperties.reloading) ProcessShooting();
 
-        if (!playerProperties.is_firing)
-        {
-            HandleRecoilReset();
-        }
+        if (!playerProperties.firing) HandleRecoilReset();
 
-        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey))
-        {
-            HandleFireModeSwitch();
-        }
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_switchFireModeKey)) HandleFireModeSwitch();
     }
     #endregion
 
     #region Initialization
-    public void Restart()
+    public void Restart(WeaponProperties wp)
     {
-        transform.localRotation = initialRotation;
-        weaponProperties = GetComponentInChildren<WeaponProperties>();
-        weaponAnimation = GetComponent<WeaponAnimation>();
-        sight_attatchment = GetComponentInChildren<Sight>();
-        weaponSounds = GetComponentInChildren<WeaponSounds>();
+        ResetVisualRecoil();
+        swayAndBob ??= GetComponent<SwayNBobScript>();
 
-        shell = weaponProperties.GetComponentInChildren<Shell>();
+        if (swayAndBob == null)
+        {
+            fallbackInitialLocalPosition = transform.localPosition;
+            fallbackInitialLocalRotation = transform.localRotation;
+        }
+
+        weaponProperties = wp;
+        reloadController = wp.GetComponent<ReloadController>();
+        weaponAnimation = wp.weaponAnimation;
+        FindActiveSights(wp);
+        equippableItemAudio = wp.weaponSound;
+
         time_to_contatenate = weaponProperties.reloadValues.timeToTransferAmmo;
 
-        can_reload = true;
-        playerProperties.is_reloading = false;
+        reloadController.Setup(this);
+
+        playerProperties.reloading = false;
         restarted = true;
 
-        weaponProperties.transform.localPosition = weaponProperties.initial_potiion;
-        weaponProperties.transform.localRotation = weaponProperties.initial_rotation;
-
-        if (sight_attatchment != null) AdsBehaviour.Instance.Setup(sight_attatchment.adsPosition, weaponProperties.ads_speed, weaponProperties.zoom, weaponProperties.canReloadAiming);
-        else AdsBehaviour.Instance.Setup(null, weaponProperties.ads_speed, weaponProperties.zoom, weaponProperties.canReloadAiming);
+        if (sight_attatchment != null) AdsBehaviour.Instance.Setup(sight_attatchment, cantedSightAttatchment, weaponProperties, weaponProperties.adsSpeed, weaponProperties.canReloadAiming, equippableItemAudio);
+        else AdsBehaviour.Instance.Setup(null, weaponProperties.adsSpeed, weaponProperties.zoom, weaponProperties.canReloadAiming, equippableItemAudio);
 
         current_spread = weaponProperties.spreadValues.baseSpread;
         SetupFiringSystem();
+
+        if (muzzleController != null)
+        {
+            muzzleController.RequestClearMuzzles();
+            muzzleController.RequestSetupMuzzle(weaponProperties.shootPos);
+            muzzleController.RequestSetMuzzleLifetime(weaponProperties.firing.interval);
+        }
+
+    }
+
+    private void FindActiveSights(WeaponProperties wp)
+    {
+        sight_attatchment = null;
+        cantedSightAttatchment = null;
+
+        Sight[] sights = wp.GetComponentsInChildren<Sight>();
+        foreach (Sight sight in sights)
+        {
+            if (sight is CantedSight cantedSight)
+            {
+                cantedSightAttatchment ??= cantedSight;
+            }
+            else
+            {
+                sight_attatchment ??= sight;
+            }
+        }
+
+        // Uma CantedSight isolada continua funcionando como uma Sight comum.
+        if (sight_attatchment == null && cantedSightAttatchment != null)
+        {
+            sight_attatchment = cantedSightAttatchment;
+            cantedSightAttatchment = null;
+        }
     }
 
     private void SetupFiringSystem()
     {
-        Firing.ResetState();
+        Firing.ResetState(weaponProperties?.firing.fireModes);
         if (weaponProperties != null && weaponProperties.firing.fireModes != null && weaponProperties.firing.fireModes.Count > 0)
         {
-            if (!weaponProperties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(weaponProperties.firing.fireModes);
+            if (!weaponProperties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(weaponProperties.firing);
         }
-        // Update HUD with current fire mode
         UpdateFireModeHUD(Firing.GetCurrentFireMode());
     }
 
     private void UpdateAmmoHUD()
     {
-        ammo = weaponProperties.reloadValues.mags[^1].ToString("F0") + " / ";
-        for (int i = 0; i < weaponProperties.reloadValues.mags.Count - 1; i++)
+        string ammoLeft = "";
+
+        if (weaponProperties.reloadValues.isSingleReload || weaponProperties.reloadValues.bulletsPerMag == 1)
         {
-            ammo += weaponProperties.reloadValues.mags[i].ToString("F0") + " ";
+            int ammoCount = 0;
+            for (int i = 0; i < weaponProperties.reloadValues.mags.Count - 1; i++)
+            {
+                ammoCount += weaponProperties.reloadValues.mags[i];
+            }
+
+            ammoLeft = ammoCount.ToString();
         }
-        soldierHudManager.SetCurrentAmmo(ammo);
+        else
+        {
+            for (int i = 0; i < weaponProperties.reloadValues.mags.Count - 1; i++)
+            {
+                ammoLeft += weaponProperties.reloadValues.mags[i].ToString("F0") + " ";
+            }
+        }
+
+        soldierHudManager.SetCurrentAmmo(weaponProperties.reloadValues.mags[^1].ToString("F0") + " / " + ammoLeft);
+
     }
     #endregion
 
@@ -152,115 +179,11 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     {
         if (!Firing.CanSwitchFireMode(weaponProperties.firing.fireModes)) return;
 
-        switch_fire_mode_sound.Play();
-
-        Firing.FireMode newMode = Firing.SwitchFireMode(weaponProperties.firing.fireModes);
+        Firing.FireMode newMode = Firing.SwitchFireMode(weaponProperties.firing);
         UpdateFireModeHUD(newMode);
     }
 
     private void UpdateFireModeHUD(Firing.FireMode mode) => soldierHudManager.fire_mode_hud.SetFireMode(mode);
-    #endregion
-
-    #region Reload
-    void HandleReload()
-    {
-        int reserveAmmo = weaponProperties.reloadValues.GetTotalReserveAmmo();
-
-        if (!ProcessReload.Reload.ReloadLogic.CanStartReload(
-            weaponProperties.reloadValues,
-            playerProperties.is_firing,
-            playerProperties.is_reloading,
-            playerProperties.roll,
-            reserveAmmo))
-        {
-            if (reserveAmmo == 0) AlertMessages.Instance.CreateMessage("Cant reload", 2);
-            return;
-        }
-
-        weaponAnimation.StartReloadAnimation();
-
-        bool isEmpty = weaponProperties.reloadValues.IsMagazineEmpty();
-        float totalReloadTime = ProcessReload.Reload.ReloadLogic.CalculateReloadTime(weaponProperties.reloadValues, isEmpty);
-
-        if (weaponAnimation.fireClip != null)
-        {
-            if (!weaponAnimation.is_in_fire_animation)
-            {
-                reload_cooldown = totalReloadTime;
-                playerProperties.is_reloading = true;
-                can_reload = true;
-            }
-        }
-        else
-        {
-            reload_cooldown = totalReloadTime;
-            playerProperties.is_reloading = true;
-            can_reload = true;
-        }
-    }
-
-    void Reload()
-    {
-        CalculateReserveAmmo();
-
-        if (reserve_ammo == 0 || !playerProperties.is_reloading)
-        {
-            can_reload = false;
-            return;
-        }
-
-        if (!weaponProperties.reloadValues.isSingleReload) HandleStandardReload();
-        else HandleSingleReload();
-        
-    }
-
-    private void CalculateReserveAmmo() => reserve_ammo = weaponProperties.reloadValues.GetTotalReserveAmmo();
-    
-
-    private void HandleStandardReload()
-    {
-        bool isEmpty = weaponProperties.reloadValues.IsMagazineEmpty();
-
-        var result = ProcessReload.Reload.ReloadLogic.ProcessStandardReload(
-            weaponProperties.reloadValues,
-            reload_cooldown,
-            Time.deltaTime,
-            isEmpty
-        );
-
-        reload_cooldown = result.remainingCooldown;
-        can_shoot = result.canShoot;
-        playerProperties.is_reloading = result.isReloading;
-
-        if (result.shouldFinishReload)
-        {
-            weaponAnimation.FinishReloadAnimation();
-            Firing.ResetState();
-        }
-    }
-
-    public void ApplyMagAmmo(int amount) => weaponProperties.reloadValues.mags[^1] = amount;
-    public void RemoveMagAmmo(int amount, int index) => weaponProperties.reloadValues.mags[index] -= amount;
-
-    private void HandleSingleReload()
-    {
-        bool shouldContinue = ProcessReload.Reload.ReloadLogic.ProcessSingleReload(
-            weaponProperties.reloadValues,
-            playerProperties.is_reloading,
-            can_reload,
-            playerProperties.is_firing,
-            out bool shouldContinueReloading
-        );
-
-        if (shouldContinueReloading)
-        {
-            shell.Reload();
-        }
-        else if (!shouldContinue)
-        {
-            playerProperties.is_reloading = false;
-        }
-    }
     #endregion
 
     #region Shooting
@@ -269,86 +192,65 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
         bool holdShoot = InputManager.GetKey(Settings.Instance._keybinds.WEAPON_shootKey);
         bool pressShoot = InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
 
-        // Check if ammo is empty for alert
         if (pressShoot && weaponProperties.reloadValues.mags[^1] == 0)
         {
             AlertMessages.Instance.CreateMessage("Not enough ammo", 2);
             return;
         }
 
-        // ATUALIZADO: Process shooting through Firing system (sem stateId)
         var result = Firing.ProcessShooting(
             weaponProperties.firing,
             holdShoot,
             pressShoot,
-            playerProperties.is_reloading,
+            playerProperties.reloading,
             playerProperties.roll,
-            playerProperties.is_dead.Value,
+            playerProperties.isDead.Value,
             weaponProperties.reloadValues.mags[^1],
             Time.deltaTime
         );
 
-        // Handle the result
-        if (result.shouldResetShotState)  ResetShotState();
+        if (result.shouldResetShotState) ResetShotState();
         if (result.shouldShoot) ExecuteShot(result.isFirstShot);
-        
-        // ATUALIZADO: sem stateId
-        playerProperties.is_firing = Firing.IsFiring();
 
-        if (weaponProperties.reloadValues.mags[^1] <= 0) playerProperties.is_firing = false;
-        
+        playerProperties.firing = Firing.IsFiring();
+
+        if (weaponProperties.reloadValues.mags[^1] <= 0) playerProperties.firing = false;
     }
 
     private void ExecuteShot(bool isFirstShot)
     {
-        did_shoot = true;
+        if (weaponAnimation != null)
+        {
+            if (weaponAnimation != null) weaponAnimation.StartFireAnimation();
+            if (weaponAnimation.fireClip == null) weaponProperties.CreateBulletExtractor();
+        }
 
-        if (weaponAnimation != null) weaponAnimation.StartFireAnimation();
-        if (weaponAnimation.fireClip == null) weaponProperties.CreateBulletExtractor();
-        
-        // Apply recoil using the next recoil index
         int patternLength = weaponProperties.recoilValues.recoilPattern.Length;
         if (patternLength > 0)
         {
             int recoilIndex = Firing.GetNextRecoilIndex(patternLength);
 
-            if (recoilIndex >= 0 && recoilIndex < patternLength)  StartCoroutine(ApplyVisualRecoilOffset(recoilIndex, isFirstShot));
+            if (recoilIndex >= 0 && recoilIndex < patternLength) ApplyVisualRecoilOffset(recoilIndex, isFirstShot);
             else
             {
                 Debug.LogWarning($"Recoil index {recoilIndex} out of range for pattern length {patternLength}");
-                StartCoroutine(ApplyVisualRecoilOffset(0, isFirstShot));
+                ApplyVisualRecoilOffset(0, isFirstShot);
             }
         }
 
-        // Create bullet
         CreateBullet();
-
-        // Remove ammo
         weaponProperties.reloadValues.mags[^1] -= 1;
     }
 
     private void ResetShotState()
     {
-        // ATUALIZADO: sem stateId
         Firing.ResetRecoilIndex();
         Firing.ResetState();
-        playerProperties.is_firing = false;
+        playerProperties.firing = false;
     }
 
     private void HandleRecoilReset()
     {
-        if (applyRotationRecoilCoroutine != null)
-        {
-            StopCoroutine(applyRotationRecoilCoroutine);
-            applyRotationRecoilCoroutine = null;
-        }
-
-        transform.localRotation = Quaternion.Lerp(
-            transform.localRotation,
-            initialRotation,
-            Time.deltaTime * 5
-        );
-
         current_spread = Spread.ResetSpread(current_spread, weaponProperties.spreadValues.baseSpread, weaponProperties.spreadValues.spreadRecovery);
     }
 
@@ -359,43 +261,102 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             SpawnBullet();
         }
 
-        if (weaponSounds != null) weaponSounds.ShootSound();
+        if (equippableItemAudio != null) equippableItemAudio.ShootSound();
+        if (muzzleController != null) muzzleController.RequestCreateMuzzle();
     }
 
     private void SpawnBullet()
     {
-        Quaternion finalRotation = Spread.CalculateSpreadRotation(weaponProperties.barrel.transform, current_spread);
+        Quaternion finalRotation = Spread.CalculateSpreadRotation(weaponProperties.shootPos, current_spread);
 
         current_spread = Spread.AddSpread(current_spread, weaponProperties.spreadValues.spreadIncreaser, weaponProperties.spreadValues.maxSpread);
 
         Projectile.ProjectileProperties prop = new Projectile.ProjectileProperties
         {
-            position = weaponProperties.barrel.transform.position,
+            position = weaponProperties.shootPos.position,
             rotation = finalRotation,
             ignoredObject = transform.root
         };
 
         if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(bullet, dummyBullet.gameObject, prop, weaponProperties.projectileValues);
-
     }
 
-
-    IEnumerator ApplyVisualRecoilOffset(int recoilIndex, bool isFirstShot)
+    private void ApplyVisualRecoilOffset(int recoilIndex, bool isFirstShot)
     {
-        // Safety check
         if (recoilIndex < 0 || recoilIndex >= weaponProperties.recoilValues.recoilPattern.Length) recoilIndex = 0;
-        
+
         ApplyRecoilToCamera(
             Recoil.GetVerticalRecoilDirection(weaponProperties.recoilValues.recoilPattern[recoilIndex].verticalRecoil),
             Recoil.GetHorizontalRecoilDirection(weaponProperties.recoilValues.recoilPattern[recoilIndex].horizontalRecoil),
             isFirstShot
         );
 
-        Vector3 recoilOffset = GetRecoilOffset();
-        Vector3 start = weaponProperties.initial_potiion;
-        Vector3 target = start + recoilOffset;
+        Vector3 recoilOffset = Recoil.CalculateVisualRecoilOffset(
+            weaponProperties.recoilValues.visualPositionRecoil,
+            playerProperties.aiming);
+        Vector3 startPositionOffset = visualRecoilPositionOffset;
+        Vector3 targetPositionOffset = startPositionOffset + recoilOffset;
 
-        yield return StartCoroutine(ApplyPositionRecoilAnimation(start, target));
+        Vector3 recoilRotOffset = Recoil.CalculateVisualRotationOffset(weaponProperties.recoilValues.maxRotationRecoil, playerProperties.aiming);
+        Quaternion startRotationOffset = visualRecoilRotationOffset;
+        Quaternion targetRotationOffset = startRotationOffset * Quaternion.Euler(recoilRotOffset);
+
+        if (visualRecoilCoroutine != null)
+        {
+            StopCoroutine(visualRecoilCoroutine);
+        }
+
+        visualRecoilCoroutine = StartCoroutine(ApplyVisualRecoilAnimation(
+            startPositionOffset,
+            targetPositionOffset,
+            startRotationOffset,
+            targetRotationOffset));
+    }
+
+    private System.Collections.IEnumerator ApplyVisualRecoilAnimation(
+        Vector3 startPositionOffset,
+        Vector3 targetPositionOffset,
+        Quaternion startRotationOffset,
+        Quaternion targetRotationOffset)
+    {
+        yield return Recoil.ApplyVisualRecoilAnimation(
+            startPositionOffset,
+            targetPositionOffset,
+            startRotationOffset,
+            targetRotationOffset,
+            weaponProperties.recoilValues.applyRecoilSpeed,
+            weaponProperties.recoilValues.resetRecoilSpeed,
+            weaponProperties.recoilValues.applyCurve,
+            weaponProperties.recoilValues.resetCurve,
+            SetVisualRecoilOffset);
+
+        visualRecoilCoroutine = null;
+    }
+
+    private void SetVisualRecoilOffset(Vector3 positionOffset, Quaternion rotationOffset)
+    {
+        visualRecoilPositionOffset = positionOffset;
+        visualRecoilRotationOffset = rotationOffset;
+
+        if (swayAndBob != null)
+        {
+            swayAndBob.SetVisualRecoilOffset(positionOffset, rotationOffset);
+            return;
+        }
+
+        transform.localPosition = fallbackInitialLocalPosition + positionOffset;
+        transform.localRotation = fallbackInitialLocalRotation * rotationOffset;
+    }
+
+    private void ResetVisualRecoil()
+    {
+        if (visualRecoilCoroutine != null)
+        {
+            StopCoroutine(visualRecoilCoroutine);
+            visualRecoilCoroutine = null;
+        }
+
+        SetVisualRecoilOffset(Vector3.zero, Quaternion.identity);
     }
 
     private void ApplyRecoilToCamera(float vr, float hr, bool isFirstShot)
@@ -408,34 +369,7 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
             weaponProperties.reloadValues.mags[^1]
         );
 
-        // Chamada direta para o ProcessCameraRecoil
         if (processCameraRecoil != null) processCameraRecoil.ApplyRecoil(recoil.vertical, recoil.horizontal);
-        
-    }
-    private Vector3 GetRecoilOffset() => Recoil.CalculateVisualRecoilOffset(weaponProperties.recoilValues.visual_recoil, playerProperties.is_aiming);
-    
-    private IEnumerator ApplyPositionRecoilAnimation(Vector3 start, Vector3 target)
-    {
-        float elapsed = 0f;
-        while (elapsed < weaponProperties.recoilValues.applyRecoilSpeed)
-        {
-            elapsed += Time.deltaTime;
-            weaponProperties.transform.localPosition = Vector3.Lerp(start, target, elapsed / weaponProperties.recoilValues.applyRecoilSpeed);
-            yield return null;
-        }
-
-        elapsed = 0f;
-
-        while (elapsed < weaponProperties.recoilValues.resetRecoilSpeed)
-        {
-            elapsed += Time.deltaTime;
-            weaponProperties.transform.localPosition = Vector3.Lerp(
-                weaponProperties.transform.localPosition,
-                start,
-                elapsed / weaponProperties.recoilValues.applyRecoilSpeed
-            );
-            yield return null;
-        }
     }
     #endregion
 
@@ -443,17 +377,16 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     private void ConcatenateBullets()
     {
         if (weaponProperties.reloadValues.mags == null || weaponProperties.reloadValues.mags.Count == 0) return;
-        
+
         if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_composeBulletsKey) &&
-            !playerProperties.is_firing &&
-            !playerProperties.is_reloading) ProcessBulletConcatenation();
+            !playerProperties.firing &&
+            !playerProperties.reloading) ProcessBulletConcatenation();
         else ResetConcatenation();
-        
     }
 
     private void ProcessBulletConcatenation()
     {
-        playerProperties.is_composing_bullets = true;
+        playerProperties.isComposingBullets = true;
         time_to_contatenate -= Time.deltaTime;
 
         if (time_to_contatenate <= 0)
@@ -466,14 +399,39 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues
     private void TransferBulletsBetweenMags() => ProcessReload.Reload.ReloadLogic.TransferBulletBetweenMags(weaponProperties.reloadValues);
     private void ResetConcatenation()
     {
-        playerProperties.is_composing_bullets = false;
+        playerProperties.isComposingBullets = false;
         time_to_contatenate = weaponProperties.reloadValues.timeToTransferAmmo;
     }
     #endregion
 
     #region Interface Implementations
+    // ==========================================
+    // INTERFACE ICurrentSpreadUIValues
+    // ==========================================
     public float GetCurrentSpread() => current_spread;
     public float GetMaxSpread() => weaponProperties.spreadValues.maxSpread;
-    #endregion
 
+    // ==========================================
+    // INTERFACE IReloadContext
+    // ==========================================
+    public ProcessReload.Reload.ReloadValues ReloadValues => weaponProperties.reloadValues;
+    public bool IsActive => is_active && restarted;
+    public bool IsFiring => playerProperties.firing;
+    public bool IsRolling => playerProperties.roll;
+
+    public bool IsReloading
+    {
+        get => playerProperties.reloading;
+        set => playerProperties.reloading = value;
+    }
+
+    public bool HasFireClip => weaponAnimation != null && weaponAnimation.fireClip != null;
+    public bool IsInFireAnimation => weaponAnimation != null && weaponAnimation.isInFireAnimation;
+
+    public void SetCanShoot(bool canShoot) => this.can_shoot = canShoot;
+    public void StartReloadAnimation() => weaponAnimation.StartReloadAnimation();
+    public void FinishReloadAnimation() => weaponAnimation.FinishReloadAnimation();
+    public void ResetFiringState() => Firing.ResetState();
+    public void OnReloadFailedNoAmmo() => AlertMessages.Instance.CreateMessage("Cant reload", 2);
+    #endregion
 }

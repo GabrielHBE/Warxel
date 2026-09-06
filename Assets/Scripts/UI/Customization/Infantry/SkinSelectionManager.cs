@@ -15,7 +15,7 @@ public class SkinSelectionManager : MonoBehaviour
         ClearSkinButtons();
         infantryLoadoutCustomization.weaponsGadgetsParent.gameObject.SetActive(true);
 
-        UpdateSelectionText($"Selecionando Skin - {infantryLoadoutCustomization._selectedClass}");
+        UpdateSelectionText($"Selecting Skin - {infantryLoadoutCustomization._selectedClass}");
 
         // Obtém todas as skins disponíveis para a classe atual
         List<Skin> availableSkins = GetSkinsForClass(infantryLoadoutCustomization._selectedClass);
@@ -36,7 +36,7 @@ public class SkinSelectionManager : MonoBehaviour
         
 
         UpdateAllButtonOutlines();
-        ResetSlider();
+        infantryLoadoutCustomization.itemSelectionManager.ConfigureScrollForItemCount(availableSkins.Count);
     }
 
     private List<Skin> GetSkinsForClass(ClassManager.Class classType)
@@ -92,7 +92,7 @@ public class SkinSelectionManager : MonoBehaviour
         if (infantryLoadoutCustomization.selectItemSfx != null)SoundManager.Play2dSoundLocal(infantryLoadoutCustomization.selectItemSfx.clip, infantryLoadoutCustomization.selectItemSfx.properties);
         
 
-        UpdateSelectionText($"Skin selecionada: {skin.skingName}");
+        UpdateSelectionText($"Selected Skin: {skin.skingName}");
 
         // Salva o loadout para persistir a skin
         infantryLoadoutCustomization.SaveCurrentLoadout();
@@ -110,7 +110,7 @@ public class SkinSelectionManager : MonoBehaviour
             _currentSkinPreview = Instantiate(skin.anim.gameObject, infantryLoadoutCustomization.currentItemParent);
 
             // Ajusta a posição, rotação e escala para melhor visualização
-            _currentSkinPreview.transform.localPosition = new Vector3(0.7f, -1, 0);
+            _currentSkinPreview.transform.localPosition = new Vector3(0.7f, -1.76f, 0);
             _currentSkinPreview.transform.localRotation = Quaternion.Euler(0, 90, 0);
             _currentSkinPreview.transform.localScale = new Vector3(70,70, 70);
         }
@@ -142,15 +142,6 @@ public class SkinSelectionManager : MonoBehaviour
             if (button != null) Destroy(button);
         }
         _buttonsList.Clear();
-    }
-
-    private void ResetSlider()
-    {
-        if (infantryLoadoutCustomization.weaponsGadgetsSlider != null)
-        {
-            infantryLoadoutCustomization.weaponsGadgetsSlider.gameObject.SetActive(true);
-            infantryLoadoutCustomization.weaponsGadgetsSlider.value = 0f;
-        }
     }
 
     private void UpdateSelectionText(string text)

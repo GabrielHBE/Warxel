@@ -35,7 +35,7 @@ public static class ProcessKill
 
     private static void MutualProcess(GameObject itemUsedToKill, string name)
     {
-        KillFeedDisplay.Instance.RequestAddKill(AccountManager.Instance.account_name, name, itemUsedToKill != null ? itemUsedToKill.name : "Placeholder");
+        KillFeedDisplay.Instance.RequestAddKill(AccountManager.Instance.accountName, name, itemUsedToKill != null ? itemUsedToKill.name : "Placeholder");
         AccountManager.Instance.accountStatus.AddKill();
         AccountManager.Instance.AddPointsToLevelUp(10);
     }

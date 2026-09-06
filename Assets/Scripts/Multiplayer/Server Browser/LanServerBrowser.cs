@@ -37,7 +37,7 @@ public class LANServerBrowser : MonoBehaviour
         if (networkDiscovery != null)
         {
             networkDiscovery.SearchForServers();
-            Debug.Log("Procurando servidores na LAN...");
+            Debug.Log("Searching for servers on the LAN...");
         }
     }
 
@@ -58,7 +58,7 @@ public class LANServerBrowser : MonoBehaviour
         GameObject newButton = Instantiate(serverButtonPrefab, serverListParent);
 
         TextMeshProUGUI buttonText = newButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (buttonText != null)  buttonText.text = $"Servidor: {endpoint.Address}";
+        if (buttonText != null)  buttonText.text = $"Server: {endpoint.Address}";
         
         UnityEngine.UI.Button btn = newButton.GetComponent<UnityEngine.UI.Button>();
         btn.onClick.AddListener(() => ConnectToServer(endpoint.Address.ToString()));
@@ -66,7 +66,7 @@ public class LANServerBrowser : MonoBehaviour
 
     private void ConnectToServer(string ipAddress)
     {
-        if (mainMenuConnection != null) mainMenuConnection.StartMapImage("Conectando ao servidor...");
+        if (mainMenuConnection != null) mainMenuConnection.StartMapImage("Connecting to server...");
 
 
         StopSearching();

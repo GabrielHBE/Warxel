@@ -15,7 +15,7 @@ public class AltitudeLevelUI : MonoBehaviour
         altitudeLevelUIValues = GetComponentInParent<IAltitudeLevelUIValues>();
         if (altitudeLevelUIValues == null)
         {
-            Debug.LogError("AltitudeLevelUI: Não foi possível encontrar um componente que implemente IAltitudeLevelUIValues no objeto pai.");
+            Debug.LogError("AltitudeLevelUI: Could not find a component implementing IAltitudeLevelUIValues on the parent object.");
             return;
         }
     }

@@ -185,7 +185,7 @@ public class VehicleLoadoutCustomization : InMatchClientSingleton<VehicleLoadout
         backButton.SetActive(false);
         categoriesParent.gameObject.SetActive(true);
 
-        if (currentSelectionText != null) currentSelectionText.text = "Selecione a Categoria de Veículos";
+        if (currentSelectionText != null) currentSelectionText.text = "Select a Vehicle Category";
 
         int index = 0;
         foreach (Vehicle.VehicleCategory category in Enum.GetValues(typeof(Vehicle.VehicleCategory)))
@@ -205,7 +205,7 @@ public class VehicleLoadoutCustomization : InMatchClientSingleton<VehicleLoadout
         backButton.SetActive(true);
         vehiclesParent.gameObject.SetActive(true);
 
-        if (currentSelectionText != null) currentSelectionText.text = $"Veículos: {category}";
+        if (currentSelectionText != null) currentSelectionText.text = $"Vehicles: {category}";
         ResetSlider(vehiclesParent);
 
         GameObject[] vehicles = GetVehiclesArrayForCategory(category);
@@ -275,7 +275,7 @@ public class VehicleLoadoutCustomization : InMatchClientSingleton<VehicleLoadout
         backButton.SetActive(true);
         optionsParent.gameObject.SetActive(true);
 
-        if (currentSelectionText != null) currentSelectionText.text = $"Customizando: {vehiclePrefab.name}";
+        if (currentSelectionText != null) currentSelectionText.text = $"Customizing: {vehiclePrefab.name}";
 
         // O veículo já foi instanciado no OnVehicleSelected, não precisamos criar novamente.
 
@@ -299,7 +299,7 @@ public class VehicleLoadoutCustomization : InMatchClientSingleton<VehicleLoadout
         backButton.SetActive(true);
         partsParent.gameObject.SetActive(true);
 
-        if (currentSelectionText != null) currentSelectionText.text = $"Selecionando: {partType}";
+        if (currentSelectionText != null) currentSelectionText.text = $"Selecting: {partType}";
         ResetSlider(partsParent);
 
         IsVehicleCustomizationPart[] allParts = _currentVehicleInstance.GetComponentsInChildren<IsVehicleCustomizationPart>(true);

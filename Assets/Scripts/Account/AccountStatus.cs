@@ -67,7 +67,7 @@ public class AccountStatus
 
     public void IncreaseClassSelecion()
     {
-        if (classSelecion.ContainsKey(AccountManager.Instance.selected_class)) classSelecion[AccountManager.Instance.selected_class] += 1;
+        if (classSelecion.ContainsKey(AccountManager.Instance.selectedClass)) classSelecion[AccountManager.Instance.selectedClass] += 1;
         else return;
         
         // Salva imediatamente a mudança
@@ -214,6 +214,6 @@ public class AccountStatus
         CalculateWinRate();
         UpdateMostUsedClass();
 
-        Debug.Log("Todos os status foram resetados!");
+        Debug.Log("All stats were reset!");
     }
 }

@@ -12,7 +12,6 @@ public class ScoutHelicopter : Helicopter
             return;
         }
 
-        throttle.Value = 0;
         SetHpProperties(heliProperties.hp, heliProperties.resistance);
     }
 
@@ -22,7 +21,7 @@ public class ScoutHelicopter : Helicopter
 
         if (currentSeat == null || currentSeat.playerController == null)
         {
-            Debug.LogError("Erro: Referências do Player não foram preenchidas pela classe base.");
+            Debug.LogError("Error: Player references were not populated by the base class.");
             return;
         }
     }

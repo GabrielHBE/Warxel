@@ -43,7 +43,7 @@ public class FlagsUI : MonoBehaviour
         // 3. Adiciona o componente Image e o Sprite da FlagCapture
         Image imageComponent = uiObject.AddComponent<Image>();
         if (flag.UI_Image != null) imageComponent.sprite = flag.UI_Image;
-        else Debug.LogWarning($"A Flag {flag.name} não possui uma UI_Image definida!");
+        else Debug.LogWarning($"Flag {flag.name} does not have a UI_Image assigned!");
         
 
         // 4. Configura o tamanho do RectTransform
@@ -80,7 +80,7 @@ public class FlagsUI : MonoBehaviour
     {
         if (AccountManager.Instance == null) return;
 
-        if (AccountManager.Instance.faction == element.Flag.GetFactionInControl()) element.UIImage.color = Settings.Instance._gameplay.ally_color;
+        if (AccountManager.Instance.selectedFaction == element.Flag.GetFactionInControl()) element.UIImage.color = Settings.Instance._gameplay.ally_color;
         else if (element.Flag.GetFactionInControl() == FactionManager.Faction.Neutral) element.UIImage.color = Settings.Instance._gameplay.neutral_color;
         else element.UIImage.color = Settings.Instance._gameplay.enemy_color;
     }
@@ -89,22 +89,22 @@ public class FlagsUI : MonoBehaviour
     {
         if (AccountManager.Instance == null || PlayerController.Instance == null) return;
 
-        if (AccountManager.Instance.faction == element.Flag.GetFactionInControl())
+        if (AccountManager.Instance.selectedFaction == element.Flag.GetFactionInControl())
         {
             Color c = element.UIImage.color;
-            c.a = PlayerController.Instance.playerProperties.is_aiming ? Settings.Instance._gameplay.ally_indicator_aim_opacity : Settings.Instance._gameplay.ally_indicator_opacity;
+            c.a = PlayerController.Instance.playerProperties.aiming ? Settings.Instance._gameplay.ally_indicator_aim_opacity : Settings.Instance._gameplay.ally_indicator_opacity;
             element.UIImage.color = c;
         }
         else if (element.Flag.GetFactionInControl() == FactionManager.Faction.Neutral)
         {
             Color c = element.UIImage.color;
-            c.a = PlayerController.Instance.playerProperties.is_aiming ? Settings.Instance._gameplay.neutral_indicator_aim_opacity : Settings.Instance._gameplay.neutral_indicator_opacity;
+            c.a = PlayerController.Instance.playerProperties.aiming ? Settings.Instance._gameplay.neutral_indicator_aim_opacity : Settings.Instance._gameplay.neutral_indicator_opacity;
             element.UIImage.color = c;
         }
         else
         {
             Color c = element.UIImage.color;
-            c.a = PlayerController.Instance.playerProperties.is_aiming ? Settings.Instance._gameplay.enemy_indicator_aim_opacity : Settings.Instance._gameplay.enemy_indicator_opacity;
+            c.a = PlayerController.Instance.playerProperties.aiming ? Settings.Instance._gameplay.enemy_indicator_aim_opacity : Settings.Instance._gameplay.enemy_indicator_opacity;
             element.UIImage.color = c;
         }
 

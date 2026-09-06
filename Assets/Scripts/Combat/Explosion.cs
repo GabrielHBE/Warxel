@@ -23,11 +23,11 @@ public static class Explosion
             if (ShouldIgnoreCollider(collider, ignoreHitGameobject))
                 continue;
 
-            ProcessVehicleCollision(collider, contactPoint, shootRoot, destructionRadius, 
-                                    infantryDmg, vehicleDmg, damageFalloff, 
+            ProcessVehicleCollision(collider, contactPoint, shootRoot, destructionRadius,
+                                    infantryDmg, vehicleDmg, damageFalloff,
                                     parentVehicle, processedVehicles);
 
-            ProcessPlayerCollision(collider, contactPoint, shootRoot, destructionRadius, 
+            ProcessPlayerCollision(collider, contactPoint, shootRoot, destructionRadius,
                                    infantryDmg, damageFalloff, processedPlayers);
 
             ProcessVoxelCollision(collider, infantryDmg);
@@ -51,11 +51,6 @@ public static class Explosion
         }
     }
 
-    private static bool ShouldIgnoreCollider(Collider collider, GameObject ignoreHitGameobject)
-    {
-        return ignoreHitGameobject != null && collider.gameObject == ignoreHitGameobject;
-    }
-
     private static void ProcessVehicleCollision(
         Collider collider,
         Vector3 contactPoint,
@@ -76,18 +71,23 @@ public static class Explosion
 
         processedVehicles.Add(vehicle);
 
-        float damage = ShouldUseVehicleDamage(parentVehicle, collider) ? vehicleDmg : infantryDmg;
-        ProcessHit.VehicleHit(vehicle, collider, contactPoint, shootRoot, damage, damageFalloff, destructionRadius);
-    }
+        float dmg = ShouldUseVehicleDamage(parentVehicle, collider) ? vehicleDmg : infantryDmg;
 
-    private static bool ShouldUseVehicleDamage(GameObject parentVehicle, Collider collider)
-    {
-        return parentVehicle != null && collider.gameObject != parentVehicle.gameObject;
-    }
+        // Cálculo de Falloff transferido do ProcessHit
+        Vector3 closestPoint = collider.ClosestPoint(contactPoint);
+        float distance = Vector3.Distance(contactPoint, closestPoint);
+        float distanceRatio = Mathf.Clamp01(1 - (distance / destructionRadius));
+        float damageMultiplier = Mathf.Pow(distanceRatio, damageFalloff);
+        float baseDamage = dmg * damageMultiplier;
 
-    private static ProcessVehicleDamage GetVehicleComponent(Collider collider)
-    {
-        return collider.gameObject.GetComponent<ProcessVehicleDamage>();
+        float target_resistance = vehicle.GetResistance();
+        float dano_real = baseDamage * ((100f - target_resistance) / 100f);
+
+        vehicle.Damage(dano_real);
+        DamageMarker.Instance.UpdateDamage(dano_real);
+
+        string[] occupantNames = vehicle.GetOccupantNames();
+        if (vehicle.IsVehicleDestroyed()) ProcessKill.ProcessVehicleKill(shootRoot, occupantNames);
     }
 
     private static void ProcessPlayerCollision(
@@ -106,26 +106,47 @@ public static class Explosion
         if (player == null || processedPlayers.Contains(player))
             return;
 
+        PlayerProperties playerProperties = player.GetComponent<PlayerProperties>();
+        if (playerProperties != null && playerProperties.isDead.Value) return;
+
+        ProcessInfantryDamage processInfantryDamage = player.GetComponent<ProcessInfantryDamage>();
+        if (processInfantryDamage == null || processInfantryDamage.IsPlayerDead()) return;
+
         processedPlayers.Add(player);
-        ProcessHit.PlayerHit(player, collider, contactPoint, shootRoot, infantryDmg, damageFalloff, destructionRadius);
+
+        // Cálculo de Falloff transferido do ProcessHit
+        Vector3 closestPoint = collider.ClosestPoint(contactPoint);
+        float distance = Vector3.Distance(contactPoint, closestPoint);
+        float distanceRatio = Mathf.Clamp01(1 - (distance / destructionRadius));
+        float damageMultiplier = Mathf.Pow(distanceRatio, damageFalloff);
+        float baseDamage = infantryDmg * damageMultiplier;
+
+        ProcessInfantryDamage.LimbMultiplier limb = processInfantryDamage.GetLimbMultiplier();
+        float limbMultiplier = ProcessHit.limbMultiplierValues.TryGetValue(limb, out float multiplier) ? multiplier : 1f;
+        bool isHeadShot = limb == ProcessInfantryDamage.LimbMultiplier.Head;
+
+        float preResistanceDamage = baseDamage * limbMultiplier;
+        float target_resistance = processInfantryDamage.GetResistance();
+        float dano_real = preResistanceDamage * ((100f - target_resistance) / 100f);
+
+        processInfantryDamage.Damage(dano_real);
+        DamageMarker.Instance.UpdateDamage(dano_real);
+
+        CameraShake cameraShake = player.GetComponentInChildren<CameraShake>();
+        if (cameraShake != null) cameraShake.RequestShake(preResistanceDamage / 10f, 1f);
+
+        if (playerProperties != null && playerProperties.isDead.Value) 
+            ProcessKill.ProcessInfantryKill(shootRoot, isHeadShot, processInfantryDamage.GetPlayerName());
     }
 
-    private static void ProcessVoxelCollision(
-        Collider collider,
-        float infantryDmg)
+    private static void ProcessVoxelCollision(Collider collider, float dmg)
     {
-        if (collider.gameObject.layer != LayerMask.NameToLayer("Voxel"))
-            return;
-
-        TryApplyVoxelPartialCollapseDamage(collider, infantryDmg);
+        if (!VoxelObj.IsVoxelLayer(collider.gameObject.layer)) return;
+        TryApplyVoxelPartialCollapseDamage(collider, dmg);
     }
 
-
-
-    private static void TryApplyVoxelPartialCollapseDamage(Collider collider, float infantryDmg)
-    {
-        VoxelPartialCollapse collapse = collider.GetComponent<VoxelPartialCollapse>();
-        if (collapse != null)
-            collapse.Damage(infantryDmg / 2);
-    }
+    private static void TryApplyVoxelPartialCollapseDamage(Collider collider, float dmg) => collider.GetComponent<VoxelDestruction>()?.TakeDamage(dmg / 2);
+    private static bool ShouldUseVehicleDamage(GameObject parentVehicle, Collider collider) => parentVehicle != null && collider.gameObject != parentVehicle.gameObject;
+    private static ProcessVehicleDamage GetVehicleComponent(Collider collider) => collider.gameObject.GetComponent<ProcessVehicleDamage>();
+    private static bool ShouldIgnoreCollider(Collider collider, GameObject ignoreHitGameobject) => ignoreHitGameobject != null && collider.gameObject == ignoreHitGameobject;
 }

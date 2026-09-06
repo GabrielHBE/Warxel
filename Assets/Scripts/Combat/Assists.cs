@@ -19,7 +19,7 @@ public class AssistsManager : MonoBehaviour
         {
             PlayerProperties p = infantryAssistList[i];
 
-            if (p.is_dead.Value) ConfirmInfantryAssist(i);
+            if (p.isDead.Value) ConfirmInfantryAssist(i);
             
         }
 

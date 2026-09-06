@@ -25,7 +25,7 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
     void Awake()
     {
         // Reseta o estado de disparo
-        Firing.ResetState();
+        Firing.ResetState(properties.firing.fireModes);
         // Garante que o estado de superaquecimento comece falso
         properties.heatValues.heatState.isOverheated = false;
         // Reseta o spread
@@ -247,14 +247,14 @@ public class TankPilotGun : NetworkBehaviour, IVehicleArmory
 
     public void SetupFiringSystem()
     {
-        Firing.ResetState();
+        Firing.ResetState(properties?.firing.fireModes);
 
         // Garante que o modo de tiro estático atual é válido para este armamento
         if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
         {
             if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
             {
-                Firing.SwitchFireMode(properties.firing.fireModes);
+                Firing.SwitchFireMode(properties.firing);
             }
         }
     }

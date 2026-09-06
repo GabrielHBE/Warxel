@@ -16,7 +16,7 @@ public class CreateVoxelMaterial : MonoBehaviour
         if (shader == null)
         {
             shader = Shader.Find("Universal Render Pipeline/Lit");
-            Debug.LogWarning("Shader Custom/VoxelURPShader não encontrado! Usando URP Lit como fallback.");
+            Debug.LogWarning("Shader Custom/VoxelURPShader was not found! Using URP Lit as a fallback.");
         }
 
         Material mat = new Material(shader);

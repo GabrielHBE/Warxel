@@ -14,7 +14,7 @@ public class CountermeasuresStatusUI : MonoBehaviour
         countermeasuresStatusUIValues = GetComponentInParent<ICountermeasuresStatusUIValues>();
         if (countermeasuresStatusUIValues == null)
         {
-            Debug.LogError("CountermeasuresStatusUI: Não foi possível encontrar um componente que implemente ICountermeasuresStatusUIValues no objeto pai.");
+            Debug.LogError("CountermeasuresStatusUI: Could not find a component implementing ICountermeasuresStatusUIValues on the parent object.");
             return;
         }
     }

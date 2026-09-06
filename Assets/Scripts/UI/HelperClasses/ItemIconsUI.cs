@@ -15,7 +15,7 @@ public class ItemIconsUI : MonoBehaviour
         currentActiveItemUIValues = GetComponentInParent<IItemIconsUIValues>();
         if (currentActiveItemUIValues == null)
         {
-            Debug.LogError("ItemIconsUI: Não encontrou IItemIconsUIValues no pai.");
+            Debug.LogError("ItemIconsUI: Could not find IItemIconsUIValues on the parent.");
             return;
         }
 
@@ -82,7 +82,7 @@ public class ItemIconsUI : MonoBehaviour
     {
         if (activeItemIndex < 0 || activeItemIndex >= itemSlots.Count)
         {
-            Debug.LogError("ItemIconsUI: Índice de item ativo fora do intervalo dos slots disponíveis.");
+            Debug.LogError("ItemIconsUI: Active item index is outside the range of available slots.");
             return;
         }
 

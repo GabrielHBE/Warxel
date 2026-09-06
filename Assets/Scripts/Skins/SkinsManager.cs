@@ -40,7 +40,7 @@ public class SkinsManager : PersistentLocalSingleton<SkinsManager>
             };
 
             if (skinCache.TryAdd(key, skin)) continue;
-            Debug.LogWarning($"[SkinsController] Skin duplicada detectada e ignorada: '{key}'");
+            Debug.LogWarning($"[SkinsController] Duplicate skin detected and ignored: '{key}'");
         }
 
         // Popula o array internalSkinList com as skins validadas no cache
@@ -54,7 +54,7 @@ public class SkinsManager : PersistentLocalSingleton<SkinsManager>
 
         if (skinCache.TryGetValue(key, out Skin skin)) return skin;
 
-        Debug.LogWarning($"[SkinsController] Skin '{key.skinName}' da classe {key.skinClass} não foi encontrada no cache!");
+        Debug.LogWarning($"[SkinsController] Skin '{key.skinName}' for class {key.skinClass} was not found in the cache!");
         return null;
     }
 

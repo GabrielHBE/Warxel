@@ -13,6 +13,6 @@ public class DeletePlayerPrefs : MonoBehaviour
         // (Opcional) Salva imediatamente as alterações no disco
         PlayerPrefs.Save();
 
-        Debug.Log("Todos os dados do PlayerPrefs foram deletados com sucesso!");
+        Debug.Log("All PlayerPrefs data was deleted successfully!");
     }
 }

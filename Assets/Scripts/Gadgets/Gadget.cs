@@ -1,66 +1,53 @@
 using UnityEngine;
-using UnityEngine.UI;
 
 public class Gadget : MonoBehaviour, UpgradeLevel
 {
     [Header("Progression / Category / Settings")]
-    public GameObject third_person_prefab;
+    public string gadgetName;
+    public GameObject thirdPersonPrefab;
     public ClassManager.Class[] class_gadget;
     public int gadget_level;
     public float points_to_up_level;
     public float gadget_level_progression;
     public int level_to_unlock;
     public string category;
-    public Sprite icon_hud;
+    public Sprite iconHud;
 
     [Header("Hands Config")]
-    [SerializeField] private Transform leftHandTarget;
-    [SerializeField] private Transform rightHandTarget;
+    protected EquippableItemHandTargets equippableItemHandTargets;
+    protected EquippableItemAudio equippableItemAudio;
+    protected EquippableItemAnimator equippableItemAnimator;
 
     [Header("Handling")]
-    public float pick_up_gadget_speed;
-    public float store_gadget_speed;
+    public float drawGadgetSped;
+    public float StoreGadgetSpeed;
 
     [Header("Sway and Bob")]
-    public float bob_walk_exageration;
-    public float bob_sprint_exageration;
-    public float bob_crouch_exageration;
-    public float bob_aim_exageration;
-    public Vector3 walk_multiplier;
-    public Vector3 sprint_multiplier;
-    public Vector3 aim_multiplier;
-    public Vector3 crouch_multiplier;
-    public float[] vector3Values;
-    public float[] quaternionValues;
+    public SwayNBobScript.SwayAndBobValues swayAndBobValues;
 
-    protected FirstPersonArms firstPersonArms;
     protected PlayerNetworkObjectSpawner playerNetworkObjectSpawner;
     protected SoldierHudManager soldierHudManager;
     protected AdsBehaviour adsBehaviour;
+    protected PlayerController playerController;
+    protected CameraShake cameraShake;
     protected bool is_active;
 
-    protected virtual void Awake()
+    public virtual void Initialize()
     {
+        equippableItemHandTargets = GetComponent<EquippableItemHandTargets>();
+        equippableItemAnimator = GetComponent<EquippableItemAnimator>();
+        equippableItemAudio = GetComponent<EquippableItemAudio>();
         adsBehaviour = GetComponentInParent<AdsBehaviour>();
-        soldierHudManager = GetComponentInParent<PlayerController>().soldierHudManager;
-        firstPersonArms = GetComponentInParent<FirstPersonArms>();
+        playerController = GetComponentInParent<PlayerController>();
         playerNetworkObjectSpawner = GetComponentInParent<PlayerNetworkObjectSpawner>();
 
+        cameraShake = playerController.cameraShake;
+        soldierHudManager = playerController.soldierHudManager;
     }
 
-    public virtual void Reestart()
-    {
-        if (firstPersonArms != null)
-        {
-            if (rightHandTarget != null) firstPersonArms.MoveRightHand(rightHandTarget, 0);
-            if (leftHandTarget != null) firstPersonArms.MoveLeftHand(leftHandTarget, 0);
-        }
-    }
+    public virtual void Restart() => equippableItemHandTargets.ResetHandTargets();
 
-    public void SetActive(bool is_active)
-    {
-        this.is_active = is_active;
-    }
+    public void SetActive(bool is_active) => this.is_active = is_active;
 
     public void AddKill()
     {

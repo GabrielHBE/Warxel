@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
 {
-
     [System.Serializable]
     public struct LocalPoolSettings
     {
@@ -17,9 +16,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
     private Dictionary<GameObject, List<GameObject>> poolDictionary = new Dictionary<GameObject, List<GameObject>>();
     private Dictionary<GameObject, Transform> poolFolders = new Dictionary<GameObject, Transform>();
     private bool isInitialized = false;
-
     private List<LocalPooledObject> instantiatedLocalPooledItems = new List<LocalPooledObject>();
-
 
     void Start() => InitializePools();
     
@@ -32,11 +29,8 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
         {
             if (item.prefab == null || item.quantity <= 0) continue;
 
-            if (!poolDictionary.ContainsKey(item.prefab))
-            {
-                poolDictionary[item.prefab] = new List<GameObject>();
-            }
-
+            if (!poolDictionary.ContainsKey(item.prefab)) poolDictionary[item.prefab] = new List<GameObject>();
+            
             GameObject folder = new GameObject($"[Local Pool] {item.prefab.name}");
             folder.transform.SetParent(transform);
             poolFolders[item.prefab] = folder.transform;
@@ -58,7 +52,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
         // Se o prefab não existir no dicionário, cria o pool dinamicamente
         if (!poolDictionary.TryGetValue(prefab, out List<GameObject> poolList))
         {
-            Debug.Log($"[LocalObjectPooling] Criando pool dinâmico para '{prefab.name}'...");
+            Debug.Log($"[LocalObjectPooling] Creating dynamic pool for '{prefab.name}'...");
 
             poolList = new List<GameObject>();
             poolDictionary[prefab] = poolList;
@@ -71,10 +65,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
         // Procura um item desativado
         foreach (GameObject obj in poolList)
         {
-            if (!obj.activeInHierarchy)
-            {
-                return obj;
-            }
+            if (!obj.activeInHierarchy) return obj;
         }
 
         // Transbordo: cria um novo
@@ -93,8 +84,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
         {
             foreach (GameObject obj in poolList)
             {
-                if (obj != null)
-                    Destroy(obj);
+                if (obj != null) Destroy(obj);
             }
             poolList.Clear();
             poolDictionary.Remove(prefab);
@@ -107,8 +97,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
         {
             foreach (GameObject obj in pool)
             {
-                if (obj != null)
-                    Destroy(obj);
+                if (obj != null) Destroy(obj);
             }
         }
         poolDictionary.Clear();
@@ -119,10 +108,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
     {
         for (int i = 0; i < instantiatedLocalPooledItems.Count; i++)
         {
-            if (instantiatedLocalPooledItems[i].gameObject.activeSelf)
-            {
-                instantiatedLocalPooledItems[i].LocalUpdate();
-            }
+            if (instantiatedLocalPooledItems[i].gameObject.activeSelf) instantiatedLocalPooledItems[i].LocalUpdate();
         }
     }
 
@@ -130,10 +116,7 @@ public class LocalObjectPooling : PersistentLocalSingleton<LocalObjectPooling>
     {
         for (int i = 0; i < instantiatedLocalPooledItems.Count; i++)
         {
-            if (instantiatedLocalPooledItems[i].gameObject.activeSelf)
-            {
-                instantiatedLocalPooledItems[i].LocalFixedUpdate();
-            }
+            if (instantiatedLocalPooledItems[i].gameObject.activeSelf) instantiatedLocalPooledItems[i].LocalFixedUpdate();
         }
     }
 }

@@ -5,8 +5,8 @@ public static class Spread
     public const float MAX_SPREAD_VALUE = 3;
     public const float MIN_SPREAD_VALUE = 0;
 
-    private static float minModifier = 0.9f;
-    private static float maxModifier = 1.1f;
+    private const float MIN_SPREAD_MODIFIER = 0.9f;
+    private const float MAX_SPREAD_MODIFIER = 1.1f;
 
     public static Quaternion CalculateSpreadRotation(Transform shootPosition, float currentSpread) => shootPosition.rotation * Quaternion.Euler(new Vector3(
                                                                                                             Random.Range(-currentSpread, currentSpread),
@@ -15,11 +15,8 @@ public static class Spread
                                                                                                         ));
     
 
-    public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread)
-    {
-        return Mathf.Clamp(currentSpread + (spreadIncreaser * Random.Range(minModifier, maxModifier)), MIN_SPREAD_VALUE, maxSpread);
-    }
-
+    public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread) => Mathf.Clamp(currentSpread + (spreadIncreaser * Random.Range(MIN_SPREAD_MODIFIER, MAX_SPREAD_MODIFIER)), MIN_SPREAD_VALUE, maxSpread);
+    
     public static float ResetSpread(float currentSpread, float baseSpread, float spreadRecoveryTime)
     {
         if (currentSpread < 0.01f) return 0;
@@ -30,12 +27,9 @@ public static class Spread
     [System.Serializable]
     public class SpreadValues
     {
-        [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)]
-        public float baseSpread = 0;
-        [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)]
-        public float spreadIncreaser;
-        [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)]
-        public float maxSpread = 1;
+        [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)] public float baseSpread = 0;
+        [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)] public float spreadIncreaser;
+        [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)] public float maxSpread = 1;
         public float spreadRecovery = 1;
         public SpreadState spreadState;
         

@@ -3,8 +3,8 @@ using UnityEngine;
 public class ProcessCameraRecoil : MonoBehaviour
 {
     [Header("Recoil Settings")]
-    [SerializeField] private float applyRecoilSpeed = 0.05f;
-    [SerializeField] private float resetRecoilSpeed = 4f;
+    private float applyRecoilSpeed = 0.05f;
+    private float resetRecoilSpeed = 4f;
 
     // Recoil Vertical (Eixo X)
     private float recoilVerticalTarget;
@@ -20,6 +20,21 @@ public class ProcessCameraRecoil : MonoBehaviour
     private float targetRecoilZ;
     private float currentRecoilZ;
     private float recoilZVelocity;
+
+    public void ResetState()
+    {
+        recoilVerticalTarget = 0f;
+        recoilVerticalCurrent = 0f;
+        recoilVerticalVelocity = 0f;
+
+        horizontalRecoilTarget = 0f;
+        horizontalRecoilCurrent = 0f;
+        horizontalRecoilVelocity = 0f;
+
+        targetRecoilZ = 0f;
+        currentRecoilZ = 0f;
+        recoilZVelocity = 0f;
+    }
 
     /// <summary>
     /// Adiciona impulso de recoil vertical e horizontal.
@@ -49,10 +64,6 @@ public class ProcessCameraRecoil : MonoBehaviour
         horizontalRecoil = horizontalRecoilCurrent;
         verticalRecoil = recoilVerticalCurrent;
         recoilZ = currentRecoilZ;
-
-        // Reseta os alvos acumulados neste passo (comportamento original)
-        horizontalRecoilTarget = 0f;
-        recoilVerticalTarget = 0f;
     }
 
     private void UpdateRecoilReset()
@@ -64,6 +75,23 @@ public class ProcessCameraRecoil : MonoBehaviour
             if (Mathf.Abs(targetRecoilZ) < 0.001f) targetRecoilZ = 0f;
         }
     }
+
+    /*
+    Auto - reset recoil function
+    private void UpdateRecoilReset()
+    {
+        // Retorna o recoil horizontal e vertical suavemente a zero
+        recoilVerticalTarget = Mathf.Lerp(recoilVerticalTarget, 0f, resetRecoilSpeed * Time.deltaTime);
+        horizontalRecoilTarget = Mathf.Lerp(horizontalRecoilTarget, 0f, resetRecoilSpeed * Time.deltaTime);
+    
+        // Retorna o recoil do eixo Z suavemente a zero
+        if (Mathf.Abs(targetRecoilZ) > 0.01f)
+        {
+            targetRecoilZ = Mathf.Lerp(targetRecoilZ, 0f, resetRecoilSpeed * Time.deltaTime);
+            if (Mathf.Abs(targetRecoilZ) < 0.001f) targetRecoilZ = 0f;
+        }
+    }
+    */
 
     public void SetApplyRecoilSpeed(float speed) => applyRecoilSpeed = speed;
 }

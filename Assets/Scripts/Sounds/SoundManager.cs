@@ -13,7 +13,7 @@ public class SoundManager : ServerSingleton<SoundManager>
 
     [Header("Audio Pool")]
     [SerializeField] private AudioDistanceController audioDistanceControllerPrefab;
-    [SerializeField, Tooltip("Prefab genérico vazio com o script LocalPooledObject e um AudioSource para sons 2D e Loops")]
+    [SerializeField, Tooltip("Empty generic prefab with the LocalPooledObject script and an AudioSource for 2D sounds and loops")]
     private GameObject audio2DPrefab;
 
     [Header("Audio Mixer Group")]
@@ -270,7 +270,7 @@ public class SoundManager : ServerSingleton<SoundManager>
                 controller.StartGrowth();
             }
         }
-        else Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
+        else Debug.LogWarning($"Sound '{soundName}' was not found in AudioManager!");
     }
 
     public void RequestPlay3dLoopSound(string soundName, SoundProperties soundProperties, Transform target, bool playForCaller)
@@ -301,7 +301,7 @@ public class SoundManager : ServerSingleton<SoundManager>
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip))
             SetupLoopAudio("LoopAudio", clip, soundProperties, target, is3D: true);
-        else Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
+        else Debug.LogWarning($"Sound '{soundName}' was not found in AudioManager!");
     }
 
     // ================= PAUSE =================
@@ -369,7 +369,7 @@ public class SoundManager : ServerSingleton<SoundManager>
     private void Play2dSound(string soundName, SoundProperties soundProperties)
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip)) Play2dSoundLocal(clip, soundProperties);
-        else Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
+        else Debug.LogWarning($"Sound '{soundName}' was not found in AudioManager!");
     }
 
     // ================= PLAY 2D LOOP =================
@@ -401,7 +401,7 @@ public class SoundManager : ServerSingleton<SoundManager>
     {
         if (audioCache.TryGetValue(soundName, out AudioClip clip))
             SetupLoopAudio("LoopAudio2D", clip, soundProperties, target, is3D: false);
-        else Debug.LogWarning($"Som '{soundName}' não foi encontrado no AudioManager!");
+        else Debug.LogWarning($"Sound '{soundName}' was not found in AudioManager!");
     }
 
     // ================= PAUSE 2D LOOP =================
@@ -472,6 +472,8 @@ public class SoundManager : ServerSingleton<SoundManager>
     #region Static Methods
     public static void Play2dSoundLocal(AudioClip clip, SoundProperties soundProperties)
     {
+        if (clip == null) return;
+        
         GameObject tempGO = LocalObjectPooling.Instance.GetPooledItem(staticAudio2DPrefab);
         if (tempGO == null) return;
 
@@ -488,10 +490,8 @@ public class SoundManager : ServerSingleton<SoundManager>
     private System.Collections.IEnumerator DeactivatePooledObjectDelay(GameObject go, float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (go != null && go.TryGetComponent(out LocalPooledObject pooled))
-        {
-            pooled.Deactivate();
-        }
+        if (go != null && go.TryGetComponent(out LocalPooledObject pooled)) pooled.Deactivate();
+        
     }
 
     public static void Play3dSoundLocal(AudioClip clip, SoundProperties soundProperties, Vector3 position)
@@ -508,6 +508,8 @@ public class SoundManager : ServerSingleton<SoundManager>
         }
     }
 
+    
+    public static AudioClip GetRandomAudioClip(AudioClip[] clips) => clips == null || clips.Length == 0 ? null : clips[UnityEngine.Random.Range(0, clips.Length)];
     public static void Play3dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target) => SetupLoopAudio("LoopAudio", clip, soundProperties, target, is3D: true);
     public static void Play2dLoopSoundLocal(AudioClip clip, SoundProperties soundProperties, Transform target) => SetupLoopAudio("LoopAudio2D", clip, soundProperties, target, is3D: false);
     public static void ServerPause3dLoopSoundLocal(AudioClip clip, Transform target) => ModifyLoopAudio(clip, target, src => src.Pause());

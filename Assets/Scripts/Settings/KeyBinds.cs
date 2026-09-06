@@ -22,7 +22,6 @@ public class KeyBinds : MonoBehaviour
     public KeyCode PLAYER_spotKey = KeyCode.Q;
     public KeyCode PLAYER_holdBreathKey = KeyCode.LeftShift;
 
-
     [Header("Weapons")]
     public KeyCode WEAPON_composeBulletsKey = KeyCode.P;
     public KeyCode WEAPON_activateSideGrip = KeyCode.T;
@@ -31,7 +30,8 @@ public class KeyBinds : MonoBehaviour
     public KeyCode WEAPON_switchFireModeKey = KeyCode.X;
     public KeyCode WEAPON_weapon1Key = KeyCode.Alpha1;
     public KeyCode WEAPON_weapon2Key = KeyCode.Alpha2;
-
+    public KeyCode WEAPON_zoomChangeKey = KeyCode.V;
+    public KeyCode WEAPON_switchSightKey = KeyCode.B;
 
     [Header("Gadget")]
     public KeyCode GADGET_gadget1Key = KeyCode.Alpha3;
@@ -39,8 +39,6 @@ public class KeyBinds : MonoBehaviour
     public KeyCode GADGET_throwGrenadeKey = KeyCode.G;
     public KeyCode GADGET_throwC4Key = KeyCode.Mouse1;
     public KeyCode GADGET_detonateC4Key = KeyCode.Mouse0;
-
-
 
     [Header("Vehicle")]
     public KeyCode VEHICLE_startEngineKey = KeyCode.E;
@@ -57,7 +55,6 @@ public class KeyBinds : MonoBehaviour
     public KeyCode VEHICLE_weapon7 = KeyCode.Alpha7;
     public KeyCode VEHICLE_weapon8 = KeyCode.Alpha8;
     public KeyCode VEHICLE_weapon9 = KeyCode.Alpha9;
-
 
     [Header("Jet")]
     public KeyCode JET_boostKey = KeyCode.LeftControl;
@@ -94,7 +91,5 @@ public class KeyBinds : MonoBehaviour
     public KeyCode TANK_boostKey = KeyCode.LeftControl;
     public KeyCode TANK_gunner_seat_key = KeyCode.F1;
     public KeyCode TANK_pilot_seat_key = KeyCode.F2;
-
-
 
 }

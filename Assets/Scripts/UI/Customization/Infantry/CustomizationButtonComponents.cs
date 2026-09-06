@@ -40,13 +40,28 @@ public class CustomizationButtonComponents : MonoBehaviour
     private void SetupImage()
     {
         Image[] allImages = GetComponentsInChildren<Image>(true);
-        if (allImages != null && allImages.Length > 0) allImages[allImages.Length - 1].sprite = _isAttachmentUnlocked ? _imageHud : InfantryLoadoutCustomization.locked_item_image;
+        if (allImages == null || allImages.Length == 0) return;
+
+        Image attachmentImage = allImages[allImages.Length - 1];
+        if (_imageHud == null)
+        {
+            Destroy(attachmentImage);
+            return;
+        }
+
+        attachmentImage.sprite = _isAttachmentUnlocked ? _imageHud : InfantryLoadoutCustomization.locked_item_image;
     }
 
     private void SetupText()
     {
         TextMeshProUGUI buttonText = GetComponentInChildren<TextMeshProUGUI>();
-        if (buttonText != null) buttonText.text = _partName;
+        Attatchment attachment = _component as Attatchment;
+        if (buttonText != null)
+        {
+            buttonText.text = attachment != null
+                ? $"{_partName}  [{attachment.attatchmentPoints:0.##} pts]"
+                : _partName;
+        }
     }
 
     private void SetupOutline()
@@ -72,18 +87,20 @@ public class CustomizationButtonComponents : MonoBehaviour
 
     private void OnPointerEnter()
     {
-        if (_isRemoveButton || _outline == null) return;
-
-        if (!_outline.enabled)
+        if (!_isRemoveButton && _outline != null && !_outline.enabled)
         {
             _outline.effectColor = Color.gray;
             _outline.effectDistance = new Vector2(2f, 2f);
             _outline.enabled = true;
         }
+
+        Attatchment attachment = _component as Attatchment;
+        if (attachment != null) infantryLoadoutCustomization.PreviewAttachmentStats(attachment);
     }
 
     private void OnPointerExit()
     {
+        infantryLoadoutCustomization.ClearAttachmentStatsPreview();
         if (_isRemoveButton || _outline == null) return;
 
         if (!IsSelected()) _outline.enabled = false;

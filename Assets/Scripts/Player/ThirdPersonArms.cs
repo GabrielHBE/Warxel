@@ -116,25 +116,19 @@ public class ThirdPersonArms : NetworkBehaviour
     #region Positions
     public void SetLeftHandFollowerPosition()
     {
-        if (leftHandTarget.Value != null)
-        {
-            leftHandPos.position = leftHandTarget.Value.position;
-        }
-        else
-        {
-            leftHandPos.position = aimingRightHandTarget.position;
-        }
+        if (leftHandTarget.Value != null)leftHandPos.position = leftHandTarget.Value.position;
+        else leftHandPos.position = aimingRightHandTarget.position;
     }
 
-    public void SetRightHandFollowerPosition(bool isAiming, bool isStoringWeapon)
+    public void SetRightHandFollowerPosition(bool aiming, bool isStoringWeapon)
     {
-        if (!isAiming && !isStoringWeapon)
+        if (!aiming && !isStoringWeapon)
         {
             rightHandPos.transform.position = Vector3.Lerp(rightHandPos.transform.position, defaultRightHandTarget.position, Time.deltaTime * TIME_TO_UPDATE_RIG_WEIGHT);
             rightHandPos.transform.rotation = Quaternion.Lerp(rightHandPos.transform.rotation, defaultRightHandTarget.rotation, Time.deltaTime * TIME_TO_UPDATE_RIG_WEIGHT);
         }
 
-        if (isAiming)
+        if (aiming)
         {
             rightHandPos.transform.position = Vector3.Lerp(rightHandPos.transform.position, aimingRightHandTarget.position + rightHandAimingOffset.Value, Time.deltaTime * TIME_TO_UPDATE_RIG_WEIGHT);
             rightHandPos.transform.rotation = Quaternion.Lerp(rightHandPos.transform.rotation, aimingRightHandTarget.rotation, Time.deltaTime * TIME_TO_UPDATE_RIG_WEIGHT);
@@ -193,15 +187,9 @@ public class ThirdPersonArms : NetworkBehaviour
 
     #region Switch Weapon
     [ServerRpc]
-    public void RequestSwitchWeapon(SwitchWeapon.WeaponSlot slot)
-    {
-        currentWeaponSlot.Value = slot;
-    }
-
-    private void OnWeaponSlotChanged(SwitchWeapon.WeaponSlot prev, SwitchWeapon.WeaponSlot next, bool asServer)
-    {
-        _SwitchWeapon(next);
-    }
+    public void RequestSwitchWeapon(SwitchWeapon.WeaponSlot slot) => currentWeaponSlot.Value = slot;
+    
+    private void OnWeaponSlotChanged(SwitchWeapon.WeaponSlot prev, SwitchWeapon.WeaponSlot next, bool asServer) => _SwitchWeapon(next);
 
     private void _SwitchWeapon(SwitchWeapon.WeaponSlot slot)
     {

@@ -11,7 +11,7 @@ public class VehicleStartEngineUI : MonoBehaviour
         vehicle = GetComponentInParent<Vehicle>();
         if (vehicle == null)
         {
-            Debug.LogError("VehicleStartEngineUI: Não foi possível encontrar um componente Vehicle no objeto pai.");
+            Debug.LogError("VehicleStartEngineUI: Could not find a Vehicle component on the parent object.");
             return;
         }
 

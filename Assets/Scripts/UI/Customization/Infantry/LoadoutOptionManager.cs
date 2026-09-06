@@ -27,10 +27,10 @@ public class LoadoutOptionManager : MonoBehaviour
         ClearAllButtons();
         infantryLoadoutCustomization.loadoutOptionsParent.gameObject.SetActive(true);
 
-        UpdateSelectionText($"Selecione o que deseja alterar - {infantryLoadoutCustomization._selectedClass}");
+        UpdateSelectionText($"Select what you want to change - {infantryLoadoutCustomization._selectedClass}");
 
-        CreateLoadoutOptionButton("Arma Primária", LoadoutOption.PrimaryWeapon, 0);
-        CreateLoadoutOptionButton("Arma Secundária", LoadoutOption.SecondaryWeapon, 1);
+        CreateLoadoutOptionButton("Primary Weapon", LoadoutOption.PrimaryWeapon, 0);
+        CreateLoadoutOptionButton("Secondary Weapon", LoadoutOption.SecondaryWeapon, 1);
         CreateLoadoutOptionButton("Gadget", LoadoutOption.Gadget1, 2);
         CreateLoadoutOptionButton("Skins", LoadoutOption.Skin, 3);
     }
@@ -73,7 +73,7 @@ public class LoadoutOptionManager : MonoBehaviour
             infantryLoadoutCustomization.loadoutOptionsParent.gameObject.SetActive(false);
             infantryLoadoutCustomization.skinSelectionManager.ShowSkinsForClass();
 
-            UpdateSelectionText($"Selecionando Skin - {infantryLoadoutCustomization._selectedClass}");
+            UpdateSelectionText($"Selecting Skin - {infantryLoadoutCustomization._selectedClass}");
             return;
         }
 
@@ -83,7 +83,7 @@ public class LoadoutOptionManager : MonoBehaviour
         infantryLoadoutCustomization.itemSelectionManager.ResetSlider();
 
         string optionName = GetLoadoutOptionDisplayName(option);
-        UpdateSelectionText($"Selecionando: {optionName} - {infantryLoadoutCustomization._selectedClass}");
+        UpdateSelectionText($"Selecting: {optionName} - {infantryLoadoutCustomization._selectedClass}");
     }
 
     public void OnBackToLoadoutOptions()
@@ -116,8 +116,8 @@ public class LoadoutOptionManager : MonoBehaviour
     {
         return option switch
         {
-            LoadoutOption.PrimaryWeapon => "Arma Primária",
-            LoadoutOption.SecondaryWeapon => "Arma Secundária",
+            LoadoutOption.PrimaryWeapon => "Primary Weapon",
+            LoadoutOption.SecondaryWeapon => "Secondary Weapon",
             LoadoutOption.Gadget1 => "Gadget",
             LoadoutOption.Skin => "Skin",
             _ => option.ToString()

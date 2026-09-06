@@ -648,7 +648,7 @@ public class VoxelEditor : Editor
                     break;
                 case KeyCode.F12:
                     // Atalho para debug - mostra info no console
-                    Debug.Log("Modo debug ativado - mova o mouse sobre um voxel");
+                    Debug.Log("Debug mode enabled - move the mouse over a voxel");
                     Event.current.Use();
                     break;
             }
@@ -686,12 +686,12 @@ public class VoxelEditor : Editor
 
         // Calcula a diferença
         Vector3Int diff = targetPos - pos;
-        string directionStr = diff == Vector3Int.up ? "⬆ CIMA" :
-                              diff == Vector3Int.down ? "⬇ BAIXO" :
-                              diff == Vector3Int.right ? "➡ DIREITA" :
-                              diff == Vector3Int.left ? "⬅ ESQUERDA" :
-                              diff == Vector3Int.forward ? "↗ FRENTE" :
-                              diff == Vector3Int.back ? "↘ TRÁS" : "⏺ MESMO";
+        string directionStr = diff == Vector3Int.up ? "⬆ UP" :
+                              diff == Vector3Int.down ? "⬇ DOWN" :
+                              diff == Vector3Int.right ? "➡ RIGHT" :
+                              diff == Vector3Int.left ? "⬅ LEFT" :
+                              diff == Vector3Int.forward ? "↗ FORWARD" :
+                              diff == Vector3Int.back ? "↘ BACK" : "⏺ SAME";
 
         // Desenha o preview
         if (terrain.CanPlaceVoxel(targetPos))
@@ -731,8 +731,8 @@ public class VoxelEditor : Editor
             $"=== DEBUG ===\n" +
             $"Voxel: ({pos.x}, {pos.y}, {pos.z})\n" +
             $"Target: ({targetPos.x}, {targetPos.y}, {targetPos.z})\n" +
-            $"Direção: {directionStr}\n" +
-            $"Offset Y: {offset.y:F2} {(offset.y > 0.1f ? "⬆ CIMA!" : offset.y < -0.1f ? "⬇ BAIXO!" : "")}\n" +
+            $"Direction: {directionStr}\n" +
+            $"Offset Y: {offset.y:F2} {(offset.y > 0.1f ? "⬆ UP!" : offset.y < -0.1f ? "⬇ DOWN!" : "")}\n" +
             $"Offset: ({offset.x:F2}, {offset.y:F2}, {offset.z:F2})";
 
         GUI.Label(new Rect(15, 15, 400, 230), debugText, style);

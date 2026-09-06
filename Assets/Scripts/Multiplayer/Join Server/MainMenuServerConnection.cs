@@ -43,7 +43,7 @@ public class MainMenuConnection : MonoBehaviour
     public void ConnectAsClient()
     {
         System.GC.Collect();
-        StartMapImage("Conectando ao servidor...");
+        StartMapImage("Connecting to server...");
 
         InstanceFinder.ClientManager.StartConnection();
     }
@@ -56,7 +56,7 @@ public class MainMenuConnection : MonoBehaviour
     public void StartAsHost()
     {
         System.GC.Collect();
-        StartMapImage("Iniciando servidor...");
+        StartMapImage("Starting server...");
 
         // Apenas pede para iniciar. A cena será carregada pelo evento abaixo!
         InstanceFinder.ServerManager.StartConnection();
@@ -74,7 +74,7 @@ public class MainMenuConnection : MonoBehaviour
         // Se o servidor acabou de ligar com sucesso...
         if (args.ConnectionState == LocalConnectionState.Started)
         {
-            if (loadingText != null) loadingText.text = "Carregando mundo...";
+            if (loadingText != null) loadingText.text = "Loading world...";
 
             SceneLoadData sld = new SceneLoadData(gameSceneName);
             sld.ReplaceScenes = ReplaceOption.All;
@@ -88,7 +88,7 @@ public class MainMenuConnection : MonoBehaviour
         if (args.ConnectionState == LocalConnectionState.Started)
         {
             // O cliente conectou com sucesso. O servidor vai mandar a instrução de trocar de cena.
-            if (loadingText != null) loadingText.text = "Carregando mundo...";
+            if (loadingText != null) loadingText.text = "Loading world...";
         }
         else if (args.ConnectionState == LocalConnectionState.Stopped)
         {
@@ -96,7 +96,7 @@ public class MainMenuConnection : MonoBehaviour
             HideLoading();
             
             // Opcional: Você pode chamar uma mensagem de erro aqui
-            Debug.LogWarning("Falha ao conectar ou servidor desconectado.");
+            Debug.LogWarning("Failed to connect or the server disconnected.");
         }
     }
 

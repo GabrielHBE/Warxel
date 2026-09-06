@@ -28,7 +28,7 @@ public class CurrentRotationUI : MonoBehaviour
         currentRotationUIValues = GetComponentInParent<ICurrentRotationUIValues>();
         if (currentRotationUIValues == null)
         {
-            Debug.LogError("CurrentRotationUI: Não foi possível encontrar um componente que implemente ICurrentRotationUIValues no objeto pai.");
+            Debug.LogError("CurrentRotationUI: Could not find a component implementing ICurrentRotationUIValues on the parent object.");
             return;
         }
 

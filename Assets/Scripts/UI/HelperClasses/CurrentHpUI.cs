@@ -5,16 +5,16 @@ public class CurrentHpUI : MonoBehaviour
     [SerializeField] private RectTransform hp_bar;
     private ICurrentHpUIValues currentHpUIValues;
     private float originalWidth;
-    private float max_hp;
+    private float maxHp;
     void Start()
     {
         currentHpUIValues = GetComponentInParent<ICurrentHpUIValues>();
         if (currentHpUIValues == null)
         {
-            Debug.LogError("CurrentHpUI: Não foi possível encontrar um componente que implemente ICurrentHpUIValues no objeto pai.");
+            Debug.LogError("CurrentHpUI: Could not find a component implementing ICurrentHpUIValues on the parent object.");
             return;
         }
-        max_hp = currentHpUIValues.GetMaxHp();
+        maxHp = currentHpUIValues.GetMaxHp();
         originalWidth = hp_bar.sizeDelta.x;
     }
 
@@ -25,7 +25,7 @@ public class CurrentHpUI : MonoBehaviour
 
     public void UpdateHp(float currentHp)
     {
-        float hpPercent = currentHp / max_hp;
+        float hpPercent = currentHp / maxHp;
         hpPercent = Mathf.Clamp01(hpPercent);
 
         hp_bar.sizeDelta = new Vector2(

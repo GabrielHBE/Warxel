@@ -73,7 +73,7 @@ public class LoadoutSaverManager : MonoBehaviour
         if (weapon == null) return "";
 
         WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
-        return wp != null ? wp.weapon_name : weapon.name;
+        return wp != null ? wp.weaponName : weapon.name;
     }
 
     public void LoadLoadoutForClass(ClassManager.Class targetClass)
@@ -84,7 +84,7 @@ public class LoadoutSaverManager : MonoBehaviour
         // VERIFICAÇÕES DE SEGURANÇA
         if (infantryLoadoutCustomization == null)
         {
-            Debug.LogWarning("[Loadout] InfantryLoadoutCustomization é nulo!");
+            Debug.LogWarning("[Loadout] InfantryLoadoutCustomization is null!");
             return;
         }
 
@@ -94,7 +94,7 @@ public class LoadoutSaverManager : MonoBehaviour
             if (weapon != null)
                 infantryLoadoutCustomization.selected_primary = weapon;
             else
-                Debug.LogWarning($"[Loadout] Arma primária '{loadoutData.primaryWeaponName}' não encontrada!");
+                Debug.LogWarning($"[Loadout] Primary weapon '{loadoutData.primaryWeaponName}' was not found!");
         }
 
         if (!string.IsNullOrEmpty(loadoutData.secondaryWeaponName))
@@ -103,7 +103,7 @@ public class LoadoutSaverManager : MonoBehaviour
             if (weapon != null)
                 infantryLoadoutCustomization.selected_secondary = weapon;
             else
-                Debug.LogWarning($"[Loadout] Arma secundária '{loadoutData.secondaryWeaponName}' não encontrada!");
+                Debug.LogWarning($"[Loadout] Secondary weapon '{loadoutData.secondaryWeaponName}' was not found!");
         }
 
         if (!string.IsNullOrEmpty(loadoutData.gadget1Name))
@@ -128,7 +128,7 @@ public class LoadoutSaverManager : MonoBehaviour
         // VERIFICAÇÃO: Se o array for nulo ou vazio, retorna null
         if (weaponArray == null || weaponArray.Length == 0)
         {
-            Debug.LogWarning($"[Loadout] Array de {(primary ? "primárias" : "secundárias")} está vazio ou nulo!");
+            Debug.LogWarning($"[Loadout] {(primary ? "Primary" : "Secondary")} weapon array is empty or null!");
             return null;
         }
 
@@ -137,14 +137,14 @@ public class LoadoutSaverManager : MonoBehaviour
             if (weapon == null) continue;
 
             WeaponProperties wp = weapon.GetComponent<WeaponProperties>();
-            if (wp != null && wp.weapon_name == weaponName)
+            if (wp != null && wp.weaponName == weaponName)
                 return weapon;
 
             if (weapon.name == weaponName)
                 return weapon;
         }
 
-        Debug.LogWarning($"[Loadout] Arma '{weaponName}' não encontrada no array!");
+        Debug.LogWarning($"[Loadout] Weapon '{weaponName}' was not found in the array!");
         return null;
     }
 
@@ -155,7 +155,7 @@ public class LoadoutSaverManager : MonoBehaviour
         var gadgets = infantryLoadoutCustomization.gadgets;
         if (gadgets == null || gadgets.Length == 0)
         {
-            Debug.LogWarning("[Loadout] Array de gadgets está vazio ou nulo!");
+            Debug.LogWarning("[Loadout] Gadget array is empty or null!");
             return null;
         }
 
@@ -165,7 +165,7 @@ public class LoadoutSaverManager : MonoBehaviour
             if (gadget.name == gadgetName) return gadget;
         }
 
-        Debug.LogWarning($"[Loadout] Gadget '{gadgetName}' não encontrado!");
+        Debug.LogWarning($"[Loadout] Gadget '{gadgetName}' was not found!");
         return null;
     }
 
@@ -182,7 +182,7 @@ public class LoadoutSaverManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"Erro ao salvar loadouts: {e.Message}");
+            Debug.LogError($"Error saving loadouts: {e.Message}");
         }
     }
 
@@ -200,7 +200,7 @@ public class LoadoutSaverManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"Erro ao carregar loadouts: {e.Message}");
+            Debug.LogError($"Error loading loadouts: {e.Message}");
         }
     }
 

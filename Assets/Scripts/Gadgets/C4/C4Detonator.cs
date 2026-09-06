@@ -22,10 +22,10 @@ public class C4Detonator : Gadget
     private float detonateTimer = 0f;
     private int detonateIndex = 0;
 
-    public override void Reestart()
+    public override void Restart()
     {
-        base.Reestart();
-        adsBehaviour.DisableUpdate();
+        base.Restart();
+        adsBehaviour.DisableAim();
     }
 
     void Update()

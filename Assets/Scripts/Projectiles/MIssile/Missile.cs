@@ -14,11 +14,4 @@ public class Missile : Projectile
         StartCoroutine(DespawnTimer());
 
     }
-
-    public override void LocalUpdate()
-    {
-        if (isDespawning) return;
-        ProcessDamageDropoff();
-    }
-
 }

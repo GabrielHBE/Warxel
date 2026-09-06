@@ -104,7 +104,7 @@ public class SquadUIItem : MonoBehaviour
             TextMeshProUGUI emptyText = emptyGO.GetComponentInChildren<TextMeshProUGUI>();
             if (emptyText != null)
             {
-                emptyText.text = "Nenhum membro";
+                emptyText.text = "No members";
                 emptyText.color = Color.gray;
                 emptyText.fontStyle = FontStyles.Italic;
             }
@@ -123,7 +123,7 @@ public class SquadUIItem : MonoBehaviour
                 // Comparação segura por ClientId
                 bool isCurrentPlayer = (member.connection != null && localConn != null && member.connection.ClientId == localConn.ClientId);
 
-                memberText.text = isCurrentPlayer ? $"{member.playerName} (Você)" : member.playerName;
+                memberText.text = isCurrentPlayer ? $"{member.playerName} (You)" : member.playerName;
 
                 Image background = memberGO.GetComponent<Image>();
                 if (background != null && isCurrentPlayer)

@@ -4,12 +4,12 @@ using System.Collections;
 public class BulletExtractor : MonoBehaviour
 {
     public GameObject bullet;
-    //public GameObject bullet_extractor;
+    [SerializeField] private Direction direction;
 
     public void CreateBullet()
     {
         float random = Random.Range(1f,3f);
-        StartCoroutine(FireBulletWithDrop(gameObject.transform.position, gameObject.transform.right * random, 2, 20));
+        StartCoroutine(FireBulletWithDrop(gameObject.transform.position, (direction == Direction.Left ? -gameObject.transform.right : gameObject.transform.right) * random, 2, 20));
     }
 
     //this whole function works in meters
@@ -40,5 +40,11 @@ public class BulletExtractor : MonoBehaviour
         while (MaxBulletDistance > Vector3.Distance(StartingPosition, EndPos));
 
         Destroy(bulletInstance);
+    }
+
+    private enum Direction
+    {
+        Left,
+        Right
     }
 }

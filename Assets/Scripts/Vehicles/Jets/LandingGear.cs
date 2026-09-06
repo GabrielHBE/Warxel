@@ -20,7 +20,7 @@ public class LandingGear : MonoBehaviour
     void Update()
     {
 
-        if (jet.is_in_vehicle)
+        if (jet.isInVehicle)
         {
             if (jet.retractLandingGear)
             {

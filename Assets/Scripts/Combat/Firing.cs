@@ -11,12 +11,6 @@ public static class Firing
         Burst
     }
 
-    [System.Serializable]
-    public struct BurstModeSettings
-    {
-        public int bulletsPerTap;
-        public float timeBetweenBursts;
-    }
 
     [System.Serializable]
     public class FiringValues
@@ -24,22 +18,32 @@ public static class Firing
         public int rateOfFire;
         public int bulletsPerShot = 1;
         public List<FireMode> fireModes;
-        public BurstModeSettings burstModeSettings;
+        public SoundManager.SoundComponents switchFireModeSound;
+        public int BurstModeBulletsPerTap;
         public float interval => 60f / rateOfFire;
     }
     #endregion
 
     #region State
-    private static FireMode crrentMode;
+    private static FireMode currentMode;
     private static float nextTimeToFire = 0f;
     private static float burstTimer = 0f;
     private static int bulletsShotInCurrentBurst = 0;
     private static bool isBursting = false;
-    private static bool isFirstShot = false;
+    private static bool hasFiredInCurrentSequence = false;
     private static int recoilPositionIndex = -1;
     private static bool hasShotThisFrame = false;
     private static bool isFiring = false;
     private static bool _isInputHeld = false;
+
+    public static void ResetState(List<FireMode> availableModes)
+    {
+        currentMode = availableModes != null && availableModes.Count > 0
+            ? availableModes[0]
+            : FireMode.Auto;
+
+        ResetState();
+    }
 
     public static void ResetState()
     {
@@ -47,7 +51,7 @@ public static class Firing
         burstTimer = 0f;
         bulletsShotInCurrentBurst = 0;
         isBursting = false;
-        isFirstShot = false;
+        hasFiredInCurrentSequence = false;
         recoilPositionIndex = -1;
         hasShotThisFrame = false;
         isFiring = false;
@@ -56,26 +60,26 @@ public static class Firing
     #endregion
 
     #region Fire Mode Management
-    public static FireMode GetCurrentFireMode()
-    {
-        return crrentMode;
-    }
+    public static FireMode GetCurrentFireMode() => currentMode;
 
-    public static FireMode SwitchFireMode(List<FireMode> availableModes)
+
+    public static FireMode SwitchFireMode(FiringValues values)
     {
+        List<FireMode> availableModes = values?.fireModes;
+
         if (availableModes == null || availableModes.Count == 0)
             return FireMode.Auto;
 
-        int currentIndex = availableModes.IndexOf(crrentMode);
-        
-        if (currentIndex == -1)  crrentMode = availableModes[0];
+        int currentIndex = availableModes.IndexOf(currentMode);
+
+        if (currentIndex == -1) currentMode = availableModes[0];
         else
         {
             currentIndex = (currentIndex + 1) % availableModes.Count;
-            crrentMode = availableModes[currentIndex];
+            currentMode = availableModes[currentIndex];
         }
 
-        if (crrentMode != FireMode.Burst)
+        if (currentMode != FireMode.Burst)
         {
             isBursting = false;
             bulletsShotInCurrentBurst = 0;
@@ -88,7 +92,15 @@ public static class Firing
         isFiring = false;
         _isInputHeld = false;
 
-        return crrentMode;
+        if (values.switchFireModeSound.clip != null)
+        {
+            SoundManager.Play2dSoundLocal(
+                values.switchFireModeSound.clip,
+                values.switchFireModeSound.properties
+            );
+        }
+
+        return currentMode;
     }
 
     public static bool CanSwitchFireMode(List<FireMode> availableModes)
@@ -121,7 +133,7 @@ public static class Firing
         {
             shouldShoot = false,
             didShoot = false,
-            isFirstShot = isFirstShot,
+            isFirstShot = !hasFiredInCurrentSequence,
             recoilIndex = -1,
             shouldResetShotState = false
         };
@@ -136,7 +148,7 @@ public static class Firing
             return result;
         }
 
-        switch (crrentMode)
+        switch (currentMode)
         {
             case FireMode.Auto:
                 ProcessAutoFire(values, isInputHeld, ref result);
@@ -151,7 +163,7 @@ public static class Firing
 
         if (result.shouldShoot)
         {
-            isFirstShot = true;
+            hasFiredInCurrentSequence = true;
             hasShotThisFrame = true;
             isFiring = true;
         }
@@ -164,7 +176,7 @@ public static class Firing
         if (isInputHeld)
         {
             isFiring = true;
-            
+
             if (nextTimeToFire <= 0f && !hasShotThisFrame)
             {
                 result.shouldShoot = true;
@@ -175,12 +187,12 @@ public static class Firing
         else
         {
             isFiring = false;
-            
+
             if (nextTimeToFire <= 0f)
             {
                 result.shouldResetShotState = true;
                 recoilPositionIndex = -1;
-                isFirstShot = false;
+                hasFiredInCurrentSequence = false;
             }
 
         }
@@ -199,7 +211,7 @@ public static class Firing
         {
             result.shouldResetShotState = true;
             recoilPositionIndex = -1;
-            isFirstShot = false;
+            hasFiredInCurrentSequence = false;
             isFiring = false;
         }
     }
@@ -217,7 +229,7 @@ public static class Firing
         {
             result.shouldResetShotState = true;
             recoilPositionIndex = -1;
-            isFirstShot = false;
+            hasFiredInCurrentSequence = false;
             isFiring = false;
             return;
         }
@@ -227,7 +239,7 @@ public static class Firing
             burstTimer -= deltaTime;
             if (burstTimer < 0) burstTimer = 0;
 
-            if (burstTimer <= 0f && bulletsShotInCurrentBurst < settings.burstModeSettings.bulletsPerTap && !hasShotThisFrame)
+            if (burstTimer <= 0f && bulletsShotInCurrentBurst < settings.BurstModeBulletsPerTap && !hasShotThisFrame)
             {
                 result.shouldShoot = true;
                 result.didShoot = true;
@@ -236,12 +248,12 @@ public static class Firing
                 isFiring = true;
             }
 
-            if (bulletsShotInCurrentBurst >= settings.burstModeSettings.bulletsPerTap)
+            if (bulletsShotInCurrentBurst >= settings.BurstModeBulletsPerTap)
             {
                 isBursting = false;
-                nextTimeToFire = settings.burstModeSettings.timeBetweenBursts;
+                nextTimeToFire = settings.interval;
                 recoilPositionIndex = -1;
-                isFirstShot = false;
+                hasFiredInCurrentSequence = false;
                 if (!isInputPressed)
                 {
                     isFiring = false;
@@ -259,9 +271,9 @@ public static class Firing
     }
 
     public static void ResetRecoilIndex() => recoilPositionIndex = -1;
-    
 
-    public static bool IsFirstShot() => isFirstShot;
+
+    public static bool IsFirstShot() => !hasFiredInCurrentSequence;
     #endregion
 
     #region Utility Methods
@@ -270,16 +282,16 @@ public static class Firing
     public static int GetBulletsInBurst() => bulletsShotInCurrentBurst;
     public static float GetBurstTimer() => burstTimer;
     public static bool IsFiring() => isFiring;
-    
+
     public static void UpdateTimeToFire(float deltaTime)
     {
         if (nextTimeToFire > 0)
         {
             nextTimeToFire -= deltaTime;
             if (nextTimeToFire < 0) nextTimeToFire = 0;
-            
-            if (nextTimeToFire <= 0 && crrentMode == FireMode.Auto && !_isInputHeld) isFiring = false;
-                
+
+            if (nextTimeToFire <= 0 && currentMode == FireMode.Auto && !_isInputHeld) isFiring = false;
+
         }
     }
     #endregion

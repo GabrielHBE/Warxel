@@ -1,4 +1,5 @@
 using System.Collections;
+using FishNet.CodeGenerating;
 using FishNet.Object;
 using UnityEngine;
 
@@ -19,17 +20,17 @@ public class Projectile : LocalPooledObject
     //Private variables
     protected float bulletDropMultiplier;
     protected float infantryDamage;
-    protected float damageDropoff;
-    protected float damageDropoffTimer;
-    protected float minimumDamage;
+    protected float initialInfantryDamage;
+    protected AnimationCurve infantryDamageByDistance;
+    protected float traveledDistance;
     protected float explosionDamageFalloff;
     protected float hsMultiplier;
     protected bool canDamageArmoredVehicles;
     protected float vehicleDamage;
     protected bool didRicochet;
-    protected float timer;
     protected float destructionRadius;
     protected float delaytoEnableForNonOwner;
+    protected float delaytoEnableForOwner;
     protected Vector3 lastPosition;
     protected Transform ignoredTransform;
     protected GameObject shootRoot;
@@ -55,25 +56,76 @@ public class Projectile : LocalPooledObject
     }
 
     [System.Serializable]
-    public class ProjectileValues
+    public class ProjectileValues : ISerializationCallbackReceiver
     {
         [Header("Damage Model")]
         public float infantryDamage;
         public float headshotMultiplier;
         public float vehicleDamage;
-        public float damageDropoff;
-        public float damageDropoffTimer;
-        public float minimumDamage;
+
+        [Tooltip("Damage by distance: X = distance traveled in meters, Y = infantry damage. The point at distance 0 always uses Infantry Damage.")]
+        [ExcludeSerialization]
+        public AnimationCurve infantryDamageByDistance = new AnimationCurve();
+
         public float explosionDamageFalloff;
 
         [Header("Projectile Model")]
         public float muzzleVelocity;
         public float dropMultiplier;
         public bool canDamageVehicles;
+
+        [Header("Visuals")]
         public float delaytoEnableForNonOwner;
+        public float delaytoEnableForOwner;
 
         [Header("Destruction")]
         public float destructionRadius;
+
+        public void OnBeforeSerialize()
+        {
+            EnsureDamageCurveStartsAtBaseDamage();
+        }
+
+        public void OnAfterDeserialize()
+        {
+            EnsureDamageCurveStartsAtBaseDamage();
+        }
+
+        public AnimationCurve CreateRuntimeDamageCurve()
+        {
+            EnsureDamageCurveStartsAtBaseDamage();
+
+            AnimationCurve runtimeCurve = new AnimationCurve(infantryDamageByDistance.keys)
+            {
+                preWrapMode = WrapMode.ClampForever,
+                postWrapMode = WrapMode.ClampForever
+            };
+
+            return runtimeCurve;
+        }
+
+        private void EnsureDamageCurveStartsAtBaseDamage()
+        {
+            if (infantryDamageByDistance == null || infantryDamageByDistance.length == 0)
+            {
+                infantryDamageByDistance = AnimationCurve.Constant(0f, 100f, infantryDamage);
+                return;
+            }
+
+            for (int i = 0; i < infantryDamageByDistance.length; i++)
+            {
+                Keyframe key = infantryDamageByDistance[i];
+
+                if (!Mathf.Approximately(key.time, 0f)) continue;
+
+                key.time = 0f;
+                key.value = infantryDamage;
+                infantryDamageByDistance.MoveKey(i, key);
+                return;
+            }
+
+            infantryDamageByDistance.AddKey(new Keyframe(0f, infantryDamage));
+        }
     }
     #endregion
 
@@ -84,9 +136,9 @@ public class Projectile : LocalPooledObject
         isDespawning = false;
         visualsEnabled = false;
         isSetup = false;
-        timer = 0f;
+        traveledDistance = 0f;
 
-        gameObject.SetActive(true);
+        base.Activate();
 
         if (rb != null)
         {
@@ -96,12 +148,12 @@ public class Projectile : LocalPooledObject
         }
 
         if (projectileCollider != null) projectileCollider.enabled = true;
-
-        SetVisualsActive(true);
+ 
     }
 
     public virtual void CreateProjectile(ProjectileProperties prop, ProjectileValues values)
     {
+        SetVisualsActive(false);
 
         SetProjectileValues(values);
         SetProjectileProperties(prop);
@@ -111,18 +163,23 @@ public class Projectile : LocalPooledObject
         SetDirection(prop.direction, values.muzzleVelocity);
 
         StopAllCoroutines();
+        
         StartCoroutine(DespawnTimer());
+        StartCoroutine(EnableVisualsRoutine(delaytoEnableForOwner));
 
         isSetup = true;
     }
     protected void SetProjectileValues(ProjectileValues values)
     {
         delaytoEnableForNonOwner = values.delaytoEnableForNonOwner == 0 ? 0.01f : values.delaytoEnableForNonOwner;
-        infantryDamage = values.infantryDamage;
+ 
+        delaytoEnableForOwner = values.delaytoEnableForOwner == 0 ? 0.01f : values.delaytoEnableForOwner;
+        
+        initialInfantryDamage = values.infantryDamage;
+        infantryDamage = initialInfantryDamage;
+        infantryDamageByDistance = values.CreateRuntimeDamageCurve();
+        traveledDistance = 0f;
         destructionRadius = values.destructionRadius;
-        damageDropoff = values.damageDropoff;
-        damageDropoffTimer = values.damageDropoffTimer;
-        minimumDamage = values.minimumDamage;
         hsMultiplier = values.headshotMultiplier;
         canDamageArmoredVehicles = values.canDamageVehicles;
         vehicleDamage = values.vehicleDamage;
@@ -168,8 +225,6 @@ public class Projectile : LocalPooledObject
     public override void LocalUpdate()
     {
         if (!isSetup || isDespawning) return;
-
-        ProcessDamageDropoff();
     }
     #endregion
 
@@ -184,7 +239,7 @@ public class Projectile : LocalPooledObject
 
         hitEffects.CustomHitEffect(hitPoint);
 
-        if (hitObject.layer == LayerMask.NameToLayer("Voxel")) ProcessVoxelCollision(collider, hitPoint);
+        if (VoxelObj.IsVoxelLayer(hitObject.layer)) ProcessVoxelCollision(collider, hitPoint);
 
         if (hitObject.layer == LayerMask.NameToLayer("Ground"))ProcessGroundCollision(hitPoint);
         
@@ -210,7 +265,9 @@ public class Projectile : LocalPooledObject
         if (isDespawning || projectileCollider == null || !projectileCollider.isTrigger) return;
         if (collider.gameObject.layer == LayerMask.NameToLayer("Projectile") || collider.gameObject.layer == LayerMask.NameToLayer("Player")) return;
         if (ignoredTransform != null && collider.transform.IsChildOf(ignoredTransform)) return;
-    
+
+        AddTraveledDistance(Vector3.Distance(lastPosition, transform.position));
+        lastPosition = transform.position;
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
     }
 
@@ -227,7 +284,7 @@ public class Projectile : LocalPooledObject
         
 
         VoxelDestruction VoxelPartialCollapse = collider.GetComponent<VoxelDestruction>();
-        if (VoxelPartialCollapse != null) VoxelPartialCollapse.Damage(infantryDamage / 2);
+        if (VoxelPartialCollapse != null) VoxelPartialCollapse.TakeDamage(infantryDamage / 2);
 
         if (destructionRadius > 2) Explosion.SphereExplosion(position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, shootRoot);
 
@@ -261,6 +318,18 @@ public class Projectile : LocalPooledObject
 
         visualsEnabled = active;
     }
+    
+    // Coroutine para ativar os visuais com delay
+    protected IEnumerator EnableVisualsRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        // Verifica se o projétil não foi desativado enquanto o tempo passava
+        if (!isDespawning)
+        {
+            SetVisualsActive(true);
+        }
+    }
     #endregion
 
     #region Helpers
@@ -279,7 +348,6 @@ public class Projectile : LocalPooledObject
 
             if (distance > 0)
             {
-                // CORREÇÃO AQUI: Ignora "Projectile" e "Player" (cápsula de movimento), MAS NÃO "PlayerHitBox"
                 int layerMask = ~(1 << LayerMask.NameToLayer("Projectile") | 1 << LayerMask.NameToLayer("Player"));
 
                 int hits = Physics.RaycastNonAlloc(lastPosition, direction.normalized, hitResults, distance, layerMask);
@@ -309,26 +377,37 @@ public class Projectile : LocalPooledObject
 
                     if (foundValidHit)
                     {
+                        AddTraveledDistance(closestHit.distance);
+                        lastPosition = closestHit.point;
                         HandleBulletHit(closestHit.collider.gameObject, closestHit.point, closestHit.normal, closestHit.collider);
+                        return;
                     }
                 }
+
+                AddTraveledDistance(distance);
             }
 
             lastPosition = currentPosition;
         }
     }
 
-    protected void ProcessDamageDropoff()
+    protected void AddTraveledDistance(float distance)
     {
-        if (infantryDamage > minimumDamage && damageDropoff != 0 && damageDropoffTimer != 0)
-        {
-            timer += Time.deltaTime;
-            if (timer >= damageDropoffTimer)
-            {
-                infantryDamage -= damageDropoff;
-                timer = 0;
-            }
-        }
+        if (distance <= 0f) return;
+
+        traveledDistance += distance;
+        infantryDamage = EvaluateInfantryDamage(traveledDistance);
+    }
+
+    protected float EvaluateInfantryDamage(float distance)
+    {
+        if (infantryDamageByDistance == null || infantryDamageByDistance.length == 0)
+            return initialInfantryDamage;
+
+        float maximumCurveDistance = infantryDamageByDistance[infantryDamageByDistance.length - 1].time;
+        float evaluatedDistance = Mathf.Clamp(distance, 0f, maximumCurveDistance);
+
+        return Mathf.Max(0f, infantryDamageByDistance.Evaluate(evaluatedDistance));
     }
     #endregion
 
@@ -343,6 +422,9 @@ public class Projectile : LocalPooledObject
     {
         if (isDespawning) return;
 
+        // Para a Coroutine que possivelmente ainda estaria tentando ativar os visuais após ele colidir
+        StopAllCoroutines(); 
+
         if (projectileCollider != null)
             projectileCollider.enabled = false;
 
@@ -352,7 +434,6 @@ public class Projectile : LocalPooledObject
 
         if (rb != null)
         {
-            // Só zera a velocidade se ele não for cinemático
             if (!rb.isKinematic)
             {
                 rb.linearVelocity = Vector3.zero;
@@ -360,6 +441,9 @@ public class Projectile : LocalPooledObject
             }
             rb.isKinematic = true;
         }
+        
+        // Retorna o objeto base (LocalPooledObject) ao seu estado inativo do gameObject, se necessário.
+        base.Deactivate(); 
     }
     #endregion
 }

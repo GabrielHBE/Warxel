@@ -54,15 +54,15 @@ public class VehicleSeats
         this.playerSeat = playerSeat;
         playerCamera = playerController.playerCamera;
         soldierHudManager = playerController.soldierHudManager;
-        this.playerProperties.is_in_vehicle = true;
+        this.playerProperties.isInVehicle = true;
         thirdPersonArms = playerController.GetComponentInChildren<ThirdPersonArms>();
 
         //if (playerAnimation != null) playerAnimation.SetVehicleIKTargets(vehicleLeftHandTarget, vehicleRightHandTarget);
 
         this.playerRigidbody.isKinematic = true;
         this.playerRigidbody.interpolation = RigidbodyInterpolation.None;
-        this.playerProperties.is_reloading = false;
-        this.playerProperties.is_in_vehicle = true;
+        this.playerProperties.reloading = false;
+        this.playerProperties.isInVehicle = true;
 
         if (seatType != SeatType.Passenger)
         {
@@ -111,7 +111,7 @@ public class VehicleSeats
         {
             playerController.first_person_player_components.SetActive(true);
             playerController.HideOwnerItems(true);
-            playerProperties.is_in_vehicle = false;
+            playerProperties.isInVehicle = false;
         }
 
         //Player GameObject Exit State

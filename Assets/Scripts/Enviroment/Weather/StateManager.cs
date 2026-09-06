@@ -79,7 +79,7 @@ public class StateManager : ServerSingleton<StateManager>
 
     private void UpdateNetworkTime()
     {
-        weatherState.NetworkTime.Value += (Time.deltaTime * 3600f) / 20;
+        weatherState.NetworkTime.Value += (Time.deltaTime * 3600f) / 200;
     }
 
     private void UpdateWeatherFromAPI()

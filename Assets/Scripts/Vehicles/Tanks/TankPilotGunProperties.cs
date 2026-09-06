@@ -14,7 +14,7 @@ public class TankPilotGunProperties : MonoBehaviour, IsVehicleCustomizationPart
     public SoundManager.SoundComponents shootSound;
 
     [Header("Shooting & Reloading")]
-    public float delay_to_shoot_animation;
+    public float delayToShootAnimation;
     public ProcessReload.Reload.ReloadValues reloadValues;
 
     [Header("Fring Settings")]

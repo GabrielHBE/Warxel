@@ -6,7 +6,7 @@ public class Mag : Attatchment
 
     [Header("Changes")]
     public ProcessReload.Reload.ReloadValues reloadValues;
-    public int bulletsPerSHotChange;
+    public int bulletsPerShotChange;
     public float adsSpeedChange;
 
     public override void Initialize()
@@ -17,7 +17,7 @@ public class Mag : Attatchment
 
     private void GetWeaponHolder()
     {
-        WeaponHolder wh = GetComponentInParent<WeaponHolder>();
+        EquippableItemHandTargets wh = GetComponentInParent<EquippableItemHandTargets>();
         if (wh != null) wh.SetWeaponMag(magHandPosition);
     }
 }

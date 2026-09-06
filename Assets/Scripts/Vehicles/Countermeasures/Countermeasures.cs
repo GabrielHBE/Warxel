@@ -7,7 +7,7 @@ public class Countermeasures : NetworkBehaviour, IsVehicleCustomizationPart
 {
     [HideInInspector] public bool is_active;
     [HideInInspector] public float reload_countermeasures_original_duration;
-    [HideInInspector] public bool is_reloading;
+    [HideInInspector] public bool reloading;
     [SerializeField] private Image hud_space;
     [SerializeField] public Sprite image_icon_hud;
     [SerializeField] protected AudioSource sound;

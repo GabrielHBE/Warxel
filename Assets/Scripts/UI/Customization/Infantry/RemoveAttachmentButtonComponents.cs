@@ -26,7 +26,7 @@ public class RemoveAttachmentButtonComponents : MonoBehaviour
         TextMeshProUGUI buttonText = GetComponentInChildren<TextMeshProUGUI>();
         if (buttonText != null)
         {
-            buttonText.text = "Remover";
+            buttonText.text = "Remove";
             buttonText.color = Color.red;
         }
     }
