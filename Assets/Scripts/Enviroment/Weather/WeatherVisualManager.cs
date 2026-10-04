@@ -85,34 +85,13 @@ public class WeatherVisualManager : MonoBehaviour
 
     void Update()
     {
-        try
-        {
-            if (PlayerController.Instance == null)
-            {
-                if (PlayerSpawnController.Instance == null)
-                {
-                    return;
-                }
-                snowObject.transform.position = PlayerSpawnController.Instance.spawn_camera.transform.position;
-                rainObject.transform.position = PlayerSpawnController.Instance.spawn_camera.transform.position;
-                windyObject.transform.position = PlayerSpawnController.Instance.spawn_camera.transform.position;
-                hurricaneObject.transform.position = PlayerSpawnController.Instance.spawn_camera.transform.position;
-                stormObject.transform.position = PlayerSpawnController.Instance.spawn_camera.transform.position;
-            }
-            else
-            {
-                snowObject.transform.position = PlayerController.Instance.transform.position;
-                rainObject.transform.position = PlayerController.Instance.transform.position;
-                windyObject.transform.position = PlayerController.Instance.transform.position;
-                hurricaneObject.transform.position = PlayerController.Instance.transform.position;
-                stormObject.transform.position = PlayerController.Instance.transform.position;
-            }
-        }catch(Exception)
-        {
-            
-        }
-
-
+        if (Camera.main == null) return;
+        Vector3 follower = Camera.main.transform.position;
+        snowObject.transform.position = follower;
+        rainObject.transform.position = follower;
+        windyObject.transform.position = follower;
+        hurricaneObject.transform.position = follower;
+        stormObject.transform.position = follower;
     }
 
     public void ActivateWeather(WeatherStateManager.WeatherType weatherType)

@@ -1,13 +1,13 @@
 using FishNet.Object;
 using UnityEngine;
+
 public class VoxelFullCollapseTrigger : VoxelPartialCollapse
 {
     [HideInInspector] public bool isTrigged;
 
-    [Server]
-    public override void Destroy()
+    protected override void ApplyCollapseState()
     {
-        base.Destroy();
-        isTrigged = true;
+        base.ApplyCollapseState();
+        isTrigged = IsDestroyed;
     }
 }

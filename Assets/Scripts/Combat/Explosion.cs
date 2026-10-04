@@ -1,8 +1,25 @@
 using System.Collections.Generic;
 using UnityEngine;
+using VoxelDestructionPro.Data;
+using VoxelDestructionPro.VoxelObjects;
 
 public static class Explosion
 {
+    private const int MaxOverlapResults = 16384;
+    private static Collider[] overlapResults = new Collider[256];
+
+    private readonly struct VoxelImpactCandidate
+    {
+        public readonly DynamicVoxelObj Voxel;
+        public readonly float DistanceSquared;
+
+        public VoxelImpactCandidate(DynamicVoxelObj voxel, float distanceSquared)
+        {
+            Voxel = voxel;
+            DistanceSquared = distanceSquared;
+        }
+    }
+
     public static void SphereExplosion(
         Vector3 contactPoint,
         float infantryDmg,
@@ -13,13 +30,16 @@ public static class Explosion
         GameObject shootRoot,
         GameObject ignoreHitGameobject = null)
     {
-        Collider[] colliders = Physics.OverlapSphere(contactPoint, destructionRadius);
+        int colliderCount = OverlapSphere(contactPoint, destructionRadius, Physics.AllLayers);
 
         var processedVehicles = new HashSet<ProcessVehicleDamage>();
         var processedPlayers = new HashSet<PlayerController>();
+        var processedVoxels = new HashSet<DynamicVoxelObj>();
+        var voxelCandidates = new List<VoxelImpactCandidate>();
 
-        foreach (Collider collider in colliders)
+        for (int i = 0; i < colliderCount; i++)
         {
+            Collider collider = overlapResults[i];
             if (ShouldIgnoreCollider(collider, ignoreHitGameobject))
                 continue;
 
@@ -30,8 +50,11 @@ public static class Explosion
             ProcessPlayerCollision(collider, contactPoint, shootRoot, destructionRadius,
                                    infantryDmg, damageFalloff, processedPlayers);
 
-            ProcessVoxelCollision(collider, infantryDmg);
+            CollectVoxelCollision(
+                collider, contactPoint, destructionRadius, processedVoxels, voxelCandidates);
         }
+
+        ProcessVoxelCandidates(voxelCandidates, contactPoint, destructionRadius);
     }
 
     public static void NoDamageSphereExplosion(
@@ -40,15 +63,25 @@ public static class Explosion
         float destructionRadius,
         GameObject ignoreHitGameobject = null)
     {
-        Collider[] colliders = Physics.OverlapSphere(contactPoint, destructionRadius);
+        int voxelMask = LayerMask.GetMask("Voxel");
+        int colliderCount = OverlapSphere(
+            contactPoint,
+            destructionRadius,
+            voxelMask != 0 ? voxelMask : Physics.AllLayers);
+        var processedVoxels = new HashSet<DynamicVoxelObj>();
+        var voxelCandidates = new List<VoxelImpactCandidate>();
 
-        foreach (Collider collider in colliders)
+        for (int i = 0; i < colliderCount; i++)
         {
+            Collider collider = overlapResults[i];
             if (ShouldIgnoreCollider(collider, ignoreHitGameobject))
                 continue;
 
-            ProcessVoxelCollision(collider, infantryDmg);
+            CollectVoxelCollision(
+                collider, contactPoint, destructionRadius, processedVoxels, voxelCandidates);
         }
+
+        ProcessVoxelCandidates(voxelCandidates, contactPoint, destructionRadius);
     }
 
     private static void ProcessVehicleCollision(
@@ -139,13 +172,62 @@ public static class Explosion
             ProcessKill.ProcessInfantryKill(shootRoot, isHeadShot, processInfantryDamage.GetPlayerName());
     }
 
-    private static void ProcessVoxelCollision(Collider collider, float dmg)
+    private static void CollectVoxelCollision(
+        Collider collider,
+        Vector3 hitPoint,
+        float radius,
+        HashSet<DynamicVoxelObj> processed,
+        List<VoxelImpactCandidate> candidates)
     {
-        if (!VoxelObj.IsVoxelLayer(collider.gameObject.layer)) return;
-        TryApplyVoxelPartialCollapseDamage(collider, dmg);
+        if (!ProcessHit.TryGetVoxel(collider.gameObject, out DynamicVoxelObj voxel)) return;
+        if (!processed.Add(voxel)) return;
+
+        // Explosion radius is expressed in voxel cells by the destruction
+        // system. Avoid submitting every building collider found by the wider
+        // gameplay overlap when its voxel volume cannot intersect the damage.
+        float worldVoxelRadius = radius * Mathf.Abs(voxel.GetSingleVoxelSize());
+        Collider voxelCollider = voxel.targetCollider;
+        float distanceSquared = voxelCollider != null
+            ? voxelCollider.bounds.SqrDistance(hitPoint)
+            : (voxel.transform.position - hitPoint).sqrMagnitude;
+        if (distanceSquared > worldVoxelRadius * worldVoxelRadius)
+            return;
+
+        candidates.Add(new VoxelImpactCandidate(voxel, distanceSquared));
     }
 
-    private static void TryApplyVoxelPartialCollapseDamage(Collider collider, float dmg) => collider.GetComponent<VoxelDestruction>()?.TakeDamage(dmg / 2);
+    private static void ProcessVoxelCandidates(
+        List<VoxelImpactCandidate> candidates,
+        Vector3 hitPoint,
+        float radius)
+    {
+        candidates.Sort((left, right) => left.DistanceSquared.CompareTo(right.DistanceSquared));
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            DynamicVoxelObj voxel = candidates[i].Voxel;
+            if (voxel == null)
+                continue;
+
+            ProcessHit.VoxelHit(
+                voxel,
+                hitPoint,
+                Vector3.up,
+                radius,
+                DestructionData.DestructionType.Sphere);
+        }
+    }
+
+    private static int OverlapSphere(Vector3 center, float radius, int layerMask)
+    {
+        while (true)
+        {
+            int count = Physics.OverlapSphereNonAlloc(
+                center, radius, overlapResults, layerMask, QueryTriggerInteraction.Collide);
+            if (count < overlapResults.Length || overlapResults.Length >= MaxOverlapResults) return count;
+            System.Array.Resize(ref overlapResults, Mathf.Min(overlapResults.Length * 2, MaxOverlapResults));
+        }
+    }
+
     private static bool ShouldUseVehicleDamage(GameObject parentVehicle, Collider collider) => parentVehicle != null && collider.gameObject != parentVehicle.gameObject;
     private static ProcessVehicleDamage GetVehicleComponent(Collider collider) => collider.gameObject.GetComponent<ProcessVehicleDamage>();
     private static bool ShouldIgnoreCollider(Collider collider, GameObject ignoreHitGameobject) => ignoreHitGameobject != null && collider.gameObject == ignoreHitGameobject;

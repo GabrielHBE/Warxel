@@ -18,7 +18,13 @@ public class SwayNBobScript : MonoBehaviour
     private const float ROTATION_SMOOTH_SPEED = 12f;
     private const float CROUCH_SHAKE_DURATION = 0.1f;
     private const float CROUCH_SHAKE_INTENSITY = 2f;
-    private const float AIRBORNE_POSITION_OFFSET = 0.01f;
+    private const float AIR_TRANSITION_SPEED = 5f;
+    private const float AIR_VERTICAL_SPEED_REFERENCE = 8f;
+    private const float AIRBORNE_BASE_PITCH = 8f;
+    private const float AIRBORNE_ASCENT_PITCH = 50f;
+    private const float AIRBORNE_DESCENT_PITCH = 6f;
+    private const float LANDING_DAMPING = 12f;
+    private const float LANDING_FREQUENCY = 20f;
 
     private static readonly Vector3 TRAVEL_LIMIT = new Vector3(0.025f, 0.025f, 0.025f);
     private static readonly Vector3 BOB_LIMIT = new Vector3(0.01f, 0.01f, 0.01f);
@@ -58,6 +64,11 @@ public class SwayNBobScript : MonoBehaviour
     private float speedCurve;
     private float bobExaggeration;
     private bool lookInputBlocked;
+    private bool wasGrounded;
+    private float airborneBlend;
+    private float lastAirborneVerticalSpeed;
+    private float landingImpact;
+    private float landingTime;
 
     #region Unity Lifecycle
     private void Awake()
@@ -85,6 +96,7 @@ public class SwayNBobScript : MonoBehaviour
         UpdateSwayPosition();
         UpdateBobOffset();
         UpdateBobRotation();
+        UpdateAirborneMotion();
         ApplyCompositeTransform();
     }
     #endregion
@@ -107,6 +119,12 @@ public class SwayNBobScript : MonoBehaviour
         baseTargetPosition = initialPosition;
         baseTargetRotation = initialRotation;
         ResetVisualRecoilOffset();
+
+        if (!isInitialized)
+        {
+            wasGrounded = playerProperties.grounded;
+            airborneBlend = wasGrounded ? 0f : 1f;
+        }
 
         isInitialized = true;
     }
@@ -321,7 +339,7 @@ public class SwayNBobScript : MonoBehaviour
         float sinCurve = Mathf.Sin(speedCurve);
 
         bobPosition.x = (cosCurve * BOB_LIMIT.x * groundedMultiplier) - (walkInput.x * TRAVEL_LIMIT.x);
-        bobPosition.y = (sinCurve * BOB_LIMIT.y) - (verticalInput * TRAVEL_LIMIT.y);
+        bobPosition.y = (sinCurve * BOB_LIMIT.y - verticalInput * TRAVEL_LIMIT.y) * groundedMultiplier;
         bobPosition.z = -(walkInput.y * TRAVEL_LIMIT.z);
     }
 
@@ -334,6 +352,30 @@ public class SwayNBobScript : MonoBehaviour
         bobEulerRotation.x = currentMovementMultiplier.x * sin2x * (isMoving ? 1f : 0.5f);
         bobEulerRotation.y = isMoving ? currentMovementMultiplier.y * cosCurve : 0f;
         bobEulerRotation.z = isMoving ? currentMovementMultiplier.z * cosCurve * walkInput.x : 0f;
+    }
+
+    private void UpdateAirborneMotion()
+    {
+        bool grounded = playerProperties.grounded;
+
+        if (!grounded)
+        {
+            lastAirborneVerticalSpeed = playerController.rb != null
+                ? playerController.rb.linearVelocity.y
+                : 0f;
+
+            if (wasGrounded) landingImpact = 0f;
+        }
+        else if (!wasGrounded)
+        {
+            landingImpact = Mathf.Clamp01((-lastAirborneVerticalSpeed - 2f) / 10f);
+            landingTime = 0f;
+        }
+
+        wasGrounded = grounded;
+        airborneBlend = Mathf.MoveTowards(
+            airborneBlend, grounded ? 0f : 1f, Time.deltaTime * AIR_TRANSITION_SPEED);
+        landingTime += Time.deltaTime;
     }
     #endregion
 
@@ -350,10 +392,43 @@ public class SwayNBobScript : MonoBehaviour
 
         combinedRotation *= Quaternion.Euler(shakeOffset);
 
-        if (playerProperties.grounded)
-            ApplyGroundedTransform(pitchOffset, yawOffset, rollOffset, combinedRotation, combinedPosition);
-        else
-            ApplyAirborneTransform(yawOffset, rollOffset, combinedRotation, combinedPosition);
+        float aimScale = playerProperties.aiming ? 0.35f : 1f;
+        float verticalSpeed = playerController.rb != null
+            ? playerController.rb.linearVelocity.y
+            : 0f;
+        float verticalMotion = Mathf.Clamp(verticalSpeed / AIR_VERTICAL_SPEED_REFERENCE, -1f, 1f);
+        float floatPhase = Time.time * 4f;
+        float horizontalMotion = playerController.moveHorizontal;
+
+        Vector3 airborneOffset = new Vector3(
+            horizontalMotion * 0.012f + Mathf.Sin(floatPhase * 0.7f) * 0.004f,
+            -verticalMotion * 0.014f + Mathf.Sin(floatPhase) * 0.004f,
+            -playerController.moveForward * 0.008f + Mathf.Cos(floatPhase * 0.8f) * 0.003f
+        ) * aimScale;
+
+        float landingBob = landingImpact * Mathf.Exp(-LANDING_DAMPING * landingTime) *
+                           Mathf.Sin(LANDING_FREQUENCY * landingTime) * 0.035f;
+
+        Quaternion groundedRotation = playerProperties.firing
+            ? Quaternion.Euler(pitchOffset / 8f, yawOffset, -rollOffset)
+            : Quaternion.Euler(pitchOffset, yawOffset, -rollOffset);
+        float airbornePitch = AIRBORNE_BASE_PITCH +
+                              Mathf.Max(0f, verticalMotion) * AIRBORNE_ASCENT_PITCH +
+                              Mathf.Min(0f, verticalMotion) * AIRBORNE_DESCENT_PITCH +
+                              Mathf.Sin(floatPhase) * 1.5f;
+        Quaternion airborneRotation = Quaternion.Euler(
+            pitchOffset + airbornePitch * aimScale,
+            yawOffset,
+            rollOffset + (-horizontalMotion * 8f + Mathf.Sin(floatPhase * 0.7f) * 2f) * aimScale
+        );
+        Quaternion movementRotation = Quaternion.Slerp(
+            groundedRotation, airborneRotation, airborneBlend);
+
+        ApplyTransform(
+            combinedPosition + airborneOffset * airborneBlend +
+            Vector3.down * landingBob + visualRecoilPositionOffset,
+            combinedRotation * movementRotation * Quaternion.Euler(landingBob * 90f, 0f, 0f) *
+            visualRecoilRotationOffset);
     }
     #endregion
 
@@ -407,41 +482,6 @@ public class SwayNBobScript : MonoBehaviour
     #endregion
 
     #region State Application
-    private void ApplyAirborneTransform(
-        float yawOffset,
-        float rollOffset,
-        Quaternion combinedRotation,
-        Vector3 combinedPosition)
-    {
-        float tiltAmount = InputManager.GetAxis("Horizontal") * 10f;
-        Quaternion targetRotation = Quaternion.Euler(15f, yawOffset, -tiltAmount + rollOffset);
-        Vector3 targetPosition = new Vector3(
-            combinedPosition.x,
-            combinedPosition.y - AIRBORNE_POSITION_OFFSET,
-            combinedPosition.z
-        );
-
-        ApplyTransform(
-            targetPosition + visualRecoilPositionOffset,
-            combinedRotation * targetRotation * visualRecoilRotationOffset);
-    }
-
-    private void ApplyGroundedTransform(
-        float pitchOffset,
-        float yawOffset,
-        float rollOffset,
-        Quaternion combinedRotation,
-        Vector3 combinedPosition)
-    {
-        Quaternion targetRotation = playerProperties.firing
-            ? Quaternion.Euler(pitchOffset / 8f, yawOffset, -rollOffset)
-            : Quaternion.Euler(pitchOffset, yawOffset, -rollOffset);
-
-        ApplyTransform(
-            combinedPosition + visualRecoilPositionOffset,
-            combinedRotation * targetRotation * visualRecoilRotationOffset);
-    }
-
     private void ApplyTransform(Vector3 targetPosition, Quaternion targetRotation)
     {
         transform.localRotation = Quaternion.Lerp(

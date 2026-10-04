@@ -1,35 +1,30 @@
-using System.Linq;
-using FishNet.Component.Transforming;
 using FishNet.Object;
 using UnityEngine;
 
-[RequireComponent(typeof(NetworkTransform))]
-public class VoxelFragmentedObj : VoxelObj
+/// <summary>A pre-fractured piece. Keep its GameObject active so FishNet can synchronize it.</summary>
+public class VoxelFragmentedObj : VoxelPartialCollapse
 {
-    private MeshCollider physicsMeshCllider;
-
     protected override void Start()
     {
         base.Start();
-        physicsMeshCllider = GetComponents<MeshCollider>().FirstOrDefault(collider => collider.convex);
-        if(physicsMeshCllider == null)
-        {
-            physicsMeshCllider = gameObject.AddComponent<MeshCollider>();
-            physicsMeshCllider.convex = true;
-        }
-        physicsMeshCllider.enabled = false;
-        gameObject.SetActive(false);
+        ApplyCollapseState();
     }
 
-    public void Activate()
+    protected override void ApplyCollapseState()
     {
-        SetGameobjectActive();
+        base.ApplyCollapseState();
+        // Hide components, never the NetworkObject itself. SyncVars restore late observers.
+        meshRenderer.enabled = IsDestroyed;
         meshCollider.enabled = false;
-        physicsMeshCllider.enabled = true;
-        rb.isKinematic = false;
-        ApplyRandomTorque();
     }
 
-    [ObserversRpc]
-    private void SetGameobjectActive() => gameObject.SetActive(true);    
+    [Server]
+    public void Activate() => Destroy();
+
+    // Hidden fragments are activated by their parent, not by bullets/explosions.
+    public override void TakeDamage(float damage) { }
+
+    // Preserve the original fragment behavior: collide physically without
+    // invoking the whole-piece player/vehicle damage pipeline per fragment.
+    protected override void OnCollisionEnter(Collision collision) { }
 }

@@ -12,6 +12,10 @@ public class Controls : MonoBehaviour
 
     [Header("Mouse")]
 
+    [Header("Vehicle Free Look")]
+    [Tooltip("Prevents mouse movement from steering a vehicle or aiming its armory while the free look key is held.")]
+    public bool block_vehicle_mouse_rotation_during_freelook = false;
+
     [Header("Infantaty")]
     public bool invert_vertical_infantary_mouse;
     [Range(0.01f, 10f)]

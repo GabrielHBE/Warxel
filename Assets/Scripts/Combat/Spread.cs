@@ -4,23 +4,21 @@ public static class Spread
 {
     public const float MAX_SPREAD_VALUE = 3;
     public const float MIN_SPREAD_VALUE = 0;
-
-    private const float MIN_SPREAD_MODIFIER = 0.9f;
-    private const float MAX_SPREAD_MODIFIER = 1.1f;
+    private const int SPREAD_DIVIDER = 5;
 
     public static Quaternion CalculateSpreadRotation(Transform shootPosition, float currentSpread) => shootPosition.rotation * Quaternion.Euler(new Vector3(
                                                                                                             Random.Range(-currentSpread, currentSpread),
                                                                                                             Random.Range(-currentSpread, currentSpread),
                                                                                                             Random.Range(-currentSpread, currentSpread)
                                                                                                         ));
-    
 
-    public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread) => Mathf.Clamp(currentSpread + (spreadIncreaser * Random.Range(MIN_SPREAD_MODIFIER, MAX_SPREAD_MODIFIER)), MIN_SPREAD_VALUE, maxSpread);
-    
+
+    public static float AddSpread(float currentSpread, float spreadIncreaser, float maxSpread) => Mathf.Clamp(currentSpread + (spreadIncreaser / SPREAD_DIVIDER), MIN_SPREAD_VALUE, maxSpread);
+
     public static float ResetSpread(float currentSpread, float baseSpread, float spreadRecoveryTime)
     {
         if (currentSpread < 0.01f) return 0;
-        
+
         return Mathf.MoveTowards(currentSpread, baseSpread, Time.deltaTime * spreadRecoveryTime);
     }
 
@@ -32,7 +30,7 @@ public static class Spread
         [Range(MIN_SPREAD_VALUE, MAX_SPREAD_VALUE)] public float maxSpread = 1;
         public float spreadRecovery = 1;
         public SpreadState spreadState;
-        
+
         public struct SpreadState
         {
             public float currentSpread;

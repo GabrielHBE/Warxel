@@ -74,6 +74,12 @@ public class SetInWorldPositionUI : MonoBehaviour
                 continue;
             }
 
+            if (map.worldPos.TryGetComponent(out InteractiveButton button) && !button.IsLocallyAvailable)
+            {
+                if (map.uiElement.gameObject.activeSelf) map.uiElement.gameObject.SetActive(false);
+                continue;
+            }
+
             float distanceToCamera = Vector3.Distance(Camera.main.transform.position, map.worldPos.position);
 
             if ((distanceToCamera > viewDistance && disableWithinDistance) || SettingsHUD.Instance.is_menu_settings_active)

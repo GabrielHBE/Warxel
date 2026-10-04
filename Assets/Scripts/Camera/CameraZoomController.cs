@@ -1,10 +1,10 @@
 using UnityEngine;
 
-public class CameraZoomController : MonoBehaviour
+public class CameraZoomController : CameraModifiers
 {
     [Header("Instances")]
     [SerializeField] private Camera _camera;
-    [SerializeField] private PlayerProperties playerProperties;
+
 
     [Header("Smooth Settings")]
     [SerializeField, Min(0f)] private float fovLerpSpeed = 12f;
@@ -13,18 +13,19 @@ public class CameraZoomController : MonoBehaviour
     private bool zoomRequested;
     private float baseFov;
 
-    public void SetZoomMultiplier(float zoomMultiplier) =>  this.zoomMultiplier = zoomMultiplier > 0f ? zoomMultiplier : 1f;
-    public void SetBaseFOV(float fov) => baseFov = fov;
-    public void ZoomIn() => zoomRequested = true;
-    public void ZoomOut() => zoomRequested = false;
-    
+    public void SetZoomMultiplier(float zoomMultiplier) => this.zoomMultiplier = zoomMultiplier > 0f ? zoomMultiplier : 1f;
+    public void SetBaseFOV(float fov)
+    {
+        baseFov = fov;
+        _camera.fieldOfView = baseFov;
+    }
+    public override void SetActive(bool state) => zoomRequested = state;
+
     private void LateUpdate()
     {
         if (_camera == null || Settings.Instance == null) return;
-        if (playerProperties != null && playerProperties.isInVehicle) return;
 
-        bool canApplyZoom = zoomRequested && (playerProperties == null || (playerProperties.aiming && !playerProperties.reloading));
-        float targetFov = canApplyZoom ? baseFov / zoomMultiplier : baseFov;
+        float targetFov = zoomRequested ? baseFov / zoomMultiplier : baseFov;
 
         _camera.fieldOfView = Mathf.Lerp(
             _camera.fieldOfView,
@@ -32,6 +33,4 @@ public class CameraZoomController : MonoBehaviour
             1f - Mathf.Exp(-fovLerpSpeed * Time.deltaTime)
         );
     }
-
-
 }

@@ -7,6 +7,7 @@ using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 [RequireComponent(typeof(Rigidbody)), RequireComponent(typeof(NetworkTransform))]
 public abstract class Vehicle : NetworkBehaviour,
@@ -38,11 +39,25 @@ public abstract class Vehicle : NetworkBehaviour,
     [SerializeField] protected GameObject fire_effects_parent;
     [SerializeField] protected GameObject crashExplosion;
     public Countermeasures countermeasures;
+    [SerializeField] protected Animator anim;
+
+    [Header("Boost")]
+    [SerializeField] protected bool canBoost;
+    [FormerlySerializedAs("afterburnerMultiplier")]
+    [SerializeField, Min(1f)] protected float boostMultiplier = 1.5f;
+    [FormerlySerializedAs("afterburnerEffects")]
+    [SerializeField] private ParticleSystem[] boostEffects;
+
+    [Header("Third Person Camera")]
+    [FormerlySerializedAs("cameraRotationLagStrength")]
+    [SerializeField, HideInInspector] private float legacyCameraRotationLagStrength = 0.12f;
+    private const float cameraRotationLagSmoothing = 0.2f;
+    [FormerlySerializedAs("cameraRotationLagMaxAngle")]
+    [SerializeField, HideInInspector] private float legacyCameraRotationLagMaxAngle = 15f;
 
     [Header("Crash Sound Properties")]
     [SerializeField] protected SoundManager.SoundComponents crashSound;
 
-    [Header("Vehicle State")]
     [HideInInspector] public bool isInVehicle = false;
     [HideInInspector] public bool ignore_damage;
     [HideInInspector] public bool used_locking_countermeasure;
@@ -66,11 +81,15 @@ public abstract class Vehicle : NetworkBehaviour,
     protected float _lastSentThrottle = -1f;
     protected float _throttleUpdateTimer = 0f;
     private float _controlledThrottle;
+    private float _baseThrottle;
+    private bool _isBoostToggled;
+    protected float boostModifier;
+    protected bool IsBoostActive { get; private set; }
     protected const float THROTTLE_THRESHOLD = 0.05f;
     protected const float THROTTLE_UPDATE_INTERVAL = 0.1f;
 
     #region Unity Lifecycle
-    void Awake()
+    protected virtual void Awake()
     {
         countermeasures?.SetVehicle(this);
         SetupRigidBody();
@@ -82,25 +101,37 @@ public abstract class Vehicle : NetworkBehaviour,
         if (!Owner.IsValid && vehicle_destroyed.Value && IsServerInitialized) HandleDestructionSequence();
 
         speed = rb.linearVelocity.magnitude;
+        UpdateBoostInput();
 
         if (isInVehicle)
         {
+            currentSeat?.RemoveCameraOffset();
             // Validação de jogador
             if (currentSeat == null || currentSeat.playerGameObject == null || (currentSeat.playerProperties != null && currentSeat.playerProperties.isDead.Value))
             {
                 ExitVehicle();
                 return;
             }
-
-            SyncPlayerPosition();
+            HandleCameraModifierState();
+            SwitchCamera();
             HandleVehicleInput();
             SwitchWeapon();
             HandleShooting();
         }
     }
+    protected virtual void LateUpdate()
+    {
+        if (isInVehicle && currentSeat != null)
+            currentSeat.UpdateCameraOffset(
+                transform.InverseTransformDirection(rb.angularVelocity) * Mathf.Rad2Deg,
+                rb.linearVelocity, Time.deltaTime,
+                legacyCameraRotationLagStrength, cameraRotationLagSmoothing, legacyCameraRotationLagMaxAngle);
+    }
     protected virtual void FixedUpdate()
     {
         if (!IsController) return;
+
+        UpdateBoost();
 
         if (vehicle_destroyed.Value)
         {
@@ -175,10 +206,8 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (vehicle_destroyed.Value) return;
 
-        if (currentSeat.currentArmory != null)
-        {
-            currentSeat.currentArmory.Shoot();
-        }
+        if (currentSeat.GetCurrentArmory() != null) currentSeat.GetCurrentArmory().Shoot();
+
     }
     protected virtual void HandleEmptyVehicle()
     {
@@ -196,12 +225,98 @@ public abstract class Vehicle : NetworkBehaviour,
     protected abstract void StartStopEngine();
     #endregion
 
+    #region Boost
+    private bool CanUseBoost() => canBoost && IsOwner && isInVehicle && currentSeat != null &&
+        currentSeat.seatType == VehicleSeats.SeatType.Pilot && startEngine.Value && !vehicle_destroyed.Value;
+
+    protected virtual KeyCode GetBoostKey() => Settings.Instance._keybinds.VEHICLE_boost_key;
+
+    protected float MovementMultiplier => Mathf.Lerp(1f, Mathf.Max(1f, boostMultiplier), boostModifier / 150f);
+
+    private void UpdateBoostInput()
+    {
+        if (!CanUseBoost())
+        {
+            ResetBoost();
+            return;
+        }
+
+        if (Settings.Instance._controls.is_vehicle_boost_on_hold)
+            _isBoostToggled = false;
+        else if (InputManager.GetKeyDown(GetBoostKey()))
+            _isBoostToggled = !_isBoostToggled;
+    }
+
+    private void UpdateBoost()
+    {
+        if (!CanUseBoost())
+        {
+            ResetBoost();
+            return;
+        }
+
+        bool wantsBoost = Settings.Instance._controls.is_vehicle_boost_on_hold
+            ? InputManager.GetKey(GetBoostKey())
+            : _isBoostToggled;
+
+        IsBoostActive = wantsBoost && CanApplyBoost();
+        boostModifier = Mathf.MoveTowards(boostModifier, IsBoostActive ? 150f : 0f, Time.fixedDeltaTime * 80f);
+        SetBoostEffects(IsBoostActive);
+    }
+
+    protected virtual bool CanApplyBoost() => Throttle > 0f;
+    protected virtual ParticleSystem[] GetBoostEffects() => boostEffects;
+
+    private void SetBoostEffects(bool enabled)
+    {
+        ParticleSystem[] effects = GetBoostEffects();
+        if (effects == null) return;
+
+        foreach (ParticleSystem effect in effects)
+        {
+            if (effect == null) continue;
+            if (enabled && !effect.isPlaying) effect.Play();
+            else if (!enabled && effect.isPlaying) effect.Stop();
+        }
+    }
+
+    private void ResetBoost()
+    {
+        _isBoostToggled = false;
+        boostModifier = 0f;
+        IsBoostActive = false;
+        SetBoostEffects(false);
+    }
+    #endregion
+
     #region Camera & FreeLook
+    public bool ShouldBlockMouseRotationForFreeLook()
+    {
+        if (isInVehicle && currentSeat != null && currentSeat.IsArmoryCameraActive)
+            return currentSeat.CanMainCameraFreeLook();
+
+        return Settings.Instance._controls.block_vehicle_mouse_rotation_during_freelook &&
+               isInVehicle && currentSeat != null &&
+               currentSeat.GetCurrentCameraRotationPivot() != null &&
+               currentSeat.CanMainCameraFreeLook() &&
+               InputManager.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey);
+    }
+
     protected virtual void FreeLook()
     {
-        if (currentSeat == null || currentSeat.activeCamera == null) return;
+        if (currentSeat == null || currentSeat.GetCurrentCameraRotationPivot() == null) return;
 
-        if (currentSeat.seatType == VehicleSeats.SeatType.Pilot)
+        if (!currentSeat.CanMainCameraFreeLook()) return;
+
+        if (currentSeat.IsArmoryCameraActive)
+        {
+            ApplyFreeLookRotation();
+            return;
+        }
+
+        bool requiresFreeLookKey = currentSeat.seatType == VehicleSeats.SeatType.Pilot ||
+                                   Settings.Instance._controls.block_vehicle_mouse_rotation_during_freelook;
+        if (requiresFreeLookKey)
         {
             if (InputManager.GetKey(Settings.Instance._keybinds.VEHICLE_freeLookKey))
                 ApplyFreeLookRotation();
@@ -220,27 +335,45 @@ public abstract class Vehicle : NetworkBehaviour,
         float mouseY = InputManager.GetAxis("Mouse Y") * -sensitivity;
         float mouseX = InputManager.GetAxis("Mouse X") * sensitivity;
 
-        Vector3 currentEuler = currentSeat.activeCamera.transform.localEulerAngles;
+        Vector3 currentEuler = currentSeat.GetCurrentCameraRotationPivot().transform.localEulerAngles;
         float currentX = (currentEuler.x > 180) ? currentEuler.x - 360 : currentEuler.x;
         float currentY = (currentEuler.y > 180) ? currentEuler.y - 360 : currentEuler.y;
 
-        currentX = Mathf.Clamp(currentX + mouseY, -80f, 40f);
-        currentY = Mathf.Clamp(currentY + mouseX, -90f, 90f);
+        if (currentSeat.IsCurrentCameraMain())
+        {
+            currentX = Mathf.Clamp(currentX + mouseY, -80f, 40f);
+            currentY = Mathf.Clamp(currentY + mouseX, -89f, 89f);
+        }
+        else
+        {
+            currentX += mouseY;
+            currentY += mouseX;
+        }
 
         Quaternion newRotation = Quaternion.Euler(currentX, currentY, 0f);
-        currentSeat.activeCamera.transform.localRotation = newRotation;
+        currentSeat.GetCurrentCameraRotationPivot().transform.localRotation = newRotation;
     }
 
     private void ReturnToCenter()
     {
         Quaternion targetRotation = Quaternion.Lerp(
-            currentSeat.activeCamera.transform.localRotation,
+            currentSeat.GetCurrentCameraRotationPivot().transform.localRotation,
             Quaternion.identity,
             Time.deltaTime * 3
         );
 
-        currentSeat.activeCamera.transform.localRotation = targetRotation;
+        currentSeat.GetCurrentCameraRotationPivot().transform.localRotation = targetRotation;
     }
+
+    private void SwitchCamera()
+    {
+        if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_switch_camera_key)) currentSeat.SwitchCamera();
+    }
+
+    private void HandleCameraModifierState() => currentSeat.ActivateCameraEffect(InputManager.GetKey(GetCameraModifierKey()));
+
+    protected virtual KeyCode GetCameraModifierKey() => Settings.Instance._keybinds.VEHICLE_zoom_key;
+
 
     protected virtual float GetCameraSensitivity() => Settings.Instance._controls.helicopter_sensibility;
 
@@ -282,18 +415,26 @@ public abstract class Vehicle : NetworkBehaviour,
     #endregion
 
     #region Player Entry/Exit
-    protected void SyncPlayerPosition()
+    public virtual bool EnterVehicle(NetworkConnection conn, GameObject _player)
     {
-        if (currentSeat == null || currentSeat.playerGameObject == null) return;
+        if (_player == null ||
+            !_player.TryGetComponent(out PlayerProperties props) ||
+            !_player.TryGetComponent(out PlayerController playerController) ||
+            !_player.TryGetComponent(out NetworkObject playerNetObj))
+        {
+            return false;
+        }
 
-        currentSeat.playerGameObject.transform.position = currentSeat.playerSeat.position;
-        currentSeat.playerGameObject.transform.rotation = currentSeat.playerSeat.rotation;
-    }
+        // Activate protection before reserving the seat so collision damage sent
+        // during the client/server round-trip is rejected by the server.
+        playerController.SetVehicleCollisionProtectionServer(true);
 
-    public virtual void EnterVehicle(NetworkConnection conn, GameObject _player)
-    {
-        // Verifica se o jogador possui os componentes necessários
-        if (!_player.TryGetComponent(out PlayerProperties props)) return;
+        if (props.isDead.Value)
+        {
+            playerController.SetVehicleCollisionProtectionServer(false);
+            return false;
+        }
+
         bool foundSeat = false;
 
         for (int i = 0; i < vehicleSeats.Length; i++)
@@ -317,7 +458,6 @@ public abstract class Vehicle : NetworkBehaviour,
             if (seat.vehicleArmory?.Length > 0) seat.SetAuthority(conn);
             if (seat.seatType == VehicleSeats.SeatType.Pilot) NetworkObject.GiveOwnership(conn);
 
-            NetworkObject playerNetObj = _player.GetComponent<NetworkObject>();
             RpcUpdateSeatStatus(i, true, playerNetObj, conn);
             TargetVehicleEntered(conn, i, _player);
 
@@ -328,11 +468,13 @@ public abstract class Vehicle : NetworkBehaviour,
         // Se percorreu todos os assentos e não encontrou um válido
         if (!foundSeat)
         {
+            playerController.SetVehicleCollisionProtectionServer(false);
             TargetRpx(conn, "All seats are occupied", 2);
-            return;
+            return false;
         }
 
         TargetDisableEnterVehicleUI(conn);
+        return true;
     }
 
     [TargetRpc]
@@ -341,7 +483,7 @@ public abstract class Vehicle : NetworkBehaviour,
         AlertMessages.Instance.CreateMessage(message, duration);
     }
 
-    [TargetRpc] private void TargetDisableEnterVehicleUI(NetworkConnection conn) => enterVehicle.gameObject.SetActive(false);
+    [TargetRpc] private void TargetDisableEnterVehicleUI(NetworkConnection conn) => enterVehicle.SetLocalAvailability(false);
 
     [TargetRpc] private void TargetVehicleEntered(NetworkConnection conn, int seatIndex, GameObject _player) => OnVehicleEntered(seatIndex, _player);
 
@@ -359,6 +501,8 @@ public abstract class Vehicle : NetworkBehaviour,
             _player.GetComponent<Rigidbody>(),
             _player
         );
+
+        VehicleStartEngineUI.ShowFor(this);
     }
 
     protected virtual void ExitVehicle()
@@ -367,7 +511,9 @@ public abstract class Vehicle : NetworkBehaviour,
 
         int currentIndex = playerSeatIndex;
         VehicleSeats seat = vehicleSeats[currentIndex];
+        PlayerController exitingPlayerController = seat?.playerController;
         isInVehicle = false;
+        VehicleStartEngineUI.HideFor(this);
 
         if (seat != null)
         {
@@ -383,9 +529,10 @@ public abstract class Vehicle : NetworkBehaviour,
 
             playerSeatIndex = -1;
             seat.ExitSeat();
+            exitingPlayerController?.EndVehicleCollisionProtection();
         }
 
-        enterVehicle.gameObject.SetActive(true);
+        enterVehicle.SetLocalAvailability(true);
     }
 
     private void RepositionPlayerOnExit(GameObject player)
@@ -400,10 +547,10 @@ public abstract class Vehicle : NetworkBehaviour,
     private void ClearSeatArmory(VehicleSeats seat)
     {
         if (seat.vehicleArmory == null) return;
-        foreach (GameObject armoryObj in seat.vehicleArmory)
+        foreach (VehicleArmory armoryObj in seat.vehicleArmory)
         {
             if (armoryObj == null) continue;
-            armoryObj.GetComponent<IVehicleArmory>()?.DeactivateArmory();
+            armoryObj.GetComponent<VehicleArmory>()?.DeactivateArmory();
             RemoveArmoryOwnership(armoryObj.GetComponent<NetworkObject>());
         }
     }
@@ -475,13 +622,18 @@ public abstract class Vehicle : NetworkBehaviour,
 
     #region Network Status & Ownership
     protected float Throttle => IsController ? _controlledThrottle : throttle.Value;
+    // Input uses the unboosted value so boost never feeds back into acceleration.
+    protected float BaseThrottle => _baseThrottle;
 
     public override void OnOwnershipClient(NetworkConnection previousOwner)
     {
         base.OnOwnershipClient(previousOwner);
 
         if (IsOwner)
+        {
             _controlledThrottle = throttle.Value;
+            _baseThrottle = ClampThrottle(_controlledThrottle);
+        }
     }
 
     public override void OnOwnershipServer(NetworkConnection previousOwner)
@@ -489,14 +641,18 @@ public abstract class Vehicle : NetworkBehaviour,
         base.OnOwnershipServer(previousOwner);
 
         if (!Owner.IsValid)
+        {
             _controlledThrottle = throttle.Value;
+            _baseThrottle = ClampThrottle(_controlledThrottle);
+        }
     }
 
     protected void SetThrottle(float value)
     {
         if (!IsController) return;
 
-        _controlledThrottle = ClampThrottle(value);
+        _baseThrottle = ClampThrottle(value);
+        _controlledThrottle = ClampBoostedThrottle(GetBoostedThrottle(_baseThrottle));
 
         // Em host ou em veiculo sem owner, o servidor publica o valor diretamente.
         if (IsServerInitialized)
@@ -504,6 +660,8 @@ public abstract class Vehicle : NetworkBehaviour,
     }
 
     protected virtual float ClampThrottle(float value) => value;
+    protected virtual float GetBoostedThrottle(float value) => value > 0f ? value * MovementMultiplier : value;
+    protected virtual float ClampBoostedThrottle(float value) => value;
 
     private void SyncOwnerThrottle()
     {
@@ -520,7 +678,7 @@ public abstract class Vehicle : NetworkBehaviour,
     }
 
     [ServerRpc]
-    private void CmdUpdateThrottle(float value) => throttle.Value = ClampThrottle(value);
+    private void CmdUpdateThrottle(float value) => throttle.Value = ClampBoostedThrottle(value);
 
     [ServerRpc] private void RemoveArmoryOwnership(NetworkObject obj) => obj?.RemoveOwnership();
     [ServerRpc(RequireOwnership = true)] private void RemoveOwnershipFromPlayer() => NetworkObject.RemoveOwnership();
@@ -553,7 +711,7 @@ public abstract class Vehicle : NetworkBehaviour,
     {
         if (gameObject.layer == LayerMask.NameToLayer("Player") && rb.linearVelocity.magnitude > 0)
         {
-            gameObject.GetComponent<PlayerController>()?.TakeDamage(rb.linearVelocity.magnitude * 10);
+            gameObject.GetComponent<PlayerController>()?.TakeVehicleCollisionDamage(rb.linearVelocity.magnitude * 10);
         }
     }
     [ServerRpc(RequireOwnership = false)]
@@ -622,7 +780,8 @@ public abstract class Vehicle : NetworkBehaviour,
     #region Utilities & Weapons
     private void CountermeasuresUpdate()
     {
-        countermeasures?.LocalUpdate();
+        if (countermeasures == null) return;
+        countermeasures.LocalUpdate();
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.VEHICLE_countermeasureKey) && isInVehicle && countermeasures.IsCooldownFinished() && currentSeat.seatType == VehicleSeats.SeatType.Pilot) countermeasures.UseCountermeasure();
     }
     protected void SetupRigidBody()
@@ -669,17 +828,19 @@ public abstract class Vehicle : NetworkBehaviour,
     }
     private int GetCurrentArmoryIndex()
     {
-        int index = Array.FindIndex(currentSeat.vehicleArmory, item => item?.GetComponent<IVehicleArmory>() == currentSeat.currentArmory);
+        int index = Array.FindIndex(currentSeat.vehicleArmory, item => item?.GetComponent<VehicleArmory>() == currentSeat.GetCurrentArmory());
         return index == -1 ? 0 : index;
     }
     private void ChangeArmory(int index)
     {
         if (currentSeat.vehicleArmory[index] == null) return;
-        currentSeat.currentArmory?.DeactivateArmory();
-        currentSeat.currentArmory = currentSeat.vehicleArmory[index].GetComponent<IVehicleArmory>();
-        currentSeat.currentArmory?.ActivateArmory();
+        currentSeat.GetCurrentArmory()?.DeactivateArmory();
+        VehicleArmory armory = currentSeat.vehicleArmory[index].GetComponent<VehicleArmory>();
+        armory?.ActivateArmory();
+        currentSeat.SetCurrentArmory(armory);
     }
     protected bool IsInLayerMask(int layer, LayerMask layerMask) => layerMask == (layerMask | (1 << layer));
+    protected abstract void UpdateAnimator();
     #endregion
 
     #region Interfaces Implementation
@@ -701,9 +862,9 @@ public abstract class Vehicle : NetworkBehaviour,
         if (countermeasures.reloading) return $"Reloading... [{countermeasures.reload_countermeasures_duration:F0}]";
         return "Ready";
     }
-    public virtual float GetMaxHeat() => currentSeat?.currentArmory?.GetMaxOverheat() ?? 0;
-    public virtual float GetCurrentHeat() => currentSeat?.currentArmory?.GetHeatingLevel() ?? 0;
-    public virtual string GetCurrentAmmo() => currentSeat?.currentArmory?.GetCurrentAmmo() ?? "";
+    public virtual float GetMaxHeat() => currentSeat?.GetCurrentArmory()?.GetMaxOverheat() ?? 0;
+    public virtual float GetCurrentHeat() => currentSeat?.GetCurrentArmory()?.GetHeatingLevel() ?? 0;
+    public virtual string GetCurrentAmmo() => currentSeat?.GetCurrentArmory()?.GetCurrentAmmo() ?? "";
     public virtual float GetCurrentAltitude() => transform.position.y;
     public virtual int GetCurrentActiveItem() => GetCurrentArmoryIndex();
 
@@ -712,7 +873,7 @@ public abstract class Vehicle : NetworkBehaviour,
         if (currentSeat?.vehicleArmory == null) return new List<Sprite>();
         return currentSeat.vehicleArmory
             .Where(obj => obj != null)
-            .Select(obj => obj.GetComponent<IVehicleArmory>()?.GetArmoryIcon())
+            .Select(obj => obj.GetComponent<VehicleArmory>()?.GetArmoryIcon())
             .Where(icon => icon != null)
             .ToList();
     }
@@ -723,7 +884,17 @@ public abstract class Vehicle : NetworkBehaviour,
     #endregion
 
     #region Enums
-    public enum VehicleCategory { Jet, Boat, Helicopter, Tank }
+    public enum VehicleCategory { Plane, Boat, Helicopter, Tank }
     public enum VehicleType { Air, Land }
+    public enum PropellerRotationAxis { X, Y, Z }
+    #endregion
+
+    #region Innter Classes
+    [Serializable]
+    public class PropellerData
+    {
+        public GameObject propeler;
+        public PropellerRotationAxis rotationAxis;
+    }
     #endregion
 }

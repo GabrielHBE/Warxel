@@ -25,4 +25,9 @@ public class AttackHelicopter : Helicopter
             return;
         }
     }
+
+    protected override void UpdateAnimator()
+    {
+        throw new System.NotImplementedException();
+    }
 }

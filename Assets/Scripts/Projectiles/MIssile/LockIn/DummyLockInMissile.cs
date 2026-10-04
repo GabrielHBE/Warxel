@@ -16,9 +16,11 @@ public class DummyLockInMissile : DummyProjectile
     public override void CreateProjectile(Projectile.ProjectileProperties prop, Projectile.ProjectileValues values)
     {
         SetProjectileProperties(prop);
+        SetProjectileValues(values);
+
+        Activate();
 
         SetVisualsActive(true);
-        Activate();
 
         StopAllCoroutines();
         //StartCoroutine(DespawnTimer());

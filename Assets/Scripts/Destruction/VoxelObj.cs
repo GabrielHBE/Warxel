@@ -1,6 +1,5 @@
 using FishNet.Object;
 using UnityEngine;
-using System.Linq;
 
 [RequireComponent(typeof(Rigidbody)), RequireComponent(typeof(MeshCollider)), RequireComponent(typeof(MeshFilter)), RequireComponent(typeof(MeshRenderer))]
 public class VoxelObj : NetworkBehaviour
@@ -16,22 +15,33 @@ public class VoxelObj : NetworkBehaviour
     protected MeshCollider meshCollider;
     protected MeshFilter meshFilter;
     protected MeshRenderer meshRenderer;
+    private bool componentsInitialized;
 
     protected virtual void Start()
     {
-        gameObject.layer = layer;
+        if (componentsInitialized) return;
+        componentsInitialized = true;
+        if (layer.value >= 0) gameObject.layer = layer;
         GetComponents();
 
-        meshCollider.convex = false;
         rb.isKinematic = true;
     }
 
     protected void GetComponents()
     {
-        meshCollider = GetComponents<MeshCollider>().FirstOrDefault(collider => !collider.convex);
         rb = GetComponent<Rigidbody>();
+        rb.isKinematic = true;
         meshFilter = GetComponent<MeshFilter>();
         meshRenderer = GetComponent<MeshRenderer>();
+        foreach (MeshCollider candidate in GetComponents<MeshCollider>())
+        {
+            if (!candidate.convex) { meshCollider = candidate; break; }
+        }
+        if (meshCollider == null)
+        {
+            meshCollider = gameObject.AddComponent<MeshCollider>();
+            meshCollider.sharedMesh = meshFilter.sharedMesh;
+        }
     }
 
     protected void ApplyRandomTorque()

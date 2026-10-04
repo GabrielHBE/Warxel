@@ -10,7 +10,6 @@ public class TowMissile : Missile
 
     public override void CreateProjectile(ProjectileProperties prop, ProjectileValues values)
     {
-        SetVisualsActive(true);
         Activate();
 
         SetProjectileValues(values);
@@ -20,6 +19,8 @@ public class TowMissile : Missile
         //StartCoroutine(DespawnTimer());
 
         SetDirection(prop.direction, values.muzzleVelocity);
+
+        SetVisualsActive(true);
 
         isSetup = true;
     }

@@ -223,7 +223,8 @@ public class AttatchmentManager : MonoBehaviour
             verticalRecoilChange = barrel.verticalRecoilChange,
             firstShootChange = barrel.firstShootRecoilChange,
             muzzleVelocityChange = barrel.muzzleVelocityChange,
-            adsSpeedChange = barrel.adsSpeedChange
+            adsSpeedChange = barrel.adsSpeedChange,
+            spreadChange = barrel.spreadChange
         };
     }
 
@@ -339,6 +340,7 @@ public class AttatchmentManager : MonoBehaviour
         wp.recoilValues.firstShootRecoilMultiplier += barrel.firstShootChange;
         wp.projectileValues.muzzleVelocity += barrel.muzzleVelocityChange;
         wp.adsSpeed += barrel.adsSpeedChange;
+        wp.spreadValues.spreadIncreaser += barrel.spreadChange;
     }
 
     private void AddSightStats(WeaponProperties wp, AttachmentData sight)
@@ -489,6 +491,7 @@ public class AttatchmentManager : MonoBehaviour
         wp.recoilValues.firstShootRecoilMultiplier -= barrel.firstShootChange;
         wp.projectileValues.muzzleVelocity -= barrel.muzzleVelocityChange;
         wp.adsSpeed -= barrel.adsSpeedChange;
+        wp.spreadValues.spreadIncreaser -= barrel.spreadChange;
 
         ResetAttachmentDataToZero(barrel);
     }

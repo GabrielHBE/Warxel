@@ -46,6 +46,9 @@ public class KeyBinds : MonoBehaviour
     public KeyCode VEHICLE_countermeasureKey = KeyCode.C;
     public KeyCode VEHICLE_switchFireModeKey = KeyCode.X;
     public KeyCode VEHICLE_switchSeatKey = KeyCode.LeftControl;
+    public KeyCode VEHICLE_switch_camera_key = KeyCode.C;
+    public KeyCode VEHICLE_boost_key = KeyCode.Mouse3;
+    public KeyCode VEHICLE_zoom_key = KeyCode.Mouse1;
     public KeyCode VEHICLE_weapon1 = KeyCode.Alpha1;
     public KeyCode VEHICLE_weapon2 = KeyCode.Alpha2;
     public KeyCode VEHICLE_weapon3 = KeyCode.Alpha3;
@@ -57,7 +60,6 @@ public class KeyBinds : MonoBehaviour
     public KeyCode VEHICLE_weapon9 = KeyCode.Alpha9;
 
     [Header("Jet")]
-    public KeyCode JET_boostKey = KeyCode.LeftControl;
     public KeyCode JET_shootVehicleKey = KeyCode.Mouse0;
     public KeyCode JET_pitchUpKey = KeyCode.Space;
     public KeyCode JET_pitchDownKey = KeyCode.LeftShift;
@@ -69,11 +71,9 @@ public class KeyBinds : MonoBehaviour
     [Header("Helicopter")]
     public KeyCode HELICOPTER_increase_throtlle = KeyCode.W;
     public KeyCode HELICOPTER_decrease_throtlle = KeyCode.S;
-    public KeyCode HELICOPTER_switch_camera_key = KeyCode.C;
     public KeyCode HELICOPTER_main_cannon_key = KeyCode.Alpha1;
     public KeyCode HELICOPTER_upgrade_gun_key = KeyCode.Alpha2;
     public KeyCode HELICOPTER_shoot_key = KeyCode.Mouse0;
-    public KeyCode HELICOPTER_zoom_key = KeyCode.Mouse1;
     public KeyCode HELICOPTER_pitch_up_key = KeyCode.Space;
     public KeyCode HELICOPTER_pitch_down_key = KeyCode.LeftShift;
     public KeyCode HELICOPTER_lean_left_key = KeyCode.A;
@@ -87,8 +87,6 @@ public class KeyBinds : MonoBehaviour
     public KeyCode TANK_turn_left_key = KeyCode.A;
     public KeyCode TANK_turn_right_key = KeyCode.D;
     public KeyCode TANK_shoot_key = KeyCode.Mouse0;
-    public KeyCode TANK_zoom_key = KeyCode.Mouse1;
-    public KeyCode TANK_boostKey = KeyCode.LeftControl;
     public KeyCode TANK_gunner_seat_key = KeyCode.F1;
     public KeyCode TANK_pilot_seat_key = KeyCode.F2;
 

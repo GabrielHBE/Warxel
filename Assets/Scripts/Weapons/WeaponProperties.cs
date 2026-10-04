@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
+[RequireComponent(typeof(EquippableItemAnimator)), RequireComponent(typeof(EquippableItemAudio)), RequireComponent(typeof(EquippableItemHandTargets)), RequireComponent(typeof(AttatchmentManager)), RequireComponent(typeof(ReloadController)), RequireComponent(typeof(Animator))]
 public class WeaponProperties : MonoBehaviour, UpgradeLevel
 {
     #region Variables
@@ -50,6 +51,8 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public EquippableItemAudio weaponSound;
     private BulletExtractor bulletExtractor;
     [HideInInspector] public EquippableItemAnimator weaponAnimation;
+
+    [HideInInspector] public Mag magAttatchment;
     #endregion
 
     #region Enums
@@ -69,10 +72,6 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     #region Initialization & Setup
     private void Awake() => DisableRendererShadows();
     private void OnTransformChildrenChanged() => DisableRendererShadows();
-
-#if UNITY_EDITOR
-    private void OnValidate() => DisableRendererShadows();
-#endif
 
     public void Initialize()
     {
@@ -123,6 +122,16 @@ public class WeaponProperties : MonoBehaviour, UpgradeLevel
     public void CreateBulletExtractor()
     {
         if (bulletExtractor != null) bulletExtractor.CreateBullet();
+    }
+
+    public void ResetMagState()
+    {
+        if (magAttatchment != null) magAttatchment.ResetMagState();
+    }
+
+    public void MagShootAnimation()
+    {
+        if (magAttatchment != null) magAttatchment.PlayMagShootAnimation();
     }
     #endregion
 

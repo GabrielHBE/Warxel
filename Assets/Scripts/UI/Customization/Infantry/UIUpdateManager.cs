@@ -792,6 +792,8 @@ public class UIUpdateManager : MonoBehaviour
                 current.MuzzleVelocity, oldBarrel?.muzzleVelocityChange ?? 0f, barrel.muzzleVelocityChange);
             projected.AdsSpeed = ApplyReplacementDelta(
                 current.AdsSpeed, oldBarrel?.adsSpeedChange ?? 0f, barrel.adsSpeedChange);
+            projected.SpreadIncreaser = ApplyReplacementDelta(
+                current.SpreadIncreaser, oldBarrel?.spreadChange ?? 0f, barrel.spreadChange);
         }
         else if (attachment is Mag mag)
         {

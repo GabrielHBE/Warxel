@@ -22,7 +22,7 @@ public class VehicleSpawner : MonoBehaviour
 
     private void ExecuteSpawn()
     {
-
+        
         Transform selected_spawn_point = spawn_points[Random.Range(0, spawn_points.Length)];
 
         switch (vehicleCategory)
@@ -31,7 +31,7 @@ public class VehicleSpawner : MonoBehaviour
                 PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedHelicopter, selected_spawn_point);
                 break;
 
-            case Vehicle.VehicleCategory.Jet:
+            case Vehicle.VehicleCategory.Plane:
                 PlayerSpawnController.Instance.InitializeSpawnVehicle(VehicleLoadoutCustomization.Instance.selectedJet, selected_spawn_point);
                 break;
 
@@ -44,5 +44,6 @@ public class VehicleSpawner : MonoBehaviour
                 break;
 
         }
+        
     }
 }

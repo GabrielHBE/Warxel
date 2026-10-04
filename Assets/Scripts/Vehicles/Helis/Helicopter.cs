@@ -16,8 +16,7 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
     [Header("Helicopter variables")]
     [SerializeField] protected HeliProperties heliProperties;
-    [SerializeField] protected GameObject main_propeller;
-    [SerializeField] protected GameObject back_propeller;
+    [SerializeField] protected PropellerData[] propellerDatas;
     #endregion
 
     #region Private Variables
@@ -57,6 +56,9 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         base.HandleEngineOff();
         localThrottle = 0f;
     }
+    protected override bool CanApplyBoost() =>
+        InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_increase_throtlle) &&
+        !InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_decrease_throtlle);
     protected override void OnDestructionPhysicsTick(float timer)
     {
         float rotate_value = Math.Clamp(Mathf.Pow(timer * 15, 2f), 0, 900);
@@ -129,8 +131,9 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
 
     protected void CalculateRotationInput(float deltaTime)
     {
-        mouseX = Math.Clamp(InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility, -heliProperties.max_rotation_value, heliProperties.max_rotation_value);
-        mouseY = Math.Clamp(InputManager.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility, -heliProperties.max_pitch_value, heliProperties.max_pitch_value);
+        bool blockMouseRotation = ShouldBlockMouseRotationForFreeLook();
+        mouseX = blockMouseRotation ? 0f : Math.Clamp(InputManager.GetAxis("Mouse X") * Settings.Instance._controls.helicopter_sensibility, -heliProperties.max_rotation_value, heliProperties.max_rotation_value);
+        mouseY = blockMouseRotation ? 0f : Math.Clamp(InputManager.GetAxis("Mouse Y") * Settings.Instance._controls.helicopter_sensibility, -heliProperties.max_pitch_value, heliProperties.max_pitch_value);
 
         if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_pitch_up_key)) mouseY = heliProperties.max_pitch_value;
         if (InputManager.GetKey(Settings.Instance._keybinds.HELICOPTER_pitch_down_key)) mouseY = -heliProperties.max_pitch_value;
@@ -150,14 +153,10 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (lean_value != 0) rb.AddTorque(transform.up * lean_value * rb.mass);
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestPropellerRotation() => CmdPropellerRotation();
-
-    [ObserversRpc()]
-    private void CmdPropellerRotation() => PropellerRotation();
-
     protected void PropellerRotation()
     {
+        if(propellerDatas.Length == 0) return;
+
         float targetSpeed = startEngine.Value && !vehicle_destroyed.Value ? heliProperties.max_lift_force / 4 : 0f;
         float smoothTime = startEngine.Value ? PROPELLER_ACCELARATION : PROPELLER_DESELERATION;
         float t = Mathf.Clamp01(Time.fixedDeltaTime / smoothTime);
@@ -165,8 +164,30 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         currentPropellerSpeed = Mathf.Lerp(currentPropellerSpeed, targetSpeed, t);
         float rotationAmount = currentPropellerSpeed * Time.fixedDeltaTime * 20;
 
-        if (main_propeller != null) main_propeller.transform.Rotate(0, rotationAmount, 0, Space.Self);
-        if (back_propeller != null) back_propeller.transform.Rotate(0, 0, rotationAmount, Space.Self);
+        if (propellerDatas == null) return;
+
+        foreach (PropellerData propellerData in propellerDatas)
+        {
+            if (propellerData == null || propellerData.propeler == null) continue;
+
+            Vector3 axis;
+            switch (propellerData.rotationAxis)
+            {
+                case PropellerRotationAxis.X:
+                    axis = Vector3.right;
+                    break;
+                case PropellerRotationAxis.Y:
+                    axis = Vector3.up;
+                    break;
+                case PropellerRotationAxis.Z:
+                    axis = Vector3.forward;
+                    break;
+                default:
+                    continue;
+            }
+
+            propellerData.propeler.transform.Rotate(axis, rotationAmount, Space.Self);
+        }
     }
     #endregion
 
@@ -186,7 +207,9 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (vehicle_destroyed.Value) return;
 
         // 1. Todos os clients calculam o alvo e suavizam o pitch localmente
-        float targetPitch = startEngine.Value ? Mathf.Lerp(0.4f, 1.2f, Throttle / heliProperties.max_lift_force) : 0f;
+        float targetPitch = startEngine.Value
+            ? Mathf.Lerp(0.4f, 1.2f + boostModifier / 300f, Throttle / heliProperties.max_lift_force)
+            : 0f;
         currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.deltaTime * 5);
 
         bool shouldBePlaying = currentPitch > 0.01f;
@@ -231,10 +254,11 @@ public abstract class Helicopter : Vehicle, ICurrentRotationUIValues
         if (vehicle_destroyed.Value && IsInLayerMask(collision.gameObject.layer, collisionLayers)) SoundManager.Play2dSoundLocal(fallAlarmSound.clip, fallAlarmSound.properties);
     }
 
-    public override float GetCurrentThrottle() => Throttle;
     public override float GetMinFov() => Settings.Instance._video.helicopter_fov;
     public override float GetMaxThrottle() => heliProperties.max_lift_force;
     protected override float ClampThrottle(float value) => Mathf.Clamp(value, 0f, heliProperties.max_lift_force);
+    protected override float ClampBoostedThrottle(float value) => Mathf.Clamp(value, 0f,
+        heliProperties.max_lift_force * Mathf.Max(1f, boostMultiplier));
     public float GetXRotation() => transform.eulerAngles.x;
     public float GetYRotation() => transform.eulerAngles.y;
     public float GetZRotation() => transform.eulerAngles.z;

@@ -4,8 +4,6 @@ using UnityEngine;
 public class RocketLauncher : Gadget
 {
     [Header("Missiles")]
-    [SerializeField] private DummyProjectile dummyMissile;
-    [SerializeField] private GameObject missile;
     [SerializeField] private Transform shootPos;
 
     [Header("Hand Positions")]
@@ -14,20 +12,8 @@ public class RocketLauncher : Gadget
     [Header("Animations")]
     [SerializeField] private Animator anim;
 
-    [Header("Firing Settings")]
-    [SerializeField] private Firing.FiringValues firing;
-
-    [Header("Damage & Ballistics")]
-    [SerializeField] private Projectile.ProjectileValues projectileValues;
-
-    [Header("Spread Settings")]
-    [SerializeField] private Spread.SpreadValues spreadValues;
-
-    [Header("Recoil Settings")]
-    [SerializeField] private Recoil.RecoilValues recoilValues;
-
-    [Header("Reload settings")]
-    public ProcessReload.Reload.ReloadValues reloadValues;
+    [Header("Properties")]
+    [SerializeField] private MissileProperties properties;
 
     [Header("ADS")]
     [SerializeField] private float adsSpeed;
@@ -58,10 +44,10 @@ public class RocketLauncher : Gadget
         base.Initialize();
         
         processCameraRecoil = GetComponentInParent<ProcessCameraRecoil>();
-        reloadValues.PopulateMags();
+        properties.reloadValues.PopulateMags();
 
-        recoilValues.CalculateRecoilSpeed(firing.interval);
-        equippableItemAnimator.Setup(0, reloadValues, false, firing);
+        properties.recoilValues.CalculateRecoilSpeed(properties.firing.interval);
+        equippableItemAnimator.Setup(0, properties.reloadValues, false, properties.firing);
     }
 
     public override void Restart()
@@ -79,7 +65,7 @@ public class RocketLauncher : Gadget
         if (AdsBehaviour.Instance != null) AdsBehaviour.Instance.Setup(adsPosition, adsSpeed, zoom, canReloadAiming, equippableItemAudio);
 
         restarted = true;
-        current_spread = spreadValues.baseSpread;
+        current_spread = properties.spreadValues.baseSpread;
         SetupFiringSystem();
 
     }
@@ -107,19 +93,19 @@ public class RocketLauncher : Gadget
     }
     private void SetupFiringSystem()
     {
-        Firing.ResetState(firing.fireModes);
+        Firing.ResetState(properties.firing.fireModes);
 
-        if (firing.fireModes != null && firing.fireModes.Count > 0 && !firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(firing);
+        if (properties.firing.fireModes != null && properties.firing.fireModes.Count > 0 && !properties.firing.fireModes.Contains(Firing.GetCurrentFireMode())) Firing.SwitchFireMode(properties.firing);
 
     }
 
     private void UpdateAmmoHUD()
     {
-        ammo = reloadValues.mags[^1].ToString("F0") + " / ";
+        ammo = properties.reloadValues.mags[^1].ToString("F0") + " / ";
         int ammoLeft = 0;
-        for (int i = 0; i < reloadValues.mags.Count - 1; i++)
+        for (int i = 0; i < properties.reloadValues.mags.Count - 1; i++)
         {
-            ammoLeft += reloadValues.mags[i];
+            ammoLeft += properties.reloadValues.mags[i];
         }
         ammo += ammoLeft.ToString();
         soldierHudManager.SetCurrentAmmo(ammo);
@@ -128,9 +114,9 @@ public class RocketLauncher : Gadget
     #region Fire Mode
     private void HandleFireModeSwitch()
     {
-        if (!Firing.CanSwitchFireMode(firing.fireModes)) return;
+        if (!Firing.CanSwitchFireMode(properties.firing.fireModes)) return;
 
-        Firing.FireMode newMode = Firing.SwitchFireMode(firing);
+        Firing.FireMode newMode = Firing.SwitchFireMode(properties.firing);
         UpdateFireModeHUD(newMode);
     }
 
@@ -140,10 +126,10 @@ public class RocketLauncher : Gadget
     #region Reload
     void HandleReload()
     {
-        int reserveAmmo = reloadValues.GetTotalReserveAmmo();
+        int reserveAmmo = properties.reloadValues.GetTotalReserveAmmo();
 
         if (!ProcessReload.Reload.ReloadLogic.CanStartReload(
-            reloadValues,
+            properties.reloadValues,
             playerController.playerProperties.firing,
             playerController.playerProperties.reloading,
             playerController.playerProperties.roll,
@@ -155,8 +141,8 @@ public class RocketLauncher : Gadget
 
         equippableItemAnimator.StartReloadAnimation();
 
-        bool isEmpty = reloadValues.IsMagazineEmpty();
-        float totalReloadTime = ProcessReload.Reload.ReloadLogic.CalculateReloadTime(reloadValues, isEmpty);
+        bool isEmpty = properties.reloadValues.IsMagazineEmpty();
+        float totalReloadTime = ProcessReload.Reload.ReloadLogic.CalculateReloadTime(properties.reloadValues, isEmpty);
 
         if (equippableItemAnimator.fireClip != null)
         {
@@ -180,17 +166,17 @@ public class RocketLauncher : Gadget
         if (reserve_ammo == 0 || !playerController.playerProperties.reloading) return;
         
 
-        if (!reloadValues.isSingleReload) HandleStandardReload();
+        if (!properties.reloadValues.isSingleReload) HandleStandardReload();
     }
 
-    private void CalculateReserveAmmo() => reserve_ammo = reloadValues.GetTotalReserveAmmo();
+    private void CalculateReserveAmmo() => reserve_ammo = properties.reloadValues.GetTotalReserveAmmo();
 
     private void HandleStandardReload()
     {
-        bool isEmpty = reloadValues.IsMagazineEmpty();
+        bool isEmpty = properties.reloadValues.IsMagazineEmpty();
 
         var result = ProcessReload.Reload.ReloadLogic.ProcessStandardReload(
-            reloadValues,
+            properties.reloadValues,
             reload_cooldown,
             Time.deltaTime,
             isEmpty
@@ -215,7 +201,7 @@ public class RocketLauncher : Gadget
         bool pressShoot = InputManager.GetKeyDown(Settings.Instance._keybinds.WEAPON_shootKey);
 
         // Check if ammo is empty for alert
-        if (pressShoot && reloadValues.mags[^1] == 0)
+        if (pressShoot && properties.reloadValues.mags[^1] == 0)
         {
             AlertMessages.Instance.CreateMessage("Not enough ammo", 2);
             return;
@@ -223,13 +209,13 @@ public class RocketLauncher : Gadget
 
         // ATUALIZADO: Process shooting through Firing system (sem stateId)
         var result = Firing.ProcessShooting(
-            firing,
+            properties.firing,
             holdShoot,
             pressShoot,
             playerController.playerProperties.reloading,
             playerController.playerProperties.roll,
             playerController.playerProperties.isDead.Value,
-            reloadValues.mags[^1],
+            properties.reloadValues.mags[^1],
             Time.deltaTime
         );
 
@@ -240,7 +226,7 @@ public class RocketLauncher : Gadget
         // ATUALIZADO: sem stateId
         playerController.playerProperties.firing = Firing.IsFiring();
 
-        if (reloadValues.mags[^1] <= 0) playerController.playerProperties.firing = false;
+        if (properties.reloadValues.mags[^1] <= 0) playerController.playerProperties.firing = false;
 
     }
 
@@ -251,7 +237,7 @@ public class RocketLauncher : Gadget
 
         if (equippableItemAnimator != null) equippableItemAnimator.StartFireAnimation();
 
-        int patternLength = recoilValues.recoilPattern.Length;
+        int patternLength = properties.recoilValues.recoilPattern.Length;
         if (patternLength > 0)
         {
             int recoilIndex = Firing.GetNextRecoilIndex(patternLength);
@@ -262,7 +248,7 @@ public class RocketLauncher : Gadget
 
         CreateBullet();
 
-        reloadValues.mags[^1] -= 1;
+        properties.reloadValues.mags[^1] -= 1;
     }
 
     private void ResetShotState()
@@ -281,12 +267,12 @@ public class RocketLauncher : Gadget
             applyRotationRecoilCoroutine = null;
         }
 
-        current_spread = Spread.ResetSpread(current_spread, spreadValues.baseSpread, spreadValues.spreadRecovery);
+        current_spread = Spread.ResetSpread(current_spread, properties.spreadValues.baseSpread, properties.spreadValues.spreadRecovery);
     }
 
     void CreateBullet()
     {
-        for (int i = 0; i < firing.bulletsPerShot; i++)
+        for (int i = 0; i < properties.firing.bulletsPerShot; i++)
         {
             SpawnBullet();
         }
@@ -298,7 +284,7 @@ public class RocketLauncher : Gadget
     {
         Quaternion finalRotation = Spread.CalculateSpreadRotation(shootPos.transform, current_spread);
 
-        current_spread = Spread.AddSpread(current_spread, spreadValues.spreadIncreaser, spreadValues.maxSpread);
+        current_spread = Spread.AddSpread(current_spread, properties.spreadValues.spreadIncreaser, properties.spreadValues.maxSpread);
 
         Projectile.ProjectileProperties prop = new Projectile.ProjectileProperties
         {
@@ -307,7 +293,7 @@ public class RocketLauncher : Gadget
             ignoredObject = transform.root
         };
 
-        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(missile, dummyMissile.gameObject, prop, projectileValues);
+        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(properties.missilePrefab, properties.dummyMissilePrefab.gameObject, prop, properties.projectileValues);
 
     }
 
@@ -315,11 +301,11 @@ public class RocketLauncher : Gadget
     IEnumerator ApplyVisualRecoilOffset(int recoilIndex, bool isFirstShot)
     {
         // Safety check
-        if (recoilIndex < 0 || recoilIndex >= recoilValues.recoilPattern.Length) recoilIndex = 0;
+        if (recoilIndex < 0 || recoilIndex >= properties.recoilValues.recoilPattern.Length) recoilIndex = 0;
 
         ApplyRecoilToCamera(
-            Recoil.GetVerticalRecoilDirection(recoilValues.recoilPattern[recoilIndex].verticalRecoil),
-            Recoil.GetHorizontalRecoilDirection(recoilValues.recoilPattern[recoilIndex].horizontalRecoil),
+            Recoil.GetVerticalRecoilDirection(properties.recoilValues.recoilPattern[recoilIndex].verticalRecoil),
+            Recoil.GetHorizontalRecoilDirection(properties.recoilValues.recoilPattern[recoilIndex].horizontalRecoil),
             isFirstShot
         );
 
@@ -330,10 +316,10 @@ public class RocketLauncher : Gadget
         yield return StartCoroutine(Recoil.ApplyPositionRecoilAnimation(
             start,
             target,
-            recoilValues.applyRecoilSpeed,
-            recoilValues.resetRecoilSpeed,
-            recoilValues.applyCurve,
-            recoilValues.resetCurve,
+            properties.recoilValues.applyRecoilSpeed,
+            properties.recoilValues.resetRecoilSpeed,
+            properties.recoilValues.applyCurve,
+            properties.recoilValues.resetCurve,
             visualRecoilApplierTransform.transform
         ));
     }
@@ -343,22 +329,22 @@ public class RocketLauncher : Gadget
         var recoil = Recoil.CalculateCameraRecoil(
             vr,
             hr,
-            recoilValues.firstShootRecoilMultiplier,
+            properties.recoilValues.firstShootRecoilMultiplier,
             isFirstShot,
-            reloadValues.mags[^1]
+            properties.reloadValues.mags[^1]
         );
 
         // Chamada direta para o ProcessCameraRecoil
         if (processCameraRecoil != null) processCameraRecoil.ApplyRecoil(recoil.vertical, recoil.horizontal);
 
     }
-    private Vector3 GetRecoilOffset() => Recoil.CalculateVisualRecoilOffset(recoilValues.visualPositionRecoil, playerController.playerProperties.aiming);
+    private Vector3 GetRecoilOffset() => Recoil.CalculateVisualRecoilOffset(properties.recoilValues.visualPositionRecoil, playerController.playerProperties.aiming);
     #endregion
 
     #region Bullet Concatenation
     private void ConcatenateBullets()
     {
-        if (reloadValues.mags == null || reloadValues.mags.Count == 0) return;
+        if (properties.reloadValues.mags == null || properties.reloadValues.mags.Count == 0) return;
 
         if (InputManager.GetKey(Settings.Instance._keybinds.WEAPON_composeBulletsKey) &&
             !playerController.playerProperties.firing &&
@@ -375,15 +361,15 @@ public class RocketLauncher : Gadget
         if (time_to_contatenate <= 0)
         {
             TransferBulletsBetweenMags();
-            time_to_contatenate = reloadValues.timeToTransferAmmo;
+            time_to_contatenate = properties.reloadValues.timeToTransferAmmo;
         }
     }
 
-    private void TransferBulletsBetweenMags() => ProcessReload.Reload.ReloadLogic.TransferBulletBetweenMags(reloadValues);
+    private void TransferBulletsBetweenMags() => ProcessReload.Reload.ReloadLogic.TransferBulletBetweenMags(properties.reloadValues);
     private void ResetConcatenation()
     {
         playerController.playerProperties.isComposingBullets = false;
-        time_to_contatenate = reloadValues.timeToTransferAmmo;
+        time_to_contatenate = properties.reloadValues.timeToTransferAmmo;
     }
     #endregion
 

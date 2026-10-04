@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-[RequireComponent(typeof(CameraZoomController))]
 public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
 {
 
@@ -16,6 +15,7 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
     [SerializeField, Min(0f)] private float sightSwitchDuration = 0.2f;
     [Tooltip("Time to reset the canted sight roll during reloading.")]
     [SerializeField, Min(0f)] private float reloadSightReturnDuration = 0.2f;
+    [SerializeField] private CameraZoomController cameraZoomController;
 
     public bool dot_position { get; private set; }
 
@@ -44,7 +44,7 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
     private bool canAim;
     private bool wasReloading;
     private float reloadSightRollBlend = 1f;
-    private CameraZoomController cameraZoomController;
+    
 
     public void Setup(Transform adsReference, float adsTimer, float zoom, bool canReloadAiming, EquippableItemAudio equippableItemAudio)
     {
@@ -97,7 +97,6 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
     protected override void Awake()
     {
         base.Awake();
-        cameraZoomController = GetComponent<CameraZoomController>();
         if (cameraZoomController == null) cameraZoomController = gameObject.AddComponent<CameraZoomController>();
         original_ads_position = transform.localPosition;
 
@@ -215,7 +214,7 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
             transform.localPosition = CalculateAimTargetLocalPosition();
             dot_position = true;
             isAimTransitionActive = true;
-            cameraZoomController.ZoomIn();
+            cameraZoomController.SetActive(true);
         }
 
         SetZoom(GetZoomForSight(currentSight));
@@ -242,7 +241,7 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
             transform.localPosition = CalculateAimTargetLocalPosition();
             dot_position = true;
             isAimTransitionActive = true;
-            cameraZoomController.ZoomIn();
+            cameraZoomController.SetActive(true);
         }
 
         SetZoom(GetZoomForSight(currentSight));
@@ -477,7 +476,7 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
         aiming = false;
         dot_position = false;
 
-        cameraZoomController.ZoomOut();
+        cameraZoomController.SetActive(false);
 
         if (isAimTransitionActive || (aimCoroutine == null && transform.localPosition != original_ads_position))
         {
@@ -535,12 +534,12 @@ public class AdsBehaviour : InMatchClientSingleton<AdsBehaviour>
             transform.localPosition = CalculateAimTargetLocalPosition();
 
             dot_position = true;
-            cameraZoomController.ZoomIn();
+            cameraZoomController.SetActive(true);
         }
         else if (!aiming)
         {
             transform.localPosition = original_ads_position;
-            cameraZoomController.ZoomOut();
+            cameraZoomController.SetActive(false);
         }
 
         aimCoroutine = null;

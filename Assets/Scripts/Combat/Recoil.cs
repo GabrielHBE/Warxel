@@ -9,6 +9,9 @@ public static class Recoil
     public const float MIN_FIRTSHOTINCREASER_VALUE = 0;
     public const float MAX_FIRTSHOTINCREASER_VALUE = 10;
 
+
+    private const float RECOIL_COPMPENSATOR = 1.5f;
+
     #region Camera Recoil
     public static (float vertical, float horizontal) CalculateCameraRecoil(
         float baseVertical,
@@ -67,16 +70,16 @@ public static class Recoil
 
     public static float GetHorizontalRecoilDirection(HorizontalRecoil horizontalRecoil)
     {
-        if (horizontalRecoil.type == HorizontalRecoilType.Left) return horizontalRecoil.value * -1;
+        if (horizontalRecoil.type == HorizontalRecoilType.Left) return horizontalRecoil.value * -1 / RECOIL_COPMPENSATOR;
 
-        return horizontalRecoil.value;
+        return horizontalRecoil.value / RECOIL_COPMPENSATOR;
     }
 
     public static float GetVerticalRecoilDirection(VerticalRecoil verticalRecoil)
     {
-        if (verticalRecoil.type == VerticalRecoilType.Down) return verticalRecoil.value * -1;
+        if (verticalRecoil.type == VerticalRecoilType.Down) return verticalRecoil.value * -1 / RECOIL_COPMPENSATOR;
 
-        return verticalRecoil.value;
+        return verticalRecoil.value / RECOIL_COPMPENSATOR;
     }
     #endregion
 

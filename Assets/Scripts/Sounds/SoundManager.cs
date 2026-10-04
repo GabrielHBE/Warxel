@@ -172,9 +172,10 @@ public class SoundManager : ServerSingleton<SoundManager>
 
     private static void SetupLoopAudio(string namePrefix, AudioClip clip, SoundProperties props, Transform target, bool is3D)
     {
+        if (clip == null) return;
         foreach (var existingLoop in loopAudioList)
         {
-            if (existingLoop.target == target && existingLoop.audioSource != null && existingLoop.audioSource.clip == clip)
+            if (MatchesLoopAudio(existingLoop, clip, target))
             {
                 if (!existingLoop.audioSource.isPlaying) existingLoop.audioSource.Play();
                 return;
@@ -206,11 +207,17 @@ public class SoundManager : ServerSingleton<SoundManager>
     #endregion
 
     #region Helpers de Modificação de Áudio
+    private static bool MatchesLoopAudio(LoopAudio loopAudio, AudioClip clip, Transform target)
+    {
+        AudioClip playingClip = loopAudio.audioSource != null ? loopAudio.audioSource.clip : null;
+        return clip != null && playingClip != null && loopAudio.target == target && playingClip.name == clip.name;
+    }
+
     private static void ModifyLoopAudio(AudioClip clip, Transform target, Action<AudioSource> action)
     {
         foreach (var loopAudio in loopAudioList)
         {
-            if (loopAudio.target == target && loopAudio.audioSource != null && loopAudio.audioSource.clip == clip) action(loopAudio.audioSource);
+            if (MatchesLoopAudio(loopAudio, clip, target)) action(loopAudio.audioSource);
         }
     }
 
@@ -218,7 +225,7 @@ public class SoundManager : ServerSingleton<SoundManager>
     {
         loopAudioList.RemoveAll(loopAudio =>
         {
-            if (loopAudio.target == target && loopAudio.audioSource != null && loopAudio.audioSource.clip == clip)
+            if (MatchesLoopAudio(loopAudio, clip, target))
             {
                 loopAudio.audioSource.Stop();
                 if (loopAudio.gameObject.TryGetComponent(out LocalPooledObject pooled)) pooled.Deactivate();

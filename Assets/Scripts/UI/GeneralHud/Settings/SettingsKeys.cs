@@ -19,6 +19,7 @@ internal static class SettingsKeys
     public const string CROUCH_HOLD = "CrouchHold";
     public const string PRONE_HOLD = "ProneHold";
     public const string VEHICLE_BOOST_HOLD = "VehicleBoostHold";
+    public const string BLOCK_VEHICLE_MOUSE_ROTATION_DURING_FREELOOK = "BlockVehicleMouseRotationDuringFreeLook";
     public const string INVERT_VERTICAL_INFANTRY = "InvertVerticalInfantry";
     public const string INFANTRY_SENSIBILITY = "InfantrySensibility";
     public const string INFANTRY_AIM_SENSIBILITY = "InfantryAimSensibility";

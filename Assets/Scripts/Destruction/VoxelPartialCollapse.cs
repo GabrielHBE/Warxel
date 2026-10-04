@@ -5,9 +5,11 @@ using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 
+[RequireComponent(typeof(NetworkTransform))]
 public class VoxelPartialCollapse : VoxelDestruction
 {
-    [SerializeField] protected VoxelPartialCollapse[] chainCollapse;
+    [Tooltip("Pieces destroyed by this piece's destruction event. Supports whole pieces and fragment roots.")]
+    [SerializeField] protected VoxelDestruction[] chainCollapse;
     [SerializeField] protected DamageModelSwap[] damageModelSwap;
 
     [Header("Debris performance")]
@@ -15,7 +17,7 @@ public class VoxelPartialCollapse : VoxelDestruction
     [SerializeField] private Collider debrisCollider;
     [Tooltip("Optional layer whose collision matrix controls rubble-to-rubble contacts.")]
     [SerializeField] private string debrisLayer = "";
-    [SerializeField] private bool settleWhenResting;
+    [SerializeField] private bool settleWhenResting = true;
     [Min(0.25f)] [SerializeField] private float restingDuration = 1.5f;
     [Min(0f)] [SerializeField] private float restingLinearSpeed = 0.15f;
     [Min(0f)] [SerializeField] private float restingAngularSpeed = 0.15f;
@@ -31,10 +33,12 @@ public class VoxelPartialCollapse : VoxelDestruction
     private int collapsedLayer;
     private Vector3 initialLocalPosition;
     private Quaternion initialLocalRotation;
+    private Mesh initialMesh;
+    private Material initialMaterial;
 
     protected override void Start() => EnsureInitialized();
 
-    private void EnsureInitialized()
+    protected void EnsureInitialized()
     {
         if (initialized) return;
         base.Start();
@@ -43,7 +47,13 @@ public class VoxelPartialCollapse : VoxelDestruction
         if (collapsedLayer < 0) collapsedLayer = intactLayer;
         initialLocalPosition = transform.localPosition;
         initialLocalRotation = transform.localRotation;
+        initialMesh = meshFilter.sharedMesh;
+        initialMaterial = meshRenderer.sharedMaterial;
         networkTransform = GetComponent<NetworkTransform>();
+        // This component owns kinematic state. FishNet must not overwrite it
+        // during host startup or ownership callbacks.
+        if (networkTransform != null)
+            networkTransform._componentConfiguration = NetworkTransform.ComponentConfigurationType.Disabled;
 
         if (debrisCollider == null)
         {
@@ -92,14 +102,14 @@ public class VoxelPartialCollapse : VoxelDestruction
         base.OnStopNetwork();
     }
 
-    private void OnEnable()
+    protected virtual void OnEnable()
     {
         if (initialized && NetworkObject != null && IsSpawned) ApplyCollapseState();
     }
 
-    private void OnDisable() => StopSettling();
+    protected virtual void OnDisable() => StopSettling();
 
-    private void OnDestroy()
+    protected virtual void OnDestroy()
     {
         damageTaken.OnChange -= OnDamageTakenChanged;
         isDestroyed.OnChange -= OnDestroyedChanged;
@@ -124,7 +134,7 @@ public class VoxelPartialCollapse : VoxelDestruction
         ApplyCollapseState();
     }
 
-    private void ApplyCollapseState()
+    protected virtual void ApplyCollapseState()
     {
         EnsureInitialized();
         bool collapsed = isDestroyed.Value;
@@ -150,6 +160,12 @@ public class VoxelPartialCollapse : VoxelDestruction
 
     private void UpdateModel(float currentDamage)
     {
+        if (currentDamage <= 0f)
+        {
+            meshFilter.sharedMesh = initialMesh;
+            meshCollider.sharedMesh = initialMesh;
+            meshRenderer.sharedMaterial = initialMaterial;
+        }
         if (damageModelSwap == null) return;
         foreach (var swap in damageModelSwap)
         {
@@ -173,17 +189,18 @@ public class VoxelPartialCollapse : VoxelDestruction
     [Server]
     public override void Destroy()
     {
-        if (isDestroyed.Value) return;
+        if (!IsSpawned || isDestroyed.Value) return;
         EnsureInitialized();
         damageTaken.Value = damageToDestroy;
         isDestroyed.Value = true;
         ApplyCollapseState();
         ApplyRandomTorque();
+        NotifyDestroyedOnServer();
 
         if (chainCollapse == null) return;
-        foreach (VoxelPartialCollapse vox in chainCollapse)
+        foreach (VoxelDestruction vox in chainCollapse)
         {
-            if (vox != null) vox.ApplyDamageOnServer(vox.damageToDestroy);
+            VoxelDestructionScheduler.Enqueue(vox);
         }
     }
 
@@ -228,7 +245,7 @@ public class VoxelPartialCollapse : VoxelDestruction
         settleRoutine = null;
     }
 
-    private void OnCollisionEnter(Collision collision)
+    protected virtual void OnCollisionEnter(Collision collision)
     {
         if (NetworkObject == null || !IsServerInitialized || !isDestroyed.Value || isSettled.Value) return;
         if (collision.gameObject.layer == LayerMask.NameToLayer("Vehicle"))
@@ -238,13 +255,17 @@ public class VoxelPartialCollapse : VoxelDestruction
     }
 
     [Server]
-    public void ResetCollapse()
+    public virtual void ResetCollapse()
     {
         EnsureInitialized();
+        InvalidatePendingDestruction();
         StopSettling();
         isDestroyed.Value = false;
         isSettled.Value = false;
         damageTaken.Value = 0;
+        meshFilter.sharedMesh = initialMesh;
+        meshCollider.sharedMesh = initialMesh;
+        meshRenderer.sharedMaterial = initialMaterial;
         ApplyCollapseState();
         transform.localPosition = initialLocalPosition;
         transform.localRotation = initialLocalRotation;

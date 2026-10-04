@@ -14,11 +14,12 @@ public class LockInMissile : Missile
 
     public override void CreateProjectile(ProjectileProperties prop, ProjectileValues values)
     {
-        SetVisualsActive(true);
         Activate();
 
         SetProjectileValues(values);
         SetProjectileProperties(prop);
+
+        SetVisualsActive(true);
 
         StopAllCoroutines();
         //StartCoroutine(DespawnTimer());

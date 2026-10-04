@@ -10,6 +10,7 @@ public partial class SettingsHUD
     public void OnCrouchHoldChanged() => _controlsController?.SetCrouchHold();
     public void OnProneHoldChanged() => _controlsController?.SetProneHold();
     public void OnVehicleBoostHoldChanged() => _controlsController?.SetVehicleBoostHold();
+    public void OnBlockVehicleMouseRotationDuringFreeLookChanged() => _controlsController?.SetBlockVehicleMouseRotationDuringFreeLook();
     public void OnInvertVerticalInfantryChanged() => _controlsController?.SetInvertVerticalInfantry();
     public void OnInfantrySensibilityChanged(TextMeshProUGUI text) => _controlsController?.SetInfantrySensitivity(text);
     public void OnInfantryAimSensibilityChanged(TextMeshProUGUI text) => _controlsController?.SetInfantryAimSensitivity(text);
@@ -145,6 +146,8 @@ public partial class SettingsHUD
     public void StartRebindVehicleCountermeasure() => StartRebinding("VEHICLE_countermeasureKey");
     public void StartRebindVehicleSwitchFireMode() => StartRebinding("VEHICLE_switchFireModeKey");
     public void StartRebindVehicleSwitchSeat() => StartRebinding("VEHICLE_switchSeatKey");
+    public void StartRebindVehicleBoost() => StartRebinding("VEHICLE_boost_key");
+    public void StartRebindVehicleZoom() => StartRebinding("VEHICLE_zoom_key");
     public void StartRebindVehicleWeapon1() => StartRebinding("VEHICLE_weapon1");
     public void StartRebindVehicleWeapon2() => StartRebinding("VEHICLE_weapon2");
     public void StartRebindVehicleWeapon3() => StartRebinding("VEHICLE_weapon3");
@@ -154,7 +157,6 @@ public partial class SettingsHUD
     public void StartRebindVehicleWeapon7() => StartRebinding("VEHICLE_weapon7");
     public void StartRebindVehicleWeapon8() => StartRebinding("VEHICLE_weapon8");
     public void StartRebindVehicleWeapon9() => StartRebinding("VEHICLE_weapon9");
-    public void StartRebindJetBoost() => StartRebinding("JET_boostKey");
     public void StartRebindJetShootVehicle() => StartRebinding("JET_shootVehicleKey");
     public void StartRebindJetPitchUp() => StartRebinding("JET_pitchUpKey");
     public void StartRebindJetPitchDown() => StartRebinding("JET_pitchDownKey");
@@ -172,7 +174,6 @@ public partial class SettingsHUD
     public void StartRebindHelicopterPitchDown() => StartRebinding("HELICOPTER_pitch_down_key");
     public void StartRebindHelicopterLeanLeft() => StartRebinding("HELICOPTER_lean_left_key");
     public void StartRebindHelicopterLeanRight() => StartRebinding("HELICOPTER_lean_right_key");
-    public void StartRebindHelicopterZoom() => StartRebinding("HELICOPTER_zoom_key");
     public void StartRebindHelicopterGunnerSeat() => StartRebinding("HELICOPTER_gunner_seat_key");
     public void StartRebindHelicopterPilotSeat() => StartRebinding("HELICOPTER_pilot_seat_key");
     public void StartRebindTankIncreaseThrottle() => StartRebinding("TANK_increase_throtlle");
@@ -180,8 +181,6 @@ public partial class SettingsHUD
     public void StartRebindTankTurnLeft() => StartRebinding("TANK_turn_left_key");
     public void StartRebindTankTurnRight() => StartRebinding("TANK_turn_right_key");
     public void StartRebindTankShoot() => StartRebinding("TANK_shoot_key");
-    public void StartRebindTankZoom() => StartRebinding("TANK_zoom_key");
-    public void StartRebindTankBoost() => StartRebinding("TANK_boostKey");
     public void StartRebindTankGunnerSeat() => StartRebinding("TANK_gunner_seat_key");
     public void StartRebindTankPilotSeat() => StartRebinding("TANK_pilot_seat_key");
 

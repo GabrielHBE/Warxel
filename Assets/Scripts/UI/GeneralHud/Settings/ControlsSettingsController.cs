@@ -8,6 +8,7 @@ internal sealed class ControlsSettingsView
     public Toggle CrouchHold;
     public Toggle ProneHold;
     public Toggle VehicleBoostHold;
+    public Toggle BlockVehicleMouseRotationDuringFreeLook;
     public Toggle InvertVerticalInfantry;
     public Slider InfantrySensitivity;
     public Slider InfantryAimSensitivity;
@@ -31,6 +32,7 @@ internal sealed class ControlsSettingsController : ISettingsSection
         SettingsKeys.CROUCH_HOLD,
         SettingsKeys.PRONE_HOLD,
         SettingsKeys.VEHICLE_BOOST_HOLD,
+        SettingsKeys.BLOCK_VEHICLE_MOUSE_ROTATION_DURING_FREELOOK,
         SettingsKeys.INVERT_VERTICAL_INFANTRY,
         SettingsKeys.INFANTRY_SENSIBILITY,
         SettingsKeys.INFANTRY_AIM_SENSIBILITY,
@@ -75,6 +77,7 @@ internal sealed class ControlsSettingsController : ISettingsSection
     public void SetCrouchHold() => SetToggle(view.CrouchHold, value => model.is_crouch_on_hold = value, SettingsKeys.CROUCH_HOLD);
     public void SetProneHold() => SetToggle(view.ProneHold, value => model.is_prone_on_hold = value, SettingsKeys.PRONE_HOLD);
     public void SetVehicleBoostHold() => SetToggle(view.VehicleBoostHold, value => model.is_vehicle_boost_on_hold = value, SettingsKeys.VEHICLE_BOOST_HOLD);
+    public void SetBlockVehicleMouseRotationDuringFreeLook() => SetToggle(view.BlockVehicleMouseRotationDuringFreeLook, value => model.block_vehicle_mouse_rotation_during_freelook = value, SettingsKeys.BLOCK_VEHICLE_MOUSE_ROTATION_DURING_FREELOOK);
     public void SetInvertVerticalInfantry() => SetToggle(view.InvertVerticalInfantry, value => model.invert_vertical_infantary_mouse = value, SettingsKeys.INVERT_VERTICAL_INFANTRY);
     public void SetInvertVerticalTank() => SetToggle(view.InvertVerticalTank, value => model.invert_vertical_tank_mouse = value, SettingsKeys.INVERT_VERTICAL_TANK);
     public void SetInvertVerticalJet() => SetToggle(view.InvertVerticalJet, value => model.invert_vertical_jet_mouse = value, SettingsKeys.INVERT_VERTICAL_JET);
@@ -143,6 +146,7 @@ internal sealed class ControlsSettingsController : ISettingsSection
         model.is_crouch_on_hold = GetBool(SettingsKeys.CROUCH_HOLD, defaults.CrouchHold, useStoredValues);
         model.is_prone_on_hold = GetBool(SettingsKeys.PRONE_HOLD, defaults.ProneHold, useStoredValues);
         model.is_vehicle_boost_on_hold = GetBool(SettingsKeys.VEHICLE_BOOST_HOLD, defaults.VehicleBoostHold, useStoredValues);
+        model.block_vehicle_mouse_rotation_during_freelook = GetBool(SettingsKeys.BLOCK_VEHICLE_MOUSE_ROTATION_DURING_FREELOOK, defaults.BlockVehicleMouseRotationDuringFreeLook, useStoredValues);
         model.invert_vertical_infantary_mouse = GetBool(SettingsKeys.INVERT_VERTICAL_INFANTRY, defaults.InvertInfantry, useStoredValues);
         model.infantary_sensibility = GetFloat(SettingsKeys.INFANTRY_SENSIBILITY, defaults.InfantrySensitivity, useStoredValues);
         model.infantary_aim_sensibility = GetFloat(SettingsKeys.INFANTRY_AIM_SENSIBILITY, defaults.InfantryAimSensitivity, useStoredValues);
@@ -161,6 +165,7 @@ internal sealed class ControlsSettingsController : ISettingsSection
         view.CrouchHold?.SetIsOnWithoutNotify(model.is_crouch_on_hold);
         view.ProneHold?.SetIsOnWithoutNotify(model.is_prone_on_hold);
         view.VehicleBoostHold?.SetIsOnWithoutNotify(model.is_vehicle_boost_on_hold);
+        view.BlockVehicleMouseRotationDuringFreeLook?.SetIsOnWithoutNotify(model.block_vehicle_mouse_rotation_during_freelook);
         view.InvertVerticalInfantry?.SetIsOnWithoutNotify(model.invert_vertical_infantary_mouse);
         view.InfantrySensitivity?.SetValueWithoutNotify(model.infantary_sensibility);
         view.InfantryAimSensitivity?.SetValueWithoutNotify(model.infantary_aim_sensibility);
@@ -211,6 +216,7 @@ internal sealed class ControlsSettingsController : ISettingsSection
         public readonly bool CrouchHold;
         public readonly bool ProneHold;
         public readonly bool VehicleBoostHold;
+        public readonly bool BlockVehicleMouseRotationDuringFreeLook;
         public readonly bool InvertInfantry;
         public readonly float InfantrySensitivity;
         public readonly float InfantryAimSensitivity;
@@ -231,6 +237,7 @@ internal sealed class ControlsSettingsController : ISettingsSection
             CrouchHold = model.is_crouch_on_hold;
             ProneHold = model.is_prone_on_hold;
             VehicleBoostHold = model.is_vehicle_boost_on_hold;
+            BlockVehicleMouseRotationDuringFreeLook = model.block_vehicle_mouse_rotation_during_freelook;
             InvertInfantry = model.invert_vertical_infantary_mouse;
             InfantrySensitivity = model.infantary_sensibility;
             InfantryAimSensitivity = model.infantary_aim_sensibility;

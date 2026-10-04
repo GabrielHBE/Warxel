@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
@@ -21,6 +22,8 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     public CapsuleCollider stand_collider;
     public CapsuleCollider crouch_collider;
     public CapsuleCollider prone_collider;
+    [Tooltip("Tempo para o servidor aguardar uma requisicao de entrada antes de confirmar dano de colisao de veiculo.")]
+    [SerializeField, Min(0f)] private float vehicleCollisionDamageGracePeriod = 0.5f;
 
     [Header("Camera Settings")]
     public Camera playerCamera;
@@ -133,6 +136,8 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private enum PlayerStance { Stand, Crouch, Prone, Disabled }
     private PlayerStance currentStance = PlayerStance.Disabled;
+    private bool vehicleCollisionProtectionActive;
+    private uint vehicleCollisionProtectionVersion;
 
     private readonly struct CapsuleGeometry
     {
@@ -178,7 +183,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     {
         if (!IsOwner) return;
 
-        if (playerProperties.isInVehicle)
+        if (playerProperties.isInVehicle || vehicleCollisionProtectionActive)
         {
             UpdateColliderStateLocal();
             CancelVoxelStep();
@@ -211,7 +216,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     {
         if (!IsOwner) return;
 
-        if (playerProperties.isDead.Value || playerProperties.isInVehicle)
+        if (playerProperties.isDead.Value || playerProperties.isInVehicle || vehicleCollisionProtectionActive)
         {
             moveForward = 0;
             moveHorizontal = 0;
@@ -1038,7 +1043,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     private PlayerStance GetTargetStance()
     {
-        if (playerProperties.isDead.Value || playerProperties.isInVehicle) return PlayerStance.Disabled;
+        if (playerProperties.isDead.Value || playerProperties.isInVehicle || vehicleCollisionProtectionActive) return PlayerStance.Disabled;
         if (playerProperties.proned) return PlayerStance.Prone;
         if (playerProperties.crouched || playerProperties.roll) return PlayerStance.Crouch;
         return PlayerStance.Stand;
@@ -1099,6 +1104,52 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         if (stand_collider.enabled) stand_collider.enabled = false;
         if (prone_collider.enabled) prone_collider.enabled = false;
         if (crouch_collider.enabled) crouch_collider.enabled = false;
+    }
+
+    public bool BeginVehicleEntry()
+    {
+        if (!IsOwner || playerProperties.isDead.Value || playerProperties.isInVehicle || vehicleCollisionProtectionActive)
+            return false;
+
+        SetVehicleCollisionProtectionLocal(true);
+        CancelVoxelStep();
+        moveForward = 0f;
+        moveHorizontal = 0f;
+        jumpRequested = false;
+        return true;
+    }
+
+    [Server]
+    public void SetVehicleCollisionProtectionServer(bool protectedState)
+    {
+        if (protectedState) vehicleCollisionProtectionVersion++;
+        SetVehicleCollisionProtectionLocal(protectedState);
+        RpcSetVehicleCollisionProtection(protectedState);
+    }
+
+    public void EndVehicleCollisionProtection()
+    {
+        SetVehicleCollisionProtectionLocal(false);
+
+        if (!IsOwner) return;
+
+        if (IsServerInitialized) SetVehicleCollisionProtectionServer(false);
+        else CmdEndVehicleCollisionProtection();
+    }
+
+    [ServerRpc(RequireOwnership = true)]
+    private void CmdEndVehicleCollisionProtection() => SetVehicleCollisionProtectionServer(false);
+
+    [ObserversRpc]
+    private void RpcSetVehicleCollisionProtection(bool protectedState) =>
+        SetVehicleCollisionProtectionLocal(protectedState);
+
+    private void SetVehicleCollisionProtectionLocal(bool protectedState)
+    {
+        vehicleCollisionProtectionActive = protectedState;
+        PlayerStance targetStance = GetTargetStance();
+        ApplyColliderStance(targetStance);
+        currentStance = targetStance;
     }
 
 
@@ -1195,6 +1246,51 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         if (IsServerStarted) ServerApplyDamage(rawDamage);
         else CmdApplyDamage(rawDamage);
 
+    }
+
+    public void TakeVehicleCollisionDamage(float rawDamage)
+    {
+        if (playerProperties.isDead.Value || vehicleCollisionProtectionActive || playerProperties.isInVehicle) return;
+
+        if (IsServerStarted) ServerApplyVehicleCollisionDamage(rawDamage);
+        else CmdApplyVehicleCollisionDamage(rawDamage);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void CmdApplyVehicleCollisionDamage(float rawDamage) => ServerApplyVehicleCollisionDamage(rawDamage);
+
+    [Server]
+    private void ServerApplyVehicleCollisionDamage(float rawDamage)
+    {
+        if (vehicleCollisionProtectionActive || playerProperties.isInVehicle) return;
+
+        if (vehicleCollisionDamageGracePeriod <= 0f)
+        {
+            ServerApplyDamage(rawDamage);
+            return;
+        }
+
+        StartCoroutine(ServerApplyVehicleCollisionDamageAfterGrace(
+            rawDamage,
+            vehicleCollisionProtectionVersion
+        ));
+    }
+
+    private IEnumerator ServerApplyVehicleCollisionDamageAfterGrace(float rawDamage, uint protectionVersion)
+    {
+        yield return new WaitForSeconds(vehicleCollisionDamageGracePeriod);
+
+        // If an entry started at any point during the grace period, this collision
+        // belongs to the transition and must not be applied, even after a quick exit.
+        if (protectionVersion != vehicleCollisionProtectionVersion ||
+            vehicleCollisionProtectionActive ||
+            playerProperties.isInVehicle ||
+            playerProperties.isDead.Value)
+        {
+            yield break;
+        }
+
+        ServerApplyDamage(rawDamage);
     }
 
     [ServerRpc(RequireOwnership = false)]

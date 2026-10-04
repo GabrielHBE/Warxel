@@ -11,6 +11,7 @@ public class Barrel : Attatchment
     public float firstShootRecoilChange;
     public int muzzleVelocityChange;
     public float adsSpeedChange;
+    public float spreadChange;
 
     private void OnEnable()
     {

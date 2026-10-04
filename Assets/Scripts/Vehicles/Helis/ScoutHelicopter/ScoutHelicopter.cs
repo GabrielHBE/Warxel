@@ -25,4 +25,9 @@ public class ScoutHelicopter : Helicopter
             return;
         }
     }
+
+    protected override void UpdateAnimator()
+    {
+        throw new System.NotImplementedException();
+    }
 }

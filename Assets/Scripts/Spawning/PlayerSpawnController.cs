@@ -264,10 +264,8 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     [ServerRpc]
     private void SpawnPlayerAndVehicle(Vector3 spawnPosition, Quaternion spawnRotation, Vehicle vehiclePrefab, ClassManager.Class playerClass, FactionManager.Faction playerFaction, string playerName)
     {
-        // 1. Instancia o Player na rede
         player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
 
-        // CORREÇÃO: Define a classe e facção no servidor IMEDIATAMENTE após instanciar e antes do spawn
         PlayerProperties props = player_instantiated.GetComponent<PlayerProperties>();
         props.selectedClass.Value = playerClass;
         props.faction.Value = playerFaction;
@@ -275,17 +273,13 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
 
         NetworkObject playerNetObj = player_instantiated.GetComponent<NetworkObject>();
         Spawn(playerNetObj, Owner);
+        TargetOnSpawnPlayerComplete(Owner, player_instantiated);
 
-        // 2. Instancia e Spawna o Veículo na rede
         GameObject spawnedVehicle = Instantiate(vehiclePrefab.gameObject, spawnPosition, spawnRotation);
         Vehicle vScript = spawnedVehicle.GetComponent<Vehicle>();
         Spawn(spawnedVehicle);
-
-        // 3. Força a entrada do player (Agora a classe já está validada!)
         vScript.EnterVehicle(Owner, player_instantiated);
 
-        // 4. Atualiza o Cliente original de que o spawn terminou
-        TargetOnSpawnPlayerComplete(Owner, player_instantiated);
     }
 
     [ServerRpc]
@@ -293,7 +287,6 @@ public class PlayerSpawnController : ServerSingleton<PlayerSpawnController>
     {
         player_instantiated = Instantiate(player_prefab, spawnPosition, spawnRotation);
 
-        // CORREÇÃO: Define a classe e facção no servidor
         PlayerProperties props = player_instantiated.GetComponent<PlayerProperties>();
         props.selectedClass.Value = playerClass;
         props.faction.Value = playerFaction;

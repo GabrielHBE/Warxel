@@ -2,10 +2,10 @@ using UnityEngine;
 using FishNet.Object;
 using System.Collections.Generic;
 
-public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
+public class ScoutHelicopterMainMinigun : VehicleArmory
 {
-    private bool isActive = true;
-    public ScoutHelicopterMainMinigunProperties properties;
+    private VehicleArmoryFireAudio fireAudio;
+    private VehicleArmoryVisualRecoil visualRecoil;
 
     [Header("Minigun Rotation Settings")]
     [SerializeField] private float maxRotationSpeed = 5000f;
@@ -15,31 +15,36 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
     [Header("Miniguns Configuration")]
     [SerializeField] private List<MinigunDictionaryWrapper> miniguns = new List<MinigunDictionaryWrapper>();
 
-    // REMOVIDO: private int firingStateId;
-    private bool wasOverheatedLastFrame = false;
-
     // Weapon State Variables
     private float _currentSpread;
     private float _currentRotationSpeed = 0f;
 
-    void Awake()
+    protected override void Awake()
     {
+        SetCameraActive(false);
+        fireAudio = new VehicleArmoryFireAudio(properties, transform);
+        visualRecoil = new VehicleArmoryVisualRecoil(this, properties);
+        properties.recoilValues.CalculateRecoilSpeed(properties.firing.interval);
         // ATUALIZADO: sem stateId, apenas reseta o estado
         Firing.ResetState(properties.firing.fireModes);
         // Garante que o estado de superaquecimento comece falso
         properties.heatValues.heatState.isOverheated = false;
     }
 
-    void Update()
+    protected override void Update()
     {
         if (!IsOwner)
         {
+            fireAudio.Stop();
+            visualRecoil.Reset();
             CoolDownCannon(Time.deltaTime);
             return;
         }
 
         if (!isActive)
         {
+            fireAudio.Stop();
+            visualRecoil.Reset();
             CoolDownCannon(Time.deltaTime);
             return;
         }
@@ -47,6 +52,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
         // Se estiver superaquecido, força o resfriamento
         if (Heating.isOverheated(properties.heatValues))
         {
+            fireAudio.Stop();
             if (!wasOverheatedLastFrame)
             {
                 wasOverheatedLastFrame = true;
@@ -92,8 +98,8 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 
     private void ExecuteFire()
     {
-        SoundManager.Instance.RequestPlay3dSound(properties.shootSound.clip.name, properties.shootSound.properties, transform.position, false);
-        SoundManager.Play2dSoundLocal(properties.shootSound.clip, properties.shootSound.properties);
+        fireAudio.OnShot();
+        visualRecoil.Play();
 
         FireAllMiniguns();
     }
@@ -135,28 +141,8 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 
         properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
     }
-
-
-    public float GetMaxHeat()
-    {
-        return properties.heatValues.maxHeat;
-    }
-
     #region Interface Methods
-    public void SetupFiringSystem()
-    {
-        Firing.ResetState(properties?.firing.fireModes);
-
-        // Garante que o modo de tiro estático atual é válido para este armamento
-        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
-        {
-            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
-            {
-                Firing.SwitchFireMode(properties.firing);
-            }
-        }
-    }
-    public void Shoot()
+    public override void Shoot()
     {
         float deltaTime = Time.deltaTime;
 
@@ -167,6 +153,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
         // Verifica se está superaquecido (usando o estado persistente)
         if (Heating.isOverheated(properties.heatValues))
         {
+            fireAudio.Stop();
             // Força o resfriamento
             CoolDownCannon(deltaTime);
             return;
@@ -189,6 +176,9 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
 
         // Obtém o estado atual de disparo (sem stateId)
         Firing.FireMode currentMode = Firing.GetCurrentFireMode();
+        fireAudio.Update(currentMode == Firing.FireMode.Auto ? isInputHeld
+            : currentMode == Firing.FireMode.Burst ? Firing.IsBursting() || shootResult.shouldShoot
+            : shootResult.shouldShoot);
 
         if (shootResult.shouldShoot)
         {
@@ -206,6 +196,7 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
             {
                 // Marca como superaquecido
                 properties.heatValues.heatState.isOverheated = true;
+                fireAudio.Stop();
 
                 // Aplica um pequeno resfriamento para começar a esfriar
                 properties.heatValues.heatState.currentHeat = Heating.HandleCooling(properties.heatValues, deltaTime);
@@ -217,24 +208,12 @@ public class ScoutHelicopterMainMinigun : NetworkBehaviour, IVehicleArmory
             CoolDownCannon(deltaTime);
         }
     }
-
-    public Sprite GetArmoryIcon() => properties.hudIcon;
-
-    public void ActivateArmory()
+    private void OnDisable()
     {
-        isActive = true;
-        // ATUALIZADO: sem stateId
-        SetupFiringSystem();
+        SetCameraActive(false);
+        fireAudio?.Stop();
+        visualRecoil?.Reset();
     }
-
-    public void DeactivateArmory()
-    {
-        isActive = false;
-    }
-
-    public string GetCurrentAmmo() => null;
-    public float GetHeatingLevel() => properties.heatValues.heatState.currentHeat;
-    public float GetMaxOverheat() => properties.heatValues.maxHeat;
     #endregion
 
     #region INNER CLASSES   

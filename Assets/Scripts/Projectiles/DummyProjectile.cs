@@ -17,6 +17,7 @@ public class DummyProjectile : LocalPooledObject
     private Transform ignoredTransform;
     private Vector3 lastPosition;
     private float bulletDropMultiplier;
+    private float projectileDrag;
     private int layerMask;
 
     protected bool isSetup;
@@ -31,9 +32,9 @@ public class DummyProjectile : LocalPooledObject
     public virtual void CreateProjectile(Projectile.ProjectileProperties prop, Projectile.ProjectileValues values)
     {
         SetProjectileProperties(prop);
+        SetProjectileValues(values);
 
         lastPosition = transform.position;
-        bulletDropMultiplier = values.dropMultiplier;
 
         Activate();
 
@@ -49,10 +50,17 @@ public class DummyProjectile : LocalPooledObject
         rb.rotation = prop.rotation;
         transform.position = prop.position;
         transform.rotation = prop.rotation;
+        lastPosition = prop.position;
         ignoredTransform = prop.ignoredObject;
         // Sincroniza sons e efeitos customizados caso existam
         if (prop.customHitSound != null && soundEffects != null) soundEffects.SetCustomHitSound(prop.customHitSound, prop.customHitSoundProperties);
         if (prop.customHitEffect != null && hitEffects != null) hitEffects.SetCustomHitEffect(prop.customHitEffect);
+    }
+
+    protected virtual void SetProjectileValues(Projectile.ProjectileValues values)
+    {
+        bulletDropMultiplier = values.dropMultiplier;
+        projectileDrag = values.projectileDrag;
     }
 
     protected IEnumerator DelayToEnable(float delay)
@@ -70,17 +78,15 @@ public class DummyProjectile : LocalPooledObject
     {
         if (hitEffects != null) hitEffects.CustomHitEffect(hitPoint);
 
-        if (hitObject.layer == LayerMask.NameToLayer("Voxel"))
+        if (ProcessHit.TryGetVoxel(hitObject, out _))
         {
-            /*
-            VoxelObjBase voxelObj = hitObject.GetComponent<VoxelObjBase>();
-            if (voxelObj != null)
-            {
-                VoxelMaterials.VoxelMaterialType material = voxelObj.material;
-                if (hitEffects != null) hitEffects.VoxelHitEffect(hitPoint, material);
-                if (soundEffects != null) soundEffects.RequestVoxelHitSound(hitPoint, material);
-            }
-            */
+            VoxelObj materialSource = hitObject.GetComponentInParent<VoxelObj>();
+            VoxelObj.VoxelMaterialType material = materialSource != null
+                ? materialSource.voxelMaterialType
+                : VoxelObj.VoxelMaterialType.Concrete;
+
+            if (hitEffects != null) hitEffects.VoxelHitEffect(hitPoint, material);
+            if (soundEffects != null) soundEffects.RequestVoxelHitSound(hitPoint, material);
 
         }
 
@@ -120,10 +126,25 @@ public class DummyProjectile : LocalPooledObject
 
     public override void LocalFixedUpdate()
     {
+        if (!isSetup || rb == null) return;
+
+        ProcessRaycastHitValidation();
         if (!isSetup) return;
 
+        ApplyProjectileDrag();
         rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);
-        ProcessRaycastHitValidation();
+    }
+
+    protected void ApplyProjectileDrag()
+    {
+        if (rb == null || rb.isKinematic || projectileDrag == 0f) return;
+
+        Vector3 velocity = rb.linearVelocity;
+        float speed = velocity.magnitude;
+        Vector3 direction = speed > 0f ? velocity / speed : transform.forward;
+        float nextSpeed = Mathf.Max(0f, speed + projectileDrag * Time.fixedDeltaTime);
+
+        rb.linearVelocity = direction * nextSpeed;
     }
 
     protected void ProcessRaycastHitValidation()
@@ -204,12 +225,17 @@ public class DummyProjectile : LocalPooledObject
         {
             trailRenderer.Clear();
             trailRenderer.enabled = active;
+            trailRenderer.emitting = active;
         }
 
         if (particle != null)
         {
-            if (active) particle.Play();
-            else particle.Stop();
+            if (active)
+            {
+                particle.Clear(true);
+                particle.Play(true);
+            }
+            else particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
     }
 }

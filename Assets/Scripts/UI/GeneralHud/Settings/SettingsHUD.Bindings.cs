@@ -39,6 +39,7 @@ public partial class SettingsHUD
     [SerializeField] private Toggle crouchHoldToggle;
     [SerializeField] private Toggle proneHoldToggle;
     [SerializeField] private Toggle vehicleBoostHoldToggle;
+    [SerializeField] private Toggle blockVehicleMouseRotationDuringFreeLookToggle;
     [SerializeField] private Toggle invertVerticalInfantryToggle;
     [SerializeField] private Slider infantrySensibilitySlider;
     [SerializeField] private Slider infantryAimSensibilitySlider;
@@ -158,6 +159,8 @@ public partial class SettingsHUD
     [SerializeField] private TextMeshProUGUI VEHICLE_countermeasureButton;
     [SerializeField] private TextMeshProUGUI VEHICLE_switchFireModeButton;
     [SerializeField] private TextMeshProUGUI VEHICLE_switchSeatButton;
+    [SerializeField] private TextMeshProUGUI VEHICLE_boostButton;
+    [SerializeField] private TextMeshProUGUI VEHICLE_zoomButton;
     [SerializeField] private TextMeshProUGUI VEHICLE_weapon1Button;
     [SerializeField] private TextMeshProUGUI VEHICLE_weapon2Button;
     [SerializeField] private TextMeshProUGUI VEHICLE_weapon3Button;
@@ -169,7 +172,6 @@ public partial class SettingsHUD
     [SerializeField] private TextMeshProUGUI VEHICLE_weapon9Button;
 
     [Header("Key Bind UI Elements - Jet")]
-    [SerializeField] private TextMeshProUGUI JET_boostButton;
     [SerializeField] private TextMeshProUGUI JET_shootVehicleButton;
     [SerializeField] private TextMeshProUGUI JET_pitchUpButton;
     [SerializeField] private TextMeshProUGUI JET_pitchDownButton;
@@ -189,7 +191,6 @@ public partial class SettingsHUD
     [SerializeField] private TextMeshProUGUI HELICOPTER_pitchDownButton;
     [SerializeField] private TextMeshProUGUI HELICOPTER_leanLeftButton;
     [SerializeField] private TextMeshProUGUI HELICOPTER_leanRightButton;
-    [SerializeField] private TextMeshProUGUI HELICOPTER_zoomButton;
     [SerializeField] private TextMeshProUGUI HELICOPTER_gunnerSeatButton;
     [SerializeField] private TextMeshProUGUI HELICOPTER_pilotSeatButton;
 
@@ -199,8 +200,6 @@ public partial class SettingsHUD
     [SerializeField] private TextMeshProUGUI TANK_turnLeftButton;
     [SerializeField] private TextMeshProUGUI TANK_turnRightButton;
     [SerializeField] private TextMeshProUGUI TANK_shootButton;
-    [SerializeField] private TextMeshProUGUI TANK_zoomButton;
-    [SerializeField] private TextMeshProUGUI TANK_boostButton;
     [SerializeField] private TextMeshProUGUI TANK_gunnerSeatButton;
     [SerializeField] private TextMeshProUGUI TANK_pilotSeatButton;
 
@@ -243,26 +242,49 @@ public partial class SettingsHUD
         RadioVoipMode = radioVoipDropdown
     };
 
-    private ControlsSettingsView CreateControlsView() => new ControlsSettingsView
+    private ControlsSettingsView CreateControlsView()
     {
-        AimHold = aimHoldToggle,
-        SprintHold = sprintHoldToggle,
-        CrouchHold = crouchHoldToggle,
-        ProneHold = proneHoldToggle,
-        VehicleBoostHold = vehicleBoostHoldToggle,
-        InvertVerticalInfantry = invertVerticalInfantryToggle,
-        InfantrySensitivity = infantrySensibilitySlider,
-        InfantryAimSensitivity = infantryAimSensibilitySlider,
-        InvertVerticalTank = invertVerticalTankToggle,
-        TankSensitivity = tankSensibilitySlider,
-        TankAimSensitivity = tankAimSensibilitySlider,
-        InvertVerticalJet = invertVerticalJetToggle,
-        JetSensitivity = jetSensibilitySlider,
-        JetAimSensitivity = jetAimSensibilitySlider,
-        InvertVerticalHelicopter = invertVerticalHeliToggle,
-        HelicopterSensitivity = helicopterSensibilitySlider,
-        HelicopterAimSensitivity = helicopterAimSensibilitySlider
-    };
+        EnsureBlockVehicleMouseRotationToggle();
+
+        return new ControlsSettingsView
+        {
+            AimHold = aimHoldToggle,
+            SprintHold = sprintHoldToggle,
+            CrouchHold = crouchHoldToggle,
+            ProneHold = proneHoldToggle,
+            VehicleBoostHold = vehicleBoostHoldToggle,
+            BlockVehicleMouseRotationDuringFreeLook = blockVehicleMouseRotationDuringFreeLookToggle,
+            InvertVerticalInfantry = invertVerticalInfantryToggle,
+            InfantrySensitivity = infantrySensibilitySlider,
+            InfantryAimSensitivity = infantryAimSensibilitySlider,
+            InvertVerticalTank = invertVerticalTankToggle,
+            TankSensitivity = tankSensibilitySlider,
+            TankAimSensitivity = tankAimSensibilitySlider,
+            InvertVerticalJet = invertVerticalJetToggle,
+            JetSensitivity = jetSensibilitySlider,
+            JetAimSensitivity = jetAimSensibilitySlider,
+            InvertVerticalHelicopter = invertVerticalHeliToggle,
+            HelicopterSensitivity = helicopterSensibilitySlider,
+            HelicopterAimSensitivity = helicopterAimSensibilitySlider
+        };
+    }
+
+    private void EnsureBlockVehicleMouseRotationToggle()
+    {
+        if (blockVehicleMouseRotationDuringFreeLookToggle != null || vehicleBoostHoldToggle == null) return;
+
+        Toggle toggle = Instantiate(vehicleBoostHoldToggle, vehicleBoostHoldToggle.transform.parent);
+        toggle.gameObject.name = nameof(blockVehicleMouseRotationDuringFreeLookToggle);
+        toggle.transform.SetSiblingIndex(vehicleBoostHoldToggle.transform.GetSiblingIndex() + 1);
+
+        TextMeshProUGUI label = toggle.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null) label.text = "Block Vehicle Mouse Input During Free Look";
+
+        // The template has a persistent Boost listener; replace it on the clone.
+        toggle.onValueChanged = new Toggle.ToggleEvent();
+        toggle.onValueChanged.AddListener(_ => OnBlockVehicleMouseRotationDuringFreeLookChanged());
+        blockVehicleMouseRotationDuringFreeLookToggle = toggle;
+    }
 
     private GameplaySettingsView CreateGameplayView() => new GameplaySettingsView
     {
@@ -369,6 +391,8 @@ public partial class SettingsHUD
             { "VEHICLE_countermeasureKey", VEHICLE_countermeasureButton },
             { "VEHICLE_switchFireModeKey", VEHICLE_switchFireModeButton },
             { "VEHICLE_switchSeatKey", VEHICLE_switchSeatButton },
+            { "VEHICLE_boost_key", VEHICLE_boostButton },
+            { "VEHICLE_zoom_key", VEHICLE_zoomButton },
             { "VEHICLE_weapon1", VEHICLE_weapon1Button },
             { "VEHICLE_weapon2", VEHICLE_weapon2Button },
             { "VEHICLE_weapon3", VEHICLE_weapon3Button },
@@ -378,7 +402,6 @@ public partial class SettingsHUD
             { "VEHICLE_weapon7", VEHICLE_weapon7Button },
             { "VEHICLE_weapon8", VEHICLE_weapon8Button },
             { "VEHICLE_weapon9", VEHICLE_weapon9Button },
-            { "JET_boostKey", JET_boostButton },
             { "JET_shootVehicleKey", JET_shootVehicleButton },
             { "JET_pitchUpKey", JET_pitchUpButton },
             { "JET_pitchDownKey", JET_pitchDownButton },
@@ -396,7 +419,6 @@ public partial class SettingsHUD
             { "HELICOPTER_pitch_down_key", HELICOPTER_pitchDownButton },
             { "HELICOPTER_lean_left_key", HELICOPTER_leanLeftButton },
             { "HELICOPTER_lean_right_key", HELICOPTER_leanRightButton },
-            { "HELICOPTER_zoom_key", HELICOPTER_zoomButton },
             { "HELICOPTER_gunner_seat_key", HELICOPTER_gunnerSeatButton },
             { "HELICOPTER_pilot_seat_key", HELICOPTER_pilotSeatButton },
             { "TANK_increase_throtlle", TANK_increaseThrottleButton },
@@ -404,8 +426,6 @@ public partial class SettingsHUD
             { "TANK_turn_left_key", TANK_turnLeftButton },
             { "TANK_turn_right_key", TANK_turnRightButton },
             { "TANK_shoot_key", TANK_shootButton },
-            { "TANK_zoom_key", TANK_zoomButton },
-            { "TANK_boostKey", TANK_boostButton },
             { "TANK_gunner_seat_key", TANK_gunnerSeatButton },
             { "TANK_pilot_seat_key", TANK_pilotSeatButton }
         };

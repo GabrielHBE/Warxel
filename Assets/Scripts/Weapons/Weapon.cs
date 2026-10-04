@@ -225,6 +225,8 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues, IReloadContext
             if (weaponAnimation.fireClip == null) weaponProperties.CreateBulletExtractor();
         }
 
+        weaponProperties.MagShootAnimation();
+
         int patternLength = weaponProperties.recoilValues.recoilPattern.Length;
         if (patternLength > 0)
         {
@@ -430,7 +432,11 @@ public class Weapon : MonoBehaviour, ICurrentSpreadUIValues, IReloadContext
 
     public void SetCanShoot(bool canShoot) => this.can_shoot = canShoot;
     public void StartReloadAnimation() => weaponAnimation.StartReloadAnimation();
-    public void FinishReloadAnimation() => weaponAnimation.FinishReloadAnimation();
+    public void FinishReloadAnimation()
+    {
+        weaponAnimation.FinishReloadAnimation();
+        weaponProperties.ResetMagState();
+    }
     public void ResetFiringState() => Firing.ResetState();
     public void OnReloadFailedNoAmmo() => AlertMessages.Instance.CreateMessage("Cant reload", 2);
     #endregion

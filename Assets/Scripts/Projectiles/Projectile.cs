@@ -19,6 +19,7 @@ public class Projectile : LocalPooledObject
 
     //Private variables
     protected float bulletDropMultiplier;
+    protected float projectileDrag;
     protected float infantryDamage;
     protected float initialInfantryDamage;
     protected AnimationCurve infantryDamageByDistance;
@@ -71,6 +72,8 @@ public class Projectile : LocalPooledObject
 
         [Header("Projectile Model")]
         public float muzzleVelocity;
+        [Tooltip("Speed change in meters per second squared. Positive accelerates, negative decelerates, zero keeps the speed unchanged by drag.")]
+        public float projectileDrag;
         public float dropMultiplier;
         public bool canDamageVehicles;
 
@@ -79,16 +82,17 @@ public class Projectile : LocalPooledObject
         public float delaytoEnableForOwner;
 
         [Header("Destruction")]
+        [Tooltip("Voxel destruction radius. A value of 10 removes voxels up to 10 cells from the impact point.")]
         public float destructionRadius;
 
-        public void OnBeforeSerialize()
-        {
-            EnsureDamageCurveStartsAtBaseDamage();
-        }
+        public void OnBeforeSerialize() => EnsureDamageCurveStartsAtBaseDamage();
+        public void OnAfterDeserialize() => EnsureDamageCurveStartsAtBaseDamage();
 
-        public void OnAfterDeserialize()
+        public ProjectileValues WithMuzzleVelocity(float initialSpeed)
         {
-            EnsureDamageCurveStartsAtBaseDamage();
+            ProjectileValues shotValues = (ProjectileValues)MemberwiseClone();
+            shotValues.muzzleVelocity = initialSpeed;
+            return shotValues;
         }
 
         public AnimationCurve CreateRuntimeDamageCurve()
@@ -184,6 +188,7 @@ public class Projectile : LocalPooledObject
         canDamageArmoredVehicles = values.canDamageVehicles;
         vehicleDamage = values.vehicleDamage;
         bulletDropMultiplier = values.dropMultiplier;
+        projectileDrag = values.projectileDrag;
         explosionDamageFalloff = values.explosionDamageFalloff;
     }
 
@@ -219,6 +224,9 @@ public class Projectile : LocalPooledObject
         if (!isSetup || isDespawning) return;
 
         ProcessRaycastHitValidation();
+        if (isDespawning) return;
+
+        ApplyProjectileDrag();
         AddForceDown();
     }
 
@@ -239,9 +247,9 @@ public class Projectile : LocalPooledObject
 
         hitEffects.CustomHitEffect(hitPoint);
 
-        if (VoxelObj.IsVoxelLayer(hitObject.layer)) ProcessVoxelCollision(collider, hitPoint);
+        bool hitVoxel = ProcessVoxelCollision(collider, hitPoint, hitNormal);
 
-        if (hitObject.layer == LayerMask.NameToLayer("Ground"))ProcessGroundCollision(hitPoint);
+        if (!hitVoxel && hitObject.layer == LayerMask.NameToLayer("Ground")) ProcessGroundCollision(hitPoint);
         
 
         if (hitObject.layer == LayerMask.NameToLayer("Vehicle") && canDamageArmoredVehicles)
@@ -271,23 +279,39 @@ public class Projectile : LocalPooledObject
         HandleBulletHit(collider.gameObject, transform.position, Vector3.zero, collider);
     }
 
-    private void ProcessVoxelCollision(Collider collider, Vector3 position)
+    private bool ProcessVoxelCollision(Collider collider, Vector3 position, Vector3 hitNormal)
     {
-        
-        VoxelObj voxelObj = collider.gameObject.GetComponent<VoxelObj>();
-        if (voxelObj != null)
+        if (!ProcessHit.TryGetVoxel(collider.gameObject, out _)) return false;
+
+        VoxelObj materialSource = collider.GetComponentInParent<VoxelObj>();
+        VoxelObj.VoxelMaterialType material = materialSource != null
+            ? materialSource.voxelMaterialType
+            : VoxelObj.VoxelMaterialType.Concrete;
+
+        if (hitEffects != null) hitEffects.VoxelHitEffect(position, material);
+        if (soundEffects != null) soundEffects.RequestVoxelHitSound(position, material);
+
+        if (destructionRadius > 2f)
         {
-            VoxelObj.VoxelMaterialType material = voxelObj.voxelMaterialType;
-            hitEffects.VoxelHitEffect(position, material);
-            soundEffects.RequestVoxelHitSound(position, material);
+            Explosion.SphereExplosion(
+                position,
+                infantryDamage,
+                vehicleDamage,
+                destructionRadius,
+                explosionDamageFalloff,
+                null,
+                shootRoot);
         }
-        
+        else
+        {
+            ProcessHit.VoxelHit(
+                collider.gameObject,
+                position,
+                hitNormal.sqrMagnitude > 0f ? hitNormal : -transform.forward,
+                destructionRadius);
+        }
 
-        VoxelDestruction VoxelPartialCollapse = collider.GetComponent<VoxelDestruction>();
-        if (VoxelPartialCollapse != null) VoxelPartialCollapse.TakeDamage(infantryDamage / 2);
-
-        if (destructionRadius > 2) Explosion.SphereExplosion(position, infantryDamage, vehicleDamage, destructionRadius, explosionDamageFalloff, null, shootRoot);
-
+        return true;
     }
 
     private void ProcessGroundCollision(Vector3 pos)
@@ -308,12 +332,17 @@ public class Projectile : LocalPooledObject
         {
             trail.enabled = active;
             trail.Clear();
+            trail.emitting = active;
         }
 
         if (particle != null)
         {
-            if (active) particle.Play();
-            else particle.Stop();
+            if (active)
+            {
+                particle.Clear(true);
+                particle.Play(true);
+            }
+            else particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
         visualsEnabled = active;
@@ -333,6 +362,18 @@ public class Projectile : LocalPooledObject
     #endregion
 
     #region Helpers
+    protected void ApplyProjectileDrag()
+    {
+        if (rb == null || rb.isKinematic || projectileDrag == 0f) return;
+
+        Vector3 velocity = rb.linearVelocity;
+        float speed = velocity.magnitude;
+        Vector3 direction = speed > 0f ? velocity / speed : transform.forward;
+        float nextSpeed = Mathf.Max(0f, speed + projectileDrag * Time.fixedDeltaTime);
+
+        rb.linearVelocity = direction * nextSpeed;
+    }
+
     protected void AddForceDown()
     {
         if (rb != null) rb.AddForce(Vector3.down * bulletDropMultiplier, ForceMode.Acceleration);

@@ -4,8 +4,8 @@ using UnityEngine.Serialization;
 public class Sight : Attatchment
 {
     public const float MAX_ZOOM_LEVEL = 10;
-    public const float MIN_ZOOM_LEVEL = 1;
-    private const float RETICLE_COLOR_INTENSITY = 5f;
+    public const float MIN_ZOOM_LEVEL = 0.01f;
+    private const float RETICLE_COLOR_INTENSITY = 4f;
     private static readonly float ReticleColorIntensityMultiplier = Mathf.Pow(2f, RETICLE_COLOR_INTENSITY);
 
     [Header("Settings")]
@@ -24,7 +24,7 @@ public class Sight : Attatchment
     [SerializeField] private float breathRecoveryRate = 1f;// Velocidade que recupera o fôlego quando não está apertando
 
     [Header("Changes")]
-    [Range(MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL)] public float[] zoomChanges = new float[1];
+    [Range(MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL)] public float[] zoomChanges = { 1f };
 
     public float zoomChange => GetCurrentZoomChange();
 
@@ -73,8 +73,13 @@ public class Sight : Attatchment
     #region Zoom
     private float GetCurrentZoomChange()
     {
+        if (zoomChanges == null || zoomChanges.Length == 0) return 1f;
+
         currentZoomIndex = Mathf.Clamp(currentZoomIndex, 0, zoomChanges.Length - 1);
-        return Mathf.Clamp(zoomChanges[currentZoomIndex], MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL);
+        float multiplier = zoomChanges[currentZoomIndex];
+        if (multiplier <= 0f) return 1f;
+
+        return Mathf.Clamp(multiplier, MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL);
     }
 
     private void ZoomChangeHandler()
