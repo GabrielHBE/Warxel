@@ -48,7 +48,11 @@ public class FirstPersonSkinApplier : MonoBehaviour
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localScale = Vector3.one;
         
-        instance.GetComponent<SkinPart>().meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        foreach (Renderer renderer in instance.GetComponentsInChildren<Renderer>(true))
+        {
+            renderer.enabled = true;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
         Destroy(instance.GetComponent<SkinPart>());
         Destroy(instance.GetComponent<ProcessInfantryDamage>());
         Destroy(instance.GetComponent<Collider>());

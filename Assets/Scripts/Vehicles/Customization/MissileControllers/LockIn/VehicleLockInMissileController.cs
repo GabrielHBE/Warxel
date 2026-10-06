@@ -16,6 +16,8 @@ public class VehicleLockInMissileController : VehicleMissileController
     [Header("Detection Settings")]
     [Min(0f)]
     [SerializeField] private float maxLockDistance = 5000f;
+    [Tooltip("Solid layers that can block lock-on. Include Vehicle and world geometry. Triggers and the firing vehicle are ignored.")]
+    [SerializeField] private LayerMask lockObstructionMask = ~0;
 
     [Header("Locked Target Zoom")]
     [SerializeField] private bool zoomOnLockedTarget = true;
@@ -44,8 +46,6 @@ public class VehicleLockInMissileController : VehicleMissileController
     [SerializeField] private Color lockAreaColor => Color.limeGreen;
 
     private Vehicle targetVehicle;
-    private Collider targetCollider;
-    private Renderer targetRenderer;
     private Transform currentTarget;
     private float currentLockTimer = 0f;
     private bool canShoot = false;
@@ -94,7 +94,11 @@ public class VehicleLockInMissileController : VehicleMissileController
         UpdateCameraTrackingState(CanTrackLockedTarget(camera), mouseMoved);
         ProcessLockOn(camera);
         UpdateCameraTrackingState(CanTrackLockedTarget(camera), mouseMoved);
-        if (cameraTrackingActive) AimCameraAtLockedTarget(camera);
+        if (cameraTrackingActive)
+        {
+            AimCameraAtLockedTarget(camera);
+            ValidateTrackedTargetLock(camera);
+        }
         UpdateArmoryFieldOfView(camera);
         UpdateLockArea(seat, camera);
         UpdateLockIndicator(seat, camera);
@@ -135,6 +139,7 @@ public class VehicleLockInMissileController : VehicleMissileController
     }
 
     private Collider[] lockCandidates = new Collider[32];
+    private RaycastHit[] lockSightHits = new RaycastHit[32];
     private readonly Plane[] lockAreaPlanes = new Plane[6];
     private readonly HashSet<Vehicle> checkedVehicles = new HashSet<Vehicle>();
     private readonly List<Renderer> vehicleRenderers = new List<Renderer>();
@@ -165,7 +170,7 @@ public class VehicleLockInMissileController : VehicleMissileController
     {
         return followLockedTarget && canShoot && targetVehicle != null &&
             targetVehicle.isActiveAndEnabled && !targetVehicle.vehicle_destroyed.Value &&
-            camera != null && camera == ArmoryCamera && camera.isActiveAndEnabled;
+            camera != null && camera == armoryCamera && camera.isActiveAndEnabled;
     }
 
     private void AimCameraAtLockedTarget(Camera camera)
@@ -184,7 +189,16 @@ public class VehicleLockInMissileController : VehicleMissileController
         // Rotate the same pivot used by manual mouse control, preserving the camera's child offset.
         Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
         Quaternion rotationDelta = targetRotation * Quaternion.Inverse(camera.transform.rotation);
-        pivot.rotation = rotationDelta * pivot.rotation;
+        Quaternion desiredWorldRotation = rotationDelta * pivot.rotation;
+        Quaternion desiredLocalRotation = pivot.parent != null
+            ? Quaternion.Inverse(pivot.parent.rotation) * desiredWorldRotation
+            : desiredWorldRotation;
+
+        // Tracking obeys the same local pitch/yaw limits as manual mouse rotation.
+        Vector3 localAngles = desiredLocalRotation.eulerAngles;
+        Vector2 clampedAngles = ClampCameraRotation(new Vector2(
+            Mathf.DeltaAngle(0f, localAngles.x), Mathf.DeltaAngle(0f, localAngles.y)));
+        pivot.localRotation = Quaternion.Euler(clampedAngles.x, clampedAngles.y, localAngles.z);
     }
 
     private void ResetCameraTracking()
@@ -193,9 +207,22 @@ public class VehicleLockInMissileController : VehicleMissileController
         cameraTrackingInterrupted = false;
     }
 
+    private void ValidateTrackedTargetLock(Camera camera)
+    {
+        // Check the target after applying the camera clamps, before zoom can widen the view.
+        // Keep partial-body detection: only lose lock when no valid part remains in the area.
+        Transform castReference = lockInFowardReference != null ? lockInFowardReference : transform;
+        Vector3 origin = castReference.position;
+        Rect lockArea = GetLockAreaScreenRect(camera);
+        UpdateLockAreaPlanes(camera, lockArea, origin);
+        if (!TryGetVehicleLockPart(camera, targetVehicle, lockArea, origin,
+            maxLockDistance * maxLockDistance, out _, out _, out _, out _))
+            ResetLock();
+    }
+
     private void UpdateArmoryFieldOfView(Camera camera)
     {
-        if (!zoomOnLockedTarget || camera == null || camera != ArmoryCamera ||
+        if (!zoomOnLockedTarget || camera == null || camera != armoryCamera ||
             !camera.isActiveAndEnabled || camera.orthographic)
         {
             RestoreArmoryFieldOfView();
@@ -306,14 +333,15 @@ public class VehicleLockInMissileController : VehicleMissileController
         Transform castReference = lockInFowardReference != null ? lockInFowardReference : transform;
         Vector3 origin = castReference.position;
 
-        // A tracked vehicle stays selected even if it moves outside the previous view cone.
-        // Keep the range limit, but do not let another vehicle steal the camera's target.
+        // Let tracking catch up to a target outside the previous view cone.
+        // ValidateTrackedTargetLock checks the lock area after the clamped camera rotation.
         if (cameraTrackingActive && CanTrackLockedTarget(camera))
         {
             Vector3 closestPoint = TryGetTargetBounds(out Bounds trackedBounds)
                 ? trackedBounds.ClosestPoint(origin)
                 : targetVehicle.transform.position;
-            if ((closestPoint - origin).sqrMagnitude <= maxLockDistance * maxLockDistance) return;
+            if ((closestPoint - origin).sqrMagnitude <= maxLockDistance * maxLockDistance &&
+                IsTargetVisible(camera, targetVehicle)) return;
 
             ResetLock();
         }
@@ -341,63 +369,36 @@ public class VehicleLockInMissileController : VehicleMissileController
         UpdateLockAreaPlanes(camera, lockArea, origin);
         checkedVehicles.Clear();
 
+        // Keep progress attached to the vehicle, even when its visible part changes.
+        // This also applies during acquisition and when only the seat camera is available.
+        if (IsValidLockVehicle(targetVehicle) &&
+            TryGetVehicleLockPart(camera, targetVehicle, lockArea, origin, maxDistanceSquared,
+                out Collider retainedCollider, out Renderer retainedRenderer, out _, out _))
+        {
+            UpdateLockProgress(targetVehicle, retainedCollider, retainedRenderer);
+            return;
+        }
+
         for (int i = 0; i < hitCount; i++)
         {
             Collider collider = lockCandidates[i];
             if (collider == null || collider.transform.root == transform.root) continue;
 
             Vehicle candidate = collider.GetComponentInParent<Vehicle>();
-            if (candidate == null || !candidate.isActiveAndEnabled || candidate.vehicle_destroyed.Value ||
-                candidate.vehicleType != lockInVehicleType ||
+            if (!IsValidLockVehicle(candidate) ||
                 !checkedVehicles.Add(candidate)) continue;
 
-            // The Vehicle layer finds the vehicle, not necessarily its whole body.
-            // Test each visible mesh separately, without combining empty space between parts.
-            candidate.GetComponentsInChildren(false, vehicleRenderers);
-            bool hasVisibleBody = false;
-            foreach (Renderer body in vehicleRenderers)
+            if (!TryGetVehicleLockPart(camera, candidate, lockArea, origin, maxDistanceSquared,
+                out Collider partCollider, out Renderer partRenderer,
+                out float alignment, out float distance)) continue;
+            if (alignment < bestAlignment ||
+                (Mathf.Approximately(alignment, bestAlignment) && distance < bestDistance))
             {
-                if (body == null || !body.enabled ||
-                    !(body is MeshRenderer || body is SkinnedMeshRenderer) ||
-                    body.GetComponentInParent<Vehicle>() != candidate ||
-                    body.GetComponentInParent<PlayerProperties>() != null) continue;
-
-                hasVisibleBody = true;
-                Bounds bounds = body.bounds;
-                if (!TryGetLockPartScore(camera, lockArea, bounds,
-                    bounds.ClosestPoint(origin), origin, maxDistanceSquared,
-                    out float alignment, out float distance)) continue;
-                if (alignment < bestAlignment ||
-                    (Mathf.Approximately(alignment, bestAlignment) && distance < bestDistance))
-                {
-                    bestTarget = candidate;
-                    bestRenderer = body;
-                    bestCollider = null;
-                    bestAlignment = alignment;
-                    bestDistance = distance;
-                }
-            }
-
-            // Vehicles without a visible mesh can still use their physical body.
-            if (hasVisibleBody) continue;
-            candidate.GetComponentsInChildren(false, vehicleColliders);
-            foreach (Collider body in vehicleColliders)
-            {
-                if (body == null || !body.enabled || body.isTrigger ||
-                    body.GetComponentInParent<Vehicle>() != candidate ||
-                    body.GetComponentInParent<PlayerProperties>() != null) continue;
-                if (!TryGetLockPartScore(camera, lockArea, body.bounds,
-                    body.ClosestPoint(origin), origin, maxDistanceSquared,
-                    out float alignment, out float distance)) continue;
-                if (alignment < bestAlignment ||
-                    (Mathf.Approximately(alignment, bestAlignment) && distance < bestDistance))
-                {
-                    bestTarget = candidate;
-                    bestCollider = body;
-                    bestRenderer = null;
-                    bestAlignment = alignment;
-                    bestDistance = distance;
-                }
+                bestTarget = candidate;
+                bestRenderer = partRenderer;
+                bestCollider = partCollider;
+                bestAlignment = alignment;
+                bestDistance = distance;
             }
         }
 
@@ -407,26 +408,116 @@ public class VehicleLockInMissileController : VehicleMissileController
             return;
         }
 
-        if (bestTarget != targetVehicle)
+        UpdateLockProgress(bestTarget, bestCollider, bestRenderer);
+    }
+
+    private bool IsValidLockVehicle(Vehicle candidate)
+    {
+        return candidate != null && candidate.isActiveAndEnabled && !candidate.vehicle_destroyed.Value &&
+            candidate.vehicleType == lockInVehicleType && candidate.transform.root != transform.root;
+    }
+
+    private bool TryGetVehicleLockPart(Camera camera, Vehicle candidate, Rect lockArea,
+        Vector3 origin, float maxDistanceSquared, out Collider bestCollider,
+        out Renderer bestRenderer, out float bestAlignment, out float bestDistance)
+    {
+        bestCollider = null;
+        bestRenderer = null;
+        bestAlignment = float.PositiveInfinity;
+        bestDistance = float.PositiveInfinity;
+        candidate.GetComponentsInChildren(false, vehicleRenderers);
+        foreach (Renderer body in vehicleRenderers)
+        {
+            if (body == null || !body.enabled ||
+                !(body is MeshRenderer || body is SkinnedMeshRenderer) ||
+                body.GetComponentInParent<Vehicle>() != candidate ||
+                body.GetComponentInParent<PlayerProperties>() != null) continue;
+
+            Bounds bounds = body.bounds;
+            if (!TryGetLockPartScore(camera, lockArea, bounds,
+                bounds.ClosestPoint(origin), origin, maxDistanceSquared,
+                out float alignment, out float distance) ||
+                !HasLineOfSight(camera, candidate, bounds.center)) continue;
+            if (alignment < bestAlignment ||
+                (Mathf.Approximately(alignment, bestAlignment) && distance < bestDistance))
+            {
+                bestRenderer = body;
+                bestAlignment = alignment;
+                bestDistance = distance;
+            }
+        }
+
+        // A combined mesh can have its center in empty space between physical parts.
+        // Always consider all colliders too, even when the vehicle has visible meshes.
+        candidate.GetComponentsInChildren(false, vehicleColliders);
+        foreach (Collider body in vehicleColliders)
+        {
+            if (body == null || !body.enabled || body.isTrigger ||
+                body.GetComponentInParent<Vehicle>() != candidate ||
+                body.GetComponentInParent<PlayerProperties>() != null) continue;
+            if (!TryGetLockPartScore(camera, lockArea, body.bounds,
+                body.ClosestPoint(origin), origin, maxDistanceSquared,
+                out float alignment, out float distance) ||
+                !HasLineOfSight(camera, candidate, body.bounds.center)) continue;
+            if (alignment < bestAlignment ||
+                (Mathf.Approximately(alignment, bestAlignment) && distance < bestDistance))
+            {
+                bestCollider = body;
+                bestRenderer = null;
+                bestAlignment = alignment;
+                bestDistance = distance;
+            }
+        }
+        return bestCollider != null || bestRenderer != null;
+    }
+
+    private void UpdateLockProgress(Vehicle selectedVehicle, Collider selectedCollider, Renderer selectedRenderer)
+    {
+        if (selectedVehicle != targetVehicle)
         {
             ResetLock();
-            targetVehicle = bestTarget;
-            currentTarget = bestTarget.transform;
+            targetVehicle = selectedVehicle;
+            currentTarget = selectedVehicle.transform;
         }
-        targetCollider = bestCollider;
-        targetRenderer = bestRenderer;
-
         currentLockTimer += Time.deltaTime;
         canShoot = currentLockTimer >= lockOnTimeRequired;
         lockingInSoundDelay = canShoot ? 0.1f : 0.5f;
+    }
+
+    private bool HasLineOfSight(Camera camera, Vehicle candidate, Vector3 aimPoint)
+    {
+        return LockInTargeting.HasLineOfSight(camera.transform.position, aimPoint,
+            transform.root, candidate, lockObstructionMask, ref lockSightHits);
+    }
+
+    private bool IsTargetVisible(Camera camera, Vehicle candidate)
+    {
+        candidate.GetComponentsInChildren(false, vehicleRenderers);
+        foreach (Renderer body in vehicleRenderers)
+        {
+            if (body == null || !body.enabled ||
+                !(body is MeshRenderer || body is SkinnedMeshRenderer) ||
+                body.GetComponentInParent<Vehicle>() != candidate ||
+                body.GetComponentInParent<PlayerProperties>() != null) continue;
+
+            if (HasLineOfSight(camera, candidate, body.bounds.center)) return true;
+        }
+
+        candidate.GetComponentsInChildren(false, vehicleColliders);
+        foreach (Collider body in vehicleColliders)
+        {
+            if (body == null || !body.enabled || body.isTrigger ||
+                body.GetComponentInParent<Vehicle>() != candidate ||
+                body.GetComponentInParent<PlayerProperties>() != null) continue;
+            if (HasLineOfSight(camera, candidate, body.bounds.center)) return true;
+        }
+        return false;
     }
 
     private void ResetLock()
     {
         ResetCameraTracking();
         targetVehicle = null;
-        targetCollider = null;
-        targetRenderer = null;
         canShoot = false;
         currentTarget = null;
         currentLockTimer = 0f;
@@ -444,7 +535,7 @@ public class VehicleLockInMissileController : VehicleMissileController
     {
         if (seat == null || seat.GetCurrentArmory() != this) return null;
 
-        if (ArmoryCamera != null && ArmoryCamera.isActiveAndEnabled) return ArmoryCamera;
+        if (armoryCamera != null && armoryCamera.isActiveAndEnabled) return armoryCamera;
 
         Camera camera = seat.seatCameras != null && seat.seatCameras.Length > 0
             ? seat.GetCurrentCamera()
@@ -542,10 +633,9 @@ public class VehicleLockInMissileController : VehicleMissileController
             return;
         }
 
-        Vector3 targetPosition = targetRenderer != null
-            ? targetRenderer.bounds.center
-            : targetCollider != null
-            ? targetCollider.bounds.center
+        // The indicator belongs to the vehicle, not the collider currently used to detect it.
+        Vector3 targetPosition = TryGetTargetBounds(out Bounds targetBounds)
+            ? targetBounds.center
             : targetVehicle.spot_position != null
                 ? targetVehicle.spot_position.position
                 : targetVehicle.transform.position;
@@ -730,7 +820,13 @@ public class VehicleLockInMissileController : VehicleMissileController
 
     protected override void ExecuteShot()
     {
-        if (!canShoot) return;
+        if (!canShoot || targetVehicle == null) return;
+        Camera camera = GetLockCamera(vehicle != null ? vehicle.currentSeat : null);
+        if (camera == null || !IsTargetVisible(camera, targetVehicle))
+        {
+            ResetLock();
+            return;
+        }
         int spawnIndex = currentSpawnPointShootIndex.Value;
         if (initializeDummyMissiles) RequestActivateDummyMissile(spawnIndex, false);
 
@@ -743,20 +839,28 @@ public class VehicleLockInMissileController : VehicleMissileController
             target = currentTarget.GetComponent<NetworkObject>()
         };
 
-        if (ProjectileSpawner.Instance != null) ProjectileSpawner.Instance.CreateProjectile(properties.bulletPref, properties.dummyBullet.gameObject, prop, properties.projectileValues);
+        if (ProjectileSpawner.Instance != null)
+        {
+            Vehicle firingVehicle = vehicle != null ? vehicle : GetComponentInParent<Vehicle>();
+            float initialSpeed = properties.projectileValues.muzzleVelocity;
+            if (firingVehicle != null && firingVehicle.rb != null) initialSpeed += firingVehicle.rb.linearVelocity.magnitude;
+
+            Projectile.ProjectileValues shotValues = properties.projectileValues.WithMuzzleVelocity(initialSpeed);
+            ProjectileSpawner.Instance.CreateProjectile(properties.bulletPref, properties.dummyBullet.gameObject, prop, shotValues);
+        }
 
         PlayShotEffects();
         UpdateAmmoAfterShot();
         UpdateCurrentSpawnPointShootIndex();
     }
 
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
     private void OnDrawGizmos()
     {
         Transform castReference = lockInFowardReference != null ? lockInFowardReference : transform;
         Vector3 origin = castReference.position;
         Camera camera = GetLockCamera(vehicle != null ? vehicle.currentSeat : null);
-        if (camera == null) camera = ArmoryCamera;
+        if (camera == null) camera = armoryCamera;
         if (camera == null) camera = castReference.GetComponent<Camera>();
 
         // Project the same HUD corners into the detection volume, clipped to the range.
@@ -807,6 +911,6 @@ public class VehicleLockInMissileController : VehicleMissileController
             $"Lock Area: {lockAreaScreenFraction:P0}\nMax Distance: {maxLockDistance}\nCan Shoot: {canShoot}"
         );
     }
-    #endif
+#endif
 
 }

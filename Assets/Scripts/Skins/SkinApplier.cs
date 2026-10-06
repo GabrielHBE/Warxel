@@ -47,13 +47,38 @@ public class SkinApplier : NetworkBehaviour
     public SkinPart instantiatedRightLowerLeg { get; private set; }
     public SkinPart instantiatedRightFoot { get; private set; }
 
-    public void ApplySkin(PlayerController pc)
-    {
+    private bool ownerHeadHidden = true;
+    private Renderer[] headRenderers = Array.Empty<Renderer>();
 
-        Skin skin = SkinsManager.GetSkin(SkinSelectionManager.LoadCurrentSkinForClass(AccountManager.Instance.selectedClass), AccountManager.Instance.selectedClass);
-        if (skin == null) return;
+    public void SetOwnerHeadHidden(bool hide)
+    {
+        if (!IsOwner) return;
+
+        ownerHeadHidden = hide;
+        ShadowCastingMode mode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+        foreach (Renderer renderer in headRenderers)
+        {
+            if (renderer != null && renderer.shadowCastingMode != mode)
+                renderer.shadowCastingMode = mode;
+        }
+    }
+
+    public async void ApplySkin(PlayerController pc)
+    {
+        if (pc == null || SkinsManager.Instance == null) return;
+        ClassManager.Class skinClass = pc.playerProperties.selectedClass.Value;
+        if (!await SkinsManager.Instance.WaitUntilReadyAsync()) return;
+        if (this == null || pc == null || !IsSpawned || !IsOwner) return;
+
+        Skin skin = SkinSelectionManager.ResolveSkinForClass(skinClass);
+        if (skin == null)
+        {
+            Debug.LogError($"[SkinApplier] No unlocked skin is available for class {skinClass}.", this);
+            return;
+        }
         SpawnSkinParts(skin, pc);
-        RequestCreateSkin(GetSelectedSkinNameForClass(AccountManager.Instance.selectedClass), AccountManager.Instance.selectedClass, pc);
+        pc.RefreshOwnerItemVisibility();
+        RequestCreateSkin(SkinsManager.GetSkinName(skin), skinClass, pc);
     }
 
 
@@ -63,6 +88,13 @@ public class SkinApplier : NetworkBehaviour
     [ObserversRpc(ExcludeOwner = true, BufferLast = true)]
     private void CmdCreateSkin(string skinName, ClassManager.Class skinClass, PlayerController pc)
     {
+        ApplyRemoteSkin(skinName, skinClass, pc);
+    }
+
+    private async void ApplyRemoteSkin(string skinName, ClassManager.Class skinClass, PlayerController pc)
+    {
+        if (SkinsManager.Instance == null || !await SkinsManager.Instance.WaitUntilReadyAsync()) return;
+        if (this == null || pc == null || !IsSpawned) return;
         Skin skin = SkinsManager.GetSkin(skinName, skinClass);
         if (skin == null) return;
 
@@ -76,7 +108,8 @@ public class SkinApplier : NetworkBehaviour
             // Core
             instantiatedHead = InstantiatePart(skin.head, headParent);
             instantiatedHead.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
-            if (IsOwner) instantiatedHead.GetComponentInChildren<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            headRenderers = instantiatedHead.GetComponentsInChildren<Renderer>(true);
+            SetOwnerHeadHidden(ownerHeadHidden);
 
             instantiatedTorso = InstantiatePart(skin.torso, torsoParent);
             instantiatedTorso.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
@@ -128,7 +161,7 @@ public class SkinApplier : NetworkBehaviour
             instantiatedRightFoot.GetComponent<ProcessInfantryDamage>().SetPlayerController(pc);
 
         }
-        catch (Exception) { }
+        catch (Exception exception) { Debug.LogException(exception, this); }
     }
 
     private SkinPart InstantiatePart(GameObject prefab, Transform parent)
@@ -138,8 +171,20 @@ public class SkinApplier : NetworkBehaviour
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localScale = Vector3.one * 1.2f;
 
-        return instance.GetComponent<SkinPart>();
+        // Preview assets may disable their source limbs. Spawned limbs must be functional.
+        SkinPart part = instance.GetComponent<SkinPart>();
+        if (part == null)
+            throw new InvalidOperationException($"Skin part '{prefab.name}' is missing SkinPart.");
+
+        part.enabled = true;
+        foreach (Renderer renderer in instance.GetComponentsInChildren<Renderer>(true))
+            renderer.enabled = true;
+        foreach (Collider collider in instance.GetComponentsInChildren<Collider>(true))
+            collider.enabled = true;
+        foreach (ProcessInfantryDamage damage in instance.GetComponentsInChildren<ProcessInfantryDamage>(true))
+            damage.enabled = true;
+
+        return part;
     }
 
-    private string GetSelectedSkinNameForClass(ClassManager.Class classType) => PlayerPrefs.GetString($"Skin_Selected_{classType}", "");
 }

@@ -182,4 +182,22 @@ public class CameraRotation : NetworkBehaviour
     }
 
     private static float NormalizeSignedAngle(float angle) => angle > 180f ? angle - 360f : angle;
+
+    public void ResetRotation()
+    {
+        if (horizontalRotation != null) horizontalRotation.localRotation = Quaternion.identity;
+        if (verticalRotation != null) verticalRotation.localRotation = Quaternion.identity;
+        if (playerHead != null) playerHead.localRotation = Quaternion.identity;
+
+        // Keep the look state aligned with the new parent so the old aim cannot return.
+        pitch = 0f;
+        yaw = horizontalRotation != null ? horizontalRotation.eulerAngles.y : 0f;
+        currentHorizontalRecoil = 0f;
+        lastVerticalRecoil = 0f;
+        currentRecoilZ = 0f;
+        if (processCameraRecoil != null) processCameraRecoil.ResetState();
+
+        initialized = horizontalRotation != null && verticalRotation != null;
+        wasInVehicle = playerProperties != null && playerProperties.isInVehicle;
+    }
 }

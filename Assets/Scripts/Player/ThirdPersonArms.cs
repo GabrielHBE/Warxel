@@ -14,7 +14,11 @@ public class ThirdPersonArms : NetworkBehaviour
     [SerializeField] private Transform aimingRightHandTarget;
     [SerializeField] private Transform defaultRightHandTarget;
 
-    
+    private Transform vehicleLeftHandTarget;
+    private Transform vehicleRightHandTarget;
+    private bool vehicleHandIKActive;
+    private Pose leftHandPoseBeforeVehicle;
+    private Pose rightHandPoseBeforeVehicle;
 
     private float currentRightHandtwoBoneIKConstraintWeight;
     private float currentLeftHandtwoBoneIKConstraintWeight;
@@ -48,6 +52,12 @@ public class ThirdPersonArms : NetworkBehaviour
             _SwitchWeapon(currentWeaponSlot.Value);
         }
 
+    }
+
+    public override void OnStopNetwork()
+    {
+        ClearVehicleIKTargets();
+        base.OnStopNetwork();
     }
 
     private void OnDestroy()
@@ -108,8 +118,59 @@ public class ThirdPersonArms : NetworkBehaviour
 
     public void UpdateRigWeight()
     {
-        rightHandRig.weight = currentRightHandtwoBoneIKConstraintWeight;
-        leftHandRig.weight = currentLeftHandtwoBoneIKConstraintWeight;
+        if (rightHandRig != null) rightHandRig.weight = currentRightHandtwoBoneIKConstraintWeight;
+        if (leftHandRig != null) leftHandRig.weight = currentLeftHandtwoBoneIKConstraintWeight;
+    }
+    #endregion
+
+    #region Vehicle Hand IK
+    public void SetVehicleIKTargets(Transform leftTarget, Transform rightTarget)
+    {
+        // Preserve the weapon followers only once, including across seat changes.
+        if (!vehicleHandIKActive)
+        {
+            if (leftHandPos != null)
+                leftHandPoseBeforeVehicle = new Pose(leftHandPos.localPosition, leftHandPos.localRotation);
+            if (rightHandPos != null)
+                rightHandPoseBeforeVehicle = new Pose(rightHandPos.localPosition, rightHandPos.localRotation);
+        }
+
+        vehicleHandIKActive = true;
+        vehicleLeftHandTarget = leftTarget;
+        vehicleRightHandTarget = rightTarget;
+        UpdateVehicleHandIK();
+    }
+
+    public void UpdateVehicleHandIK()
+    {
+        bool useLeftHand = vehicleLeftHandTarget != null && leftHandPos != null;
+        bool useRightHand = vehicleRightHandTarget != null && rightHandPos != null;
+
+        if (useLeftHand)
+            leftHandPos.SetPositionAndRotation(vehicleLeftHandTarget.position, vehicleLeftHandTarget.rotation);
+        if (useRightHand)
+            rightHandPos.SetPositionAndRotation(vehicleRightHandTarget.position, vehicleRightHandTarget.rotation);
+
+        // An unassigned hand keeps the seated animation instead of the weapon IK.
+        currentLeftHandtwoBoneIKConstraintWeight = useLeftHand ? 1f : 0f;
+        currentRightHandtwoBoneIKConstraintWeight = useRightHand ? 1f : 0f;
+        UpdateRigWeight();
+    }
+
+    public void ClearVehicleIKTargets()
+    {
+        if (!vehicleHandIKActive) return;
+
+        vehicleHandIKActive = false;
+        vehicleLeftHandTarget = null;
+        vehicleRightHandTarget = null;
+        if (leftHandPos != null)
+            leftHandPos.SetLocalPositionAndRotation(leftHandPoseBeforeVehicle.position, leftHandPoseBeforeVehicle.rotation);
+        if (rightHandPos != null)
+            rightHandPos.SetLocalPositionAndRotation(rightHandPoseBeforeVehicle.position, rightHandPoseBeforeVehicle.rotation);
+        currentLeftHandtwoBoneIKConstraintWeight = 0f;
+        currentRightHandtwoBoneIKConstraintWeight = 0f;
+        UpdateRigWeight();
     }
     #endregion
 

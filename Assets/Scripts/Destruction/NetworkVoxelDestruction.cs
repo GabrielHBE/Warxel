@@ -107,9 +107,10 @@ public sealed class NetworkVoxelDestruction : NetworkBehaviour
     {
         if (!ValidateRequest(hitPoint, hitNormal, voxelRadius, destructionType)) return false;
 
-        VoxelDestructionImpactEffect.Show(
-            hitPoint,
-            voxelRadius * Mathf.Abs(voxel.GetSingleVoxelSize()));
+        if (voxelRadius >= 5f)
+            VoxelDestructionImpactEffect.Show(
+                hitPoint,
+                voxelRadius * Mathf.Abs(voxel.GetSingleVoxelSize()));
 
         if (IsServerInitialized)
             return EnqueueServerCommand(hitPoint, hitNormal, voxelRadius, destructionType);
@@ -255,9 +256,10 @@ public sealed class NetworkVoxelDestruction : NetworkBehaviour
     private void ReceiveDestructionResultObserversRpc(NetworkVoxelDestructionCommand result)
     {
         if (!IsClientInitialized || IsServerInitialized) return;
-        VoxelDestructionImpactEffect.Show(
-            result.HitPoint,
-            result.VoxelRadius * Mathf.Abs(voxel.GetSingleVoxelSize()));
+        if (result.VoxelRadius >= 5f)
+            VoxelDestructionImpactEffect.Show(
+                result.HitPoint,
+                result.VoxelRadius * Mathf.Abs(voxel.GetSingleVoxelSize()));
         EnqueueClientCommand(result);
     }
 

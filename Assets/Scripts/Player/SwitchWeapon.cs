@@ -402,7 +402,7 @@ public class SwitchWeapon : MonoBehaviour
 
         if (weaponProperties != null)
         {
-            playerController.UpdateWeaponProperties(weaponProperties.speedChange, weaponProperties.recoilValues.applyRecoilSpeed, weaponProperties.recoilValues.resetRecoilSpeed);
+            playerController.UpdateWeaponProperties(weaponProperties.speedChange, weaponProperties.recoilValues.applyRecoilSpeed);
             EquippableItemHandTargets wh = weaponProperties.GetComponent<EquippableItemHandTargets>();
             wh.ResetHandTargets();
         }

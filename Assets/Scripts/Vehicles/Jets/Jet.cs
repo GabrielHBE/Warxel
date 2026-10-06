@@ -27,7 +27,7 @@ public class Jet : Vehicle
     private float _currentGravity = 0;
     private float _downwardComponent;
     private float _gForce;
-    private const float MAX_SPEED = 1000;
+    private const float MAX_SPEED = 2000;
     private const float PROPELLER_ACCELARATION = 2f;
     private const float PROPELLER_DESELERATION = 2f;
     private const int SONIC_BOON_SPEED = 700;
@@ -405,6 +405,7 @@ public class Jet : Vehicle
     protected override void HandleVehicleInput()
     {
         base.HandleVehicleInput();
+        if (!isInVehicle) return;
         if (InputManager.GetKeyDown(Settings.Instance._keybinds.PLAYER_interactKey) && exit_cooldown > 0.1f && Throttle > 10) EjectPlayer();
     }
 

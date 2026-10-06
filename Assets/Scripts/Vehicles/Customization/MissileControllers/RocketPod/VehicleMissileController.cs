@@ -13,9 +13,9 @@ public class VehicleMissileController : VehicleArmory
     protected readonly SyncVar<int> currentMagIndex = new SyncVar<int>();
     protected readonly SyncVar<int> currentSpawnPointShootIndex = new SyncVar<int>();
     protected readonly SyncVar<bool> isReloading = new SyncVar<bool>();
-    private Firing.FireMode currentFireMode = Firing.FireMode.Auto;
-    private float nextFireTime;
-    private int burstShotsRemaining;
+    private Firing.FireMode missileFireMode = Firing.FireMode.Auto;
+    private float nextMissileFireTime;
+    private int missileBurstShotsRemaining;
     #region Unity Lifecycle
     protected override void Awake()
     {
@@ -63,8 +63,8 @@ public class VehicleMissileController : VehicleArmory
     public override void SetupFiringSystem()
     {
         List<Firing.FireMode> modes = properties?.firing?.fireModes;
-        currentFireMode = modes != null && modes.Count > 0 ? modes[0] : Firing.FireMode.Auto;
-        nextFireTime = 0f;
+        missileFireMode = modes != null && modes.Count > 0 ? modes[0] : Firing.FireMode.Auto;
+        nextMissileFireTime = 0f;
         ResetShotState();
 
     }
@@ -74,10 +74,10 @@ public class VehicleMissileController : VehicleArmory
         List<Firing.FireMode> modes = properties?.firing?.fireModes;
         if (modes == null || modes.Count < 2) return;
 
-        int currentIndex = modes.IndexOf(currentFireMode);
-        currentFireMode = modes[(currentIndex + 1) % modes.Count];
+        int currentIndex = modes.IndexOf(missileFireMode);
+        missileFireMode = modes[(currentIndex + 1) % modes.Count];
         ResetShotState();
-        nextFireTime = 0f;
+        nextMissileFireTime = 0f;
 
         SoundManager.SoundComponents sound = properties.firing.switchFireModeSound;
         if (sound?.clip != null)
@@ -145,30 +145,30 @@ public class VehicleMissileController : VehicleArmory
             return;
         }
 
-        bool ready = Time.time >= nextFireTime;
-        if (currentFireMode == Firing.FireMode.Burst && burstShotsRemaining == 0 && pressShoot && ready)
-            burstShotsRemaining = Mathf.Max(1, properties.firing.BurstModeBulletsPerTap);
+        bool ready = Time.time >= nextMissileFireTime;
+        if (missileFireMode == Firing.FireMode.Burst && missileBurstShotsRemaining == 0 && pressShoot && ready)
+            missileBurstShotsRemaining = Mathf.Max(1, properties.firing.BurstModeBulletsPerTap);
 
-        bool shouldShoot = ready && (currentFireMode == Firing.FireMode.Auto && holdShoot ||
-                                     currentFireMode == Firing.FireMode.Single && pressShoot ||
-                                     currentFireMode == Firing.FireMode.Burst && burstShotsRemaining > 0);
+        bool shouldShoot = ready && (missileFireMode == Firing.FireMode.Auto && holdShoot ||
+                                     missileFireMode == Firing.FireMode.Single && pressShoot ||
+                                     missileFireMode == Firing.FireMode.Burst && missileBurstShotsRemaining > 0);
         if (shouldShoot)
         {
             ExecuteShot();
             int rateOfFire = properties.firing.rateOfFire;
-            nextFireTime = Time.time + (rateOfFire > 0 ? 60f / rateOfFire : 1f);
-            if (currentFireMode == Firing.FireMode.Burst) burstShotsRemaining--;
+            nextMissileFireTime = Time.time + (rateOfFire > 0 ? 60f / rateOfFire : 1f);
+            if (missileFireMode == Firing.FireMode.Burst) missileBurstShotsRemaining--;
         }
 
         UpdateFireAudio(CanPlayFireAudio() && !isReloading.Value && GetCurrentMagAmmo() > 0 &&
-            (currentFireMode == Firing.FireMode.Auto ? holdShoot
-                : currentFireMode == Firing.FireMode.Burst ? burstShotsRemaining > 0 || shouldShoot
+            (missileFireMode == Firing.FireMode.Auto ? holdShoot
+                : missileFireMode == Firing.FireMode.Burst ? missileBurstShotsRemaining > 0 || shouldShoot
                 : shouldShoot));
     }
 
     protected void ResetShotState()
     {
-        burstShotsRemaining = 0;
+        missileBurstShotsRemaining = 0;
         UpdateFireAudio(false);
     }
 
@@ -222,8 +222,7 @@ public class VehicleMissileController : VehicleArmory
         {
             Vehicle firingVehicle = vehicle != null ? vehicle : GetComponentInParent<Vehicle>();
             float initialSpeed = properties.projectileValues.muzzleVelocity;
-            if (firingVehicle != null && firingVehicle.rb != null)
-                initialSpeed = Mathf.Max(initialSpeed, firingVehicle.rb.linearVelocity.magnitude);
+            if (firingVehicle != null && firingVehicle.rb != null) initialSpeed += firingVehicle.rb.linearVelocity.magnitude;
 
             Projectile.ProjectileValues shotValues = properties.projectileValues.WithMuzzleVelocity(initialSpeed);
             ProjectileSpawner.Instance.CreateProjectile(properties.bulletPref, properties.dummyBullet.gameObject, prop, shotValues);

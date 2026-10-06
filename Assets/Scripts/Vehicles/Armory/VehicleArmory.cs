@@ -9,29 +9,27 @@ public class VehicleArmory : NetworkBehaviour
     [SerializeField] private Transform shootPos;
     [SerializeField] protected Vehicle vehicle;
     [SerializeField] protected VehicleArmoryProperties properties;
-    
+    [SerializeField] protected Animator anim;
+
     [Header("Armory Camera")]
-    [SerializeField] protected Camera armoryCamera;
+    [SerializeField] public Camera armoryCamera;
     [Tooltip("Pivot rotated by mouse input. Defaults to the armory camera transform.")]
     [SerializeField] private Transform cameraRotationPivot;
     [Tooltip("Allows mouse rotation only while the armory camera is active.")]
     [SerializeField] private bool canRotateCamera;
+    [SerializeField] protected CameraModifiers cameraModifier;
 
-    public Camera ArmoryCamera => armoryCamera;
-    public Transform CameraRotationPivot => cameraRotationPivot != null
-        ? cameraRotationPivot : armoryCamera != null ? armoryCamera.transform : null;
+    [Header("Camera Rotational Clamps")]
+    [SerializeField] private bool hasCameraXAxisClamp;
+    [SerializeField] private bool hasCameraYAxisClamp;
+    [Tooltip("Minimum local camera angles in degrees: X is pitch, Y is yaw.")]
+    [SerializeField] private Vector2 minCameraRotationClamp = new Vector2(-80f, -89f);
+    [Tooltip("Maximum local camera angles in degrees: X is pitch, Y is yaw.")]
+    [SerializeField] private Vector2 maxCameraRotationClamp = new Vector2(40f, 89f);
+
+    public Transform CameraRotationPivot => cameraRotationPivot != null ? cameraRotationPivot : armoryCamera != null ? armoryCamera.transform : null;
     public virtual bool CanRotateCamera => canRotateCamera;
-    public bool CanUseCamera => isActive && isActiveAndEnabled &&
-        armoryCamera != null && armoryCamera.gameObject.activeInHierarchy;
-
-    public virtual void SetCameraActive(bool active)
-    {
-        if (armoryCamera == null) return;
-        armoryCamera.enabled = active;
-        AudioListener listener = armoryCamera.GetComponent<AudioListener>();
-        if (listener != null) listener.enabled = active;
-        if (!active) CameraRotationPivot.localRotation = Quaternion.identity;
-    }
+    public bool CanUseCamera => isActive && isActiveAndEnabled && armoryCamera != null && armoryCamera.gameObject.activeInHierarchy;
 
     [Header("Rotation Settings")]
     [SerializeField] private bool canRotate;
@@ -56,6 +54,9 @@ public class VehicleArmory : NetworkBehaviour
     protected bool wasOverheatedLastFrame = false;
     private bool isReloading;
     protected float reloadTimer;
+    private Firing.FireMode currentFireMode;
+    private float nextFireTime;
+    private int burstShotsRemaining;
 
     private bool UsesHeat => properties != null && properties.useHeatValues && properties.heatValues != null;
     private bool UsesReload => properties != null && properties.useReloadValues && properties.reloadValues != null;
@@ -93,8 +94,7 @@ public class VehicleArmory : NetworkBehaviour
 
         fireAudio = new VehicleArmoryFireAudio(properties, transform);
         visualRecoil = new VehicleArmoryVisualRecoil(this, properties);
-        // ATUALIZADO: sem stateId, apenas reseta o estado
-        Firing.ResetState(properties.firing.fireModes);
+        InitializeFireMode();
         // Garante que o estado de superaquecimento comece falso
         if (UsesHeat) properties.heatValues.heatState.isOverheated = false;
         if (UsesReload)
@@ -179,6 +179,24 @@ public class VehicleArmory : NetworkBehaviour
         RotateFollowers(yRotationFollowers, yRotationPivot.localEulerAngles.y, interpolation, false);
     }
 
+    public Vector2 ClampCameraRotation(Vector2 rotation)
+    {
+        if (hasCameraXAxisClamp) rotation.x = Mathf.Clamp(rotation.x, minCameraRotationClamp.x, maxCameraRotationClamp.x);
+        if (hasCameraYAxisClamp) rotation.y = Mathf.Clamp(rotation.y, minCameraRotationClamp.y, maxCameraRotationClamp.y);
+        return rotation;
+    }
+
+    public virtual void SetCameraActive(bool active)
+    {
+        if (armoryCamera == null) return;
+        armoryCamera.enabled = active;
+        AudioListener listener = armoryCamera.GetComponent<AudioListener>();
+        if (listener != null) listener.enabled = active;
+        if (!active) CameraRotationPivot.localRotation = Quaternion.identity;
+        if (cameraModifier != null) cameraModifier.SetActive(active);
+    }
+
+
     private void RotateFollowers(Transform[] followers, float targetAngle, float interpolation, bool rotateX)
     {
         if (followers == null) return;
@@ -260,12 +278,16 @@ public class VehicleArmory : NetworkBehaviour
             2
         );
 
+        OnRecoilApplied(recoil.vertical);
+
         recoilVerticalTarget += recoil.vertical;
         horizontalRecoilTarget += recoil.horizontal;
 
         is_first_shot = true;
         recoil_position_in_array++;
     }
+
+    protected virtual void OnRecoilApplied(float verticalRecoil) { }
 
     private void ExecuteFire()
     {
@@ -321,7 +343,10 @@ public class VehicleArmory : NetworkBehaviour
             return;
 
         reloadTimer = ProcessReload.Reload.ReloadLogic.CalculateReloadTime(values, values.IsMagazineEmpty());
+        if (automatic)
+            reloadTimer = Mathf.Max(reloadTimer, nextFireTime - Time.time);
         isReloading = true;
+        burstShotsRemaining = 0;
         fireAudio.Stop();
     }
 
@@ -345,7 +370,6 @@ public class VehicleArmory : NetworkBehaviour
             if (values.IsMagazineFull() || values.GetTotalReserveAmmo() <= 0)
             {
                 isReloading = false;
-                if (isActive) Firing.ResetState();
             }
             else
             {
@@ -358,7 +382,29 @@ public class VehicleArmory : NetworkBehaviour
             values, reloadTimer, deltaTime, values.IsMagazineEmpty());
         reloadTimer = result.remainingCooldown;
         isReloading = result.isReloading;
-        if (result.shouldFinishReload && isActive) Firing.ResetState();
+    }
+
+    private bool ProcessShotInput(bool isInputHeld, bool isInputPressed, int currentAmmo)
+    {
+        if (isReloading || currentAmmo <= 0)
+        {
+            burstShotsRemaining = 0;
+            return false;
+        }
+
+        if (Time.time < nextFireTime) return false;
+
+        if (currentFireMode == Firing.FireMode.Burst && burstShotsRemaining == 0 && isInputPressed)
+            burstShotsRemaining = Mathf.Max(1, properties.firing.BurstModeBulletsPerTap);
+
+        bool shouldShoot = currentFireMode == Firing.FireMode.Auto && isInputHeld ||
+                           currentFireMode == Firing.FireMode.Single && isInputPressed ||
+                           currentFireMode == Firing.FireMode.Burst && burstShotsRemaining > 0;
+        if (!shouldShoot || properties.firing.rateOfFire <= 0) return false;
+
+        nextFireTime = Time.time + properties.firing.interval;
+        if (currentFireMode == Firing.FireMode.Burst) burstShotsRemaining--;
+        return true;
     }
 
     public virtual void Shoot()
@@ -384,30 +430,16 @@ public class VehicleArmory : NetworkBehaviour
             return;
         }
 
-        // ATUALIZADO: sem stateId
-        Firing.UpdateTimeToFire(deltaTime);
-
-        // Processa o tiro usando o sistema Firing (sem stateId)
-        var shootResult = Firing.ProcessShooting(
-            properties.firing,
-            isInputHeld,
-            isInputPressed,
-            isReloading: isReloading,
-            isRolling: false,
-            isDead: false,
-            currentAmmo: currentAmmo,
-            deltaTime
-        );
-
-        // Obtém o estado atual de disparo (sem stateId)
-        Firing.FireMode currentMode = Firing.GetCurrentFireMode();
+        bool shouldShoot = ProcessShotInput(isInputHeld, isInputPressed, currentAmmo);
+        Firing.FireMode currentMode = currentFireMode;
         bool shouldHeat = UsesHeat && !isReloading && currentAmmo > 0 && Heating.ShouldHeat(currentMode, isInputHeld);
         fireAudio.Update(!isReloading && currentAmmo > 0 && (currentMode == Firing.FireMode.Auto ? isInputHeld
-            : currentMode == Firing.FireMode.Burst ? Firing.IsBursting() || shootResult.shouldShoot
-            : shootResult.shouldShoot));
+            : currentMode == Firing.FireMode.Burst ? burstShotsRemaining > 0 || shouldShoot
+            : shouldShoot));
 
-        if (shootResult.shouldShoot)
+        if (shouldShoot)
         {
+            if (anim != null) anim.SetTrigger("Firing");
             ExecuteFire();
             if (UsesReload)
             {
@@ -457,16 +489,16 @@ public class VehicleArmory : NetworkBehaviour
 
     public virtual void SetupFiringSystem()
     {
-        Firing.ResetState(properties?.firing.fireModes);
+        // Specialized armories may still use the shared Firing API.
+        Firing.ResetState(properties?.firing?.fireModes);
+        InitializeFireMode();
+        burstShotsRemaining = 0;
+    }
 
-        // Garante que o modo de tiro estático atual é válido para este armamento
-        if (properties != null && properties.firing.fireModes != null && properties.firing.fireModes.Count > 0)
-        {
-            if (!properties.firing.fireModes.Contains(Firing.GetCurrentFireMode()))
-            {
-                Firing.SwitchFireMode(properties.firing);
-            }
-        }
+    private void InitializeFireMode()
+    {
+        var modes = properties?.firing?.fireModes;
+        currentFireMode = modes != null && modes.Count > 0 ? modes[0] : Firing.FireMode.Auto;
     }
 
     public virtual void DeactivateArmory()
@@ -475,6 +507,7 @@ public class VehicleArmory : NetworkBehaviour
 
         fireAudio?.Stop();
         visualRecoil?.Reset();
+        burstShotsRemaining = 0;
         isActive = false;
     }
 

@@ -35,7 +35,7 @@ public abstract class Vehicle : NetworkBehaviour,
 
     [Header("References & Components")]
     public Rigidbody rb;
-    public EnterVehicle enterVehicle;
+    [SerializeField] private EnterVehicle enterVehicle;
     [SerializeField] protected GameObject fire_effects_parent;
     [SerializeField] protected GameObject crashExplosion;
     public Countermeasures countermeasures;
@@ -65,6 +65,7 @@ public abstract class Vehicle : NetworkBehaviour,
     [HideInInspector] public readonly SyncVar<bool> startEngine = new SyncVar<bool>();
     [HideInInspector] public readonly SyncVar<bool> vehicle_destroyed = new SyncVar<bool>();
     private bool did_explode = false;
+    private bool isExploding;
     protected float exit_cooldown;
 
     [Header("Health & Damage")]
@@ -89,6 +90,22 @@ public abstract class Vehicle : NetworkBehaviour,
     protected const float THROTTLE_UPDATE_INTERVAL = 0.1f;
 
     #region Unity Lifecycle
+    public override void OnStopNetwork()
+    {
+        // Keep independent players out of the vehicle hierarchy before it is destroyed.
+        foreach (VehicleSeats seat in vehicleSeats)
+        {
+            if (seat.playerGameObject != null && seat.playerGameObject.transform.parent == seat.playerSeat)
+                VehicleSeats.DetachPlayer(seat.playerGameObject);
+        }
+        base.OnStopNetwork();
+
+        // FishNet retains despawned scene objects as inactive GameObjects.
+        // Exploded vehicles should be removed after both network sides stop.
+        if (NetworkObject.IsSceneObject && (isExploding || did_explode))
+            Destroy(gameObject);
+    }
+
     protected virtual void Awake()
     {
         countermeasures?.SetVehicle(this);
@@ -107,7 +124,7 @@ public abstract class Vehicle : NetworkBehaviour,
         {
             currentSeat?.RemoveCameraOffset();
             // Validação de jogador
-            if (currentSeat == null || currentSeat.playerGameObject == null || (currentSeat.playerProperties != null && currentSeat.playerProperties.isDead.Value))
+            if (currentSeat == null || !currentSeat.isOccupied || currentSeat.playerGameObject == null || currentSeat.playerController.playerProperties.isDead.Value)
             {
                 ExitVehicle();
                 return;
@@ -115,6 +132,7 @@ public abstract class Vehicle : NetworkBehaviour,
             HandleCameraModifierState();
             SwitchCamera();
             HandleVehicleInput();
+            if (!isInVehicle) return;
             SwitchWeapon();
             HandleShooting();
         }
@@ -350,6 +368,14 @@ public abstract class Vehicle : NetworkBehaviour,
             currentY += mouseX;
         }
 
+        if (currentSeat.IsArmoryCameraActive)
+        {
+            Vector2 clampedRotation = currentSeat.GetCurrentArmory().ClampCameraRotation(
+                new Vector2(currentX, currentY));
+            currentX = clampedRotation.x;
+            currentY = clampedRotation.y;
+        }
+
         Quaternion newRotation = Quaternion.Euler(currentX, currentY, 0f);
         currentSeat.GetCurrentCameraRotationPivot().transform.localRotation = newRotation;
     }
@@ -453,12 +479,13 @@ public abstract class Vehicle : NetworkBehaviour,
 
             // Se passou pelas verificações, ocupa o assento
             seat.isOccupied = true;
+            seat.playerGameObject = _player;
             occupantsNames.Add(props.playerName.Value);
 
             if (seat.vehicleArmory?.Length > 0) seat.SetAuthority(conn);
             if (seat.seatType == VehicleSeats.SeatType.Pilot) NetworkObject.GiveOwnership(conn);
 
-            RpcUpdateSeatStatus(i, true, playerNetObj, conn);
+            UpdateSeatStatusServer(i, true, playerNetObj, conn);
             TargetVehicleEntered(conn, i, _player);
 
             foundSeat = true;
@@ -495,7 +522,6 @@ public abstract class Vehicle : NetworkBehaviour,
         exit_cooldown = 0f;
 
         currentSeat.EnterSeat(
-            _player.GetComponent<PlayerProperties>(),
             _player.GetComponent<PlayerController>(),
             currentSeat.playerSeat,
             _player.GetComponent<Rigidbody>(),
@@ -510,48 +536,43 @@ public abstract class Vehicle : NetworkBehaviour,
         if (!isInVehicle) return;
 
         int currentIndex = playerSeatIndex;
-        VehicleSeats seat = vehicleSeats[currentIndex];
+        VehicleSeats seat = currentSeat;
         PlayerController exitingPlayerController = seat?.playerController;
+        NetworkObject exitingPlayer = seat?.playerGameObject != null
+            ? seat.playerGameObject.GetComponent<NetworkObject>() : null;
         isInVehicle = false;
+        playerSeatIndex = -1;
         VehicleStartEngineUI.HideFor(this);
 
         if (seat != null)
         {
-            ClearSeatArmory(seat);
-            RemoveOwnershipFromPlayer();
-            RepositionPlayerOnExit(seat.playerGameObject);
+            // Despawning already releases ownership. Do not queue ownership
+            // changes for a vehicle (or nested armory) that is about to disappear.
+            ClearSeatArmory(seat, releaseOwnership: !isExploding);
+            if (!isExploding) RemoveOwnershipFromPlayer();
 
-            if (currentIndex >= 0)
-            {
-                if (IsServerInitialized) RpcUpdateSeatStatus(currentIndex, false, null, null);
-                else CmdUpdateSeatStatus(currentIndex, false);
-            }
-
-            playerSeatIndex = -1;
+            // Finish local cleanup while the seat still holds the player references.
             seat.ExitSeat();
             exitingPlayerController?.EndVehicleCollisionProtection();
+
+            if (!isExploding && currentIndex >= 0)
+            {
+                if (IsServerInitialized) UpdateSeatStatusServer(currentIndex, false, exitingPlayer, null);
+                else CmdUpdateSeatStatus(currentIndex, false);
+            }
         }
 
         enterVehicle.SetLocalAvailability(true);
     }
 
-    private void RepositionPlayerOnExit(GameObject player)
-    {
-        if (player == null) return;
-        Quaternion spawnRotation = Quaternion.Euler(0, currentSeat.exitPosition.rotation.eulerAngles.y, 0);
-        float yPos = currentSeat.exitPosition.position.y > 0 ? currentSeat.exitPosition.position.y : 0.1f;
-        player.transform.position = new Vector3(currentSeat.exitPosition.position.x, yPos, currentSeat.exitPosition.position.z);
-        player.transform.rotation = spawnRotation;
-    }
-
-    private void ClearSeatArmory(VehicleSeats seat)
+    private void ClearSeatArmory(VehicleSeats seat, bool releaseOwnership = true)
     {
         if (seat.vehicleArmory == null) return;
         foreach (VehicleArmory armoryObj in seat.vehicleArmory)
         {
             if (armoryObj == null) continue;
             armoryObj.GetComponent<VehicleArmory>()?.DeactivateArmory();
-            RemoveArmoryOwnership(armoryObj.GetComponent<NetworkObject>());
+            if (releaseOwnership) RemoveArmoryOwnership(armoryObj.GetComponent<NetworkObject>());
         }
     }
     #endregion
@@ -562,7 +583,7 @@ public abstract class Vehicle : NetworkBehaviour,
         if (vehicleSeats.Length <= 1) return;
 
         // Obtém as propriedades do jogador atual
-        PlayerProperties props = currentSeat.playerProperties;
+        PlayerProperties props = currentSeat.playerController.playerProperties;
         if (props == null) return;
 
         int searchIndex = (playerSeatIndex == vehicleSeats.Length - 1) ? 0 : playerSeatIndex + 1;
@@ -595,7 +616,7 @@ public abstract class Vehicle : NetworkBehaviour,
             currentSeat.ClearReferences();
             currentSeat = seat;
             playerSeatIndex = newIndex;
-            currentSeat.EnterSeat(props, controller, seat.playerSeat, rb, pGo);
+            currentSeat.EnterSeat(controller, seat.playerSeat, rb, pGo);
 
             UpdateServerSwitchSeatsStatus(oldIndex, newIndex, pGo, conn);
             break;
@@ -612,8 +633,8 @@ public abstract class Vehicle : NetworkBehaviour,
         if (vehicleSeats[oldSeatIndex].vehicleArmory != null) vehicleSeats[oldSeatIndex].SetAuthority(null);
         if (vehicleSeats[newSeatIndex].vehicleArmory != null) vehicleSeats[newSeatIndex].SetAuthority(conn);
 
-        RpcUpdateSeatStatus(oldSeatIndex, false, null, null);
-        RpcUpdateSeatStatus(newSeatIndex, true, playerNetObj, conn);
+        UpdateSeatStatusServer(oldSeatIndex, false, playerNetObj, null, switchingSeats: true);
+        UpdateSeatStatusServer(newSeatIndex, true, playerNetObj, conn);
 
         if (vehicleSeats[newSeatIndex].seatType == VehicleSeats.SeatType.Pilot)
             this.NetworkObject.GiveOwnership(playerNetObj.Owner);
@@ -692,7 +713,31 @@ public abstract class Vehicle : NetworkBehaviour,
             if (seat.playerGameObject != null && seat.playerGameObject.TryGetComponent(out PlayerProperties props))
                 occupantsNames.Remove(props.playerName.Value);
         }
-        RpcUpdateSeatStatus(seatIndex, occupiedStatus, null);
+        UpdateSeatStatusServer(seatIndex, occupiedStatus, null);
+    }
+
+    private void UpdateSeatStatusServer(int seatIndex, bool occupiedStatus, NetworkObject playerNetObj,
+        NetworkConnection authorizedConn = null, bool switchingSeats = false)
+    {
+        if (seatIndex < 0 || seatIndex >= vehicleSeats.Length) return;
+
+        // ObserversRpc only executes on clients; keep the dedicated server's seats current too.
+        VehicleSeats seat = vehicleSeats[seatIndex];
+        if (playerNetObj == null && seat.playerGameObject != null)
+            playerNetObj = seat.playerGameObject.GetComponent<NetworkObject>();
+
+        // During a seat change the next update reparents directly, without resuming movement.
+        if (!switchingSeats && playerNetObj != null && playerNetObj.TryGetComponent(out PlayerController occupant))
+            occupant.SetVehicleSeatServer(occupiedStatus ? this : null, seatIndex);
+
+        seat.isOccupied = occupiedStatus;
+        if (occupiedStatus)
+            seat.playerGameObject = playerNetObj != null ? playerNetObj.gameObject : null;
+        else if (!isInVehicle || currentSeat != seat)
+            seat.playerGameObject = null;
+        if (authorizedConn != null) seat.authorizedConnection = authorizedConn;
+
+        RpcUpdateSeatStatus(seatIndex, occupiedStatus, playerNetObj, authorizedConn);
     }
 
     [ObserversRpc]
@@ -701,7 +746,12 @@ public abstract class Vehicle : NetworkBehaviour,
         if (seatIndex < 0 || seatIndex >= vehicleSeats.Length) return;
         VehicleSeats seat = vehicleSeats[seatIndex];
         seat.isOccupied = occupiedStatus;
-        seat.playerGameObject = occupiedStatus && playerNetObj != null ? playerNetObj.gameObject : null;
+        // The local occupant needs this reference until ExitSeat detaches and
+        // repositions it, even if a seat release arrives before the next Update.
+        if (occupiedStatus)
+            seat.playerGameObject = playerNetObj != null ? playerNetObj.gameObject : null;
+        else if (!isInVehicle || currentSeat != seat)
+            seat.playerGameObject = null;
         if (authorizedConn != null) seat.authorizedConnection = authorizedConn;
     }
     #endregion
@@ -733,22 +783,36 @@ public abstract class Vehicle : NetworkBehaviour,
     [ServerRpc(RequireOwnership = false)]
     protected void RequestToExplode(Vector3 contact_point)
     {
-        foreach (VehicleSeats seat in vehicleSeats)
+        ExplodeServer(contact_point);
+    }
+
+    private void ExplodeServer(Vector3 contact_point)
+    {
+        if (!IsServerInitialized || isExploding || !IsSpawned) return;
+        isExploding = true;
+
+        for (int seatIndex = 0; seatIndex < vehicleSeats.Length; seatIndex++)
         {
+            VehicleSeats seat = vehicleSeats[seatIndex];
             if (seat.isOccupied && seat.playerGameObject != null)
             {
-                NetworkConnection conn = seat.playerGameObject.GetComponent<NetworkObject>().Owner;
+                NetworkObject occupant = seat.playerGameObject.GetComponent<NetworkObject>();
+                NetworkConnection conn = occupant.Owner;
                 TargetForceExitAndDamage(conn);
+                UpdateSeatStatusServer(seatIndex, false, occupant);
             }
         }
         CmdExplode(contact_point);
+        // Queue exit and visual RPCs before the server's single despawn.
+        Despawn(gameObject, DespawnType.Destroy);
     }
     [TargetRpc]
     private void TargetForceExitAndDamage(NetworkConnection conn)
     {
-        if (isInVehicle && currentSeat?.playerController != null)
-            currentSeat.playerController.TakeDamage(100);
+        isExploding = true;
+        PlayerController occupant = isInVehicle ? currentSeat?.playerController : null;
         ExitVehicle();
+        occupant?.TakeDamage(100);
     }
     [ObserversRpc]
     private void CmdExplode(Vector3 contact_point)
@@ -757,17 +821,12 @@ public abstract class Vehicle : NetworkBehaviour,
         did_explode = true;
         SoundManager.Play3dSoundLocal(crashSound.clip, crashSound.properties, contact_point);
         Instantiate(crashExplosion, contact_point, Quaternion.identity);
-        RequestDespawn();
     }
     public virtual void Explode(Vector3 contact_point, Vector3 contact_normal, LayerMask layer, float explosionForce)
     {
-        if (!IsOwner && !IsServerInitialized) return;
-        RequestToExplode(contact_point);
-    }
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestDespawn()
-    {
-        if (gameObject != null && gameObject.activeInHierarchy) Despawn(gameObject);
+        if (isExploding || !IsSpawned || (!IsOwner && !IsServerInitialized)) return;
+        if (IsServerInitialized) ExplodeServer(contact_point);
+        else RequestToExplode(contact_point);
     }
     protected void SetHpProperties(float hp, float resistance)
     {

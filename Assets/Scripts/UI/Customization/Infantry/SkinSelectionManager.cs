@@ -7,12 +7,20 @@ public class SkinSelectionManager : MonoBehaviour
     private readonly List<GameObject> _buttonsList = new List<GameObject>();
     private GameObject _currentSkinPreview;
     private Skin _selectedSkin;
+    private int skinSelectionRequest;
 
     public void Initialize(InfantryLoadoutCustomization parent) => infantryLoadoutCustomization = parent;
 
-    public void ShowSkinsForClass()
+    public async void ShowSkinsForClass()
     {
         ClearSkinButtons();
+        int request = skinSelectionRequest;
+        ClassManager.Class selectedClass = infantryLoadoutCustomization._selectedClass;
+        if (SkinsManager.Instance == null || !await SkinsManager.Instance.WaitUntilReadyAsync()) return;
+        if (this == null || !isActiveAndEnabled || request != skinSelectionRequest ||
+            selectedClass != infantryLoadoutCustomization._selectedClass ||
+            infantryLoadoutCustomization.GetCurrentStage() != InfantryLoadoutCustomization.SelectionStage.SkinSelection) return;
+
         infantryLoadoutCustomization.weaponsGadgetsParent.gameObject.SetActive(true);
 
         UpdateSelectionText($"Selecting Skin - {infantryLoadoutCustomization._selectedClass}");
@@ -21,8 +29,7 @@ public class SkinSelectionManager : MonoBehaviour
         List<Skin> availableSkins = GetSkinsForClass(infantryLoadoutCustomization._selectedClass);
 
         // Carrega a skin atualmente selecionada
-        string currentSkinName = LoadCurrentSkinForClass(infantryLoadoutCustomization._selectedClass);
-        _selectedSkin = SkinsManager.GetSkin(currentSkinName, infantryLoadoutCustomization._selectedClass);
+        _selectedSkin = ResolveSkinForClass(selectedClass);
 
         int skinIndex = 0;
         foreach (Skin skin in availableSkins)
@@ -32,7 +39,6 @@ public class SkinSelectionManager : MonoBehaviour
         }
 
         if (_selectedSkin != null) ShowSkinPreview(_selectedSkin);
-        else if (availableSkins.Count > 0) ShowSkinPreview(availableSkins[0]);
         
 
         UpdateAllButtonOutlines();
@@ -49,7 +55,7 @@ public class SkinSelectionManager : MonoBehaviour
         {
             if (skin.skinClass == classType)
             {
-                bool isUnlocked = skin.battleCoinsToUnlock == 0 || PlayerPrefs.GetInt($"Skin_Unlocked_{skin.skingName}_{classType}", 0) == 1;
+                bool isUnlocked = IsSkinUnlocked(skin);
                 if (isUnlocked) skinsForClass.Add(skin);
             }
         }
@@ -80,7 +86,7 @@ public class SkinSelectionManager : MonoBehaviour
         _selectedSkin = skin;
 
         // Salva a skin selecionada para a classe atual
-        SaveSkinForClass(infantryLoadoutCustomization._selectedClass, skin.skingName);
+        SaveSkinForClass(infantryLoadoutCustomization._selectedClass, SkinsManager.GetSkinName(skin));
 
         // Mostra a pré-visualização da skin
         ShowSkinPreview(skin);
@@ -116,13 +122,38 @@ public class SkinSelectionManager : MonoBehaviour
         }
     }
 
-    private void SaveSkinForClass(ClassManager.Class classType, string skinName)
+    private static void SaveSkinForClass(ClassManager.Class classType, string skinName)
     {
         PlayerPrefs.SetString($"Skin_Selected_{classType}", skinName);
         PlayerPrefs.Save();
     }
 
     public static string LoadCurrentSkinForClass(ClassManager.Class classType) => PlayerPrefs.GetString($"Skin_Selected_{classType}", "");
+
+    public static bool IsSkinUnlocked(Skin skin) => skin.battleCoinsToUnlock == 0 ||
+        PlayerPrefs.GetInt($"Skin_Unlocked_{SkinsManager.GetSkinName(skin)}_{skin.skinClass}", 0) == 1;
+
+    public static Skin ResolveSkinForClass(ClassManager.Class classType)
+    {
+        string savedName = LoadCurrentSkinForClass(classType);
+        if (SkinsManager.TryGetSkin(savedName, classType, out Skin selected) && IsSkinUnlocked(selected))
+            return selected;
+
+        if (SkinsManager.Instance == null) return null;
+        selected = null;
+
+        // Save the preview fallback so spawning uses the same skin.
+        foreach (Skin skin in SkinsManager.Instance.GetAllSkins())
+        {
+            if (skin == null || skin.skinClass != classType || !IsSkinUnlocked(skin)) continue;
+            if (selected == null || string.CompareOrdinal(SkinsManager.GetSkinName(skin),
+                SkinsManager.GetSkinName(selected)) < 0)
+                selected = skin;
+        }
+
+        if (selected != null) SaveSkinForClass(classType, SkinsManager.GetSkinName(selected));
+        return selected;
+    }
 
     public void UpdateAllButtonOutlines()
     {
@@ -137,6 +168,7 @@ public class SkinSelectionManager : MonoBehaviour
 
     public void ClearSkinButtons()
     {
+        skinSelectionRequest++;
         foreach (GameObject button in _buttonsList.ToArray())
         {
             if (button != null) Destroy(button);
@@ -161,10 +193,7 @@ public class SkinSelectionManager : MonoBehaviour
 
     public Skin GetCurrentSkinForClass(ClassManager.Class classType)
     {
-        string skinName = LoadCurrentSkinForClass(classType);
-        if (!string.IsNullOrEmpty(skinName)) return SkinsManager.GetSkin(skinName, classType);
-        
-        return null;
+        return ResolveSkinForClass(classType);
     }
 
 

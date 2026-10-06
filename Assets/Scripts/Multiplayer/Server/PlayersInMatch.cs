@@ -13,14 +13,32 @@ public class PlayersInMatch : ServerSingleton<PlayersInMatch>
     [ServerRpc(RequireOwnership = false)]
     public void RequestAddPlayer(FactionManager.Faction faction, string playerName)
     {
-        if (playersInMatch.TryGetValue(faction, out List<string> players)) players.Add(playerName);
-        else playersInMatch[faction] = new List<string> { playerName };
+        AddPlayerServer(faction, playerName);
     }
 
     [ServerRpc(RequireOwnership = false)]
     public void RequestRemovePlayer(FactionManager.Faction faction, string playerName)
     {
-        if (playersInMatch.TryGetValue(faction, out List<string> players)) players.Remove(playerName);
+        RemovePlayerServer(faction, playerName);
+    }
+
+    public void AddPlayerServer(FactionManager.Faction faction, string playerName)
+    {
+        if (!IsServerInitialized || !IsServerStarted) return;
+
+        if (playersInMatch.TryGetValue(faction, out List<string> players))
+        {
+            players.Add(playerName);
+            playersInMatch.Dirty(faction);
+        }
         else playersInMatch[faction] = new List<string> { playerName };
+    }
+
+    public void RemovePlayerServer(FactionManager.Faction faction, string playerName)
+    {
+        if (!IsServerInitialized || !IsServerStarted) return;
+
+        if (playersInMatch.TryGetValue(faction, out List<string> players) && players.Remove(playerName))
+            playersInMatch.Dirty(faction);
     }
 }

@@ -1,0 +1,74 @@
+diff --git a/Assets/FishNet/Runtime/Generated/Component/NetworkTransform/NetworkTransform.cs b/Assets/FishNet/Runtime/Generated/Component/NetworkTransform/NetworkTransform.cs
+index dd1ec5a..5bdf685 100644
+--- a/Assets/FishNet/Runtime/Generated/Component/NetworkTransform/NetworkTransform.cs
++++ b/Assets/FishNet/Runtime/Generated/Component/NetworkTransform/NetworkTransform.cs
+@@ -670,6 +670,25 @@ namespace FishNet.Component.Transforming
+             _interval = Math.Max(_interval, (byte)1);
+         }
+ 
++        private void OnDisable()
++        {
++            // enabled=false must also stop the work performed by TimeManager callbacks.
++            while (_goalDataQueue.Count > 0)
++                ResettableObjectCaches<GoalData>.Store(_goalDataQueue.Dequeue());
++            ResettableObjectCaches<GoalData>.StoreAndDefault(ref _currentGoalData);
++            _authoritativeClientData.ResetState();
++        }
++
++        private void OnEnable()
++        {
++            if (_cachedTransform == null || !IsSpawned) return;
++
++            SetDefaultGoalData();
++            _lastSentTransformData?.ResetState();
++            _intervalsRemaining = 0;
++            Teleport();
++        }
++
+         private void OnDestroy()
+         {
+             base.ResetState(true);
+@@ -779,6 +798,7 @@ namespace FishNet.Component.Transforming
+ 
+         private void TimeManager_OnUpdate()
+         {
++            if (!isActiveAndEnabled) return;
+             using (_pm_OnUpdate.Auto())
+             {
+                 float deltaTime = _useScaledTime ? Time.deltaTime : Time.unscaledDeltaTime;
+@@ -923,6 +943,11 @@ namespace FishNet.Component.Transforming
+         {
+             using (_pm_OnPostTick.Auto())
+             {
++                // A host may stop the server side before client teardown
++                // unsubscribes this callback. Never send for a despawned object.
++                if (!IsSpawned || !isActiveAndEnabled)
++                    return;
++
+                 //If to force send via tick delay do so and reset force send tick.
+                 if (_forceSendTick != TimeManager.UNSET_TICK && _timeManager.LocalTick > _forceSendTick)
+                 {
+@@ -2273,6 +2298,7 @@ namespace FishNet.Component.Transforming
+         [TargetRpc(ValidateTarget = false)]
+         private void TargetUpdateTransform(NetworkConnection conn, ArraySegment<byte> data, Channel channel)
+         {
++            if (!isActiveAndEnabled) return;
+             #if DEVELOPMENT
+             //If receiver is client host then do nothing, clientHost need not process.
+             if (IsServerInitialized && conn.IsLocalClient)
+@@ -2293,6 +2319,7 @@ namespace FishNet.Component.Transforming
+         [ObserversRpc]
+         private void ObserversUpdateClientAuthoritativeTransform(ArraySegment<byte> data, Channel channel)
+         {
++            if (!isActiveAndEnabled) return;
+             if (!_clientAuthoritative && IsOwner && !_sendToOwner)
+                 return;
+             if (_clientAuthoritative && IsOwner)
+@@ -2314,6 +2341,7 @@ namespace FishNet.Component.Transforming
+         [ServerRpc]
+         private void ServerUpdateTransform(ArraySegment<byte> data, Channel channel)
+         {
++            if (!isActiveAndEnabled) return;
+             if (!_clientAuthoritative)
+             {
+                 Owner.Kick(KickReason.ExploitAttempt, LoggingType.Common, $"Connection Id {Owner.ClientId} has been kicked for trying to update this object without client authority.");

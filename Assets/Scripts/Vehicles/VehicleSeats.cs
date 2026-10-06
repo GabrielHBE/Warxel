@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
+using FishNet.Component.Transforming;
 using UnityEngine;
 
 [Serializable]
@@ -17,14 +18,15 @@ public class VehicleSeats
 
 
     [Header("Player Hand IK Targets")]
+    [Tooltip("Alvo da mao esquerda. A mao segue a posicao e a rotacao deste Transform; vazio usa a pose sentada.")]
     public Transform vehicleLeftHandTarget;
+    [Tooltip("Alvo da mao direita. A mao segue a posicao e a rotacao deste Transform; vazio usa a pose sentada.")]
     public Transform vehicleRightHandTarget;
 
     [Header("Runtime References (Auto-assigned)")]
     [HideInInspector] public List<UIElementsColor> setHudElementColors = new List<UIElementsColor>();
     [HideInInspector] public CameraZoomController seatCameraZoomController;
     [HideInInspector] public bool isOccupied;
-    [HideInInspector] public PlayerProperties playerProperties;
     [HideInInspector] public PlayerController playerController;
     [HideInInspector] public Rigidbody playerRigidbody;
     [HideInInspector] public GameObject playerGameObject;
@@ -48,7 +50,7 @@ public class VehicleSeats
     private bool cameraModifierRequested;
     private bool appliedCameraModifierState;
 
-    public void EnterSeat(PlayerProperties playerProperties, PlayerController playerController, Transform playerSeat, Rigidbody playerRigidbody, GameObject playerGameObject)
+    public void EnterSeat(PlayerController playerController, Transform playerSeat, Rigidbody playerRigidbody, GameObject playerGameObject)
     {
         ResetCameraOffset();
         if (vehicleArmory != null && vehicleArmory.Length > 0)
@@ -58,20 +60,20 @@ public class VehicleSeats
             else Debug.LogWarning($"The {seatType} seat has no valid IVehicleArmory assigned.");
         }
 
-        this.playerProperties = playerProperties;
+
         this.playerController = playerController;
         this.playerRigidbody = playerRigidbody;
         this.playerGameObject = playerGameObject;
         this.playerSeat = playerSeat;
-        this.playerProperties.isInVehicle = true;
-        thirdPersonArms = playerController.GetComponentInChildren<ThirdPersonArms>();
-
-        //if (playerAnimation != null) playerAnimation.SetVehicleIKTargets(vehicleLeftHandTarget, vehicleRightHandTarget);
+        thirdPersonArms = playerController.GetComponentInChildren<ThirdPersonArms>(true);
 
         this.playerRigidbody.isKinematic = true;
         this.playerRigidbody.interpolation = RigidbodyInterpolation.None;
-        this.playerProperties.reloading = false;
-        this.playerProperties.isInVehicle = true;
+
+        AttachPlayer(this.playerGameObject);
+
+        this.playerController.playerProperties.reloading = false;
+        this.playerController.playerProperties.isInVehicle = true;
 
         if (seatType != SeatType.Passenger)
         {
@@ -133,32 +135,28 @@ public class VehicleSeats
 
     public void ExitSeat()
     {
-        //Player Animation Exit State
-        if (thirdPersonArms != null)
-        {
-            //playerAnimation.ActivateCurrentWeapon();
-            //playerAnimation.SetVehicleIKTargets(null, null);
-        }
-
         //Player Controls Exit State
         if (playerController != null)
         {
             playerController.first_person_player_components.SetActive(true);
             playerController.HideOwnerItems(true);
-            if (playerProperties != null) playerProperties.isInVehicle = false;
+            if (playerController.playerProperties != null) playerController.playerProperties.isInVehicle = false;
         }
 
         //Player GameObject Exit State
         if (playerGameObject != null)
         {
             if (!playerGameObject.activeSelf) playerGameObject.SetActive(true);
-            playerGameObject.transform.SetParent(null); // Detach the player from the vehicle seat
+            DetachPlayer(playerGameObject);
+            RepositionPlayerOnExit();
         }
 
         //Player Rigidbody Exit State
         if (playerRigidbody != null)
         {
             playerRigidbody.isKinematic = false;
+            playerRigidbody.linearVelocity = Vector3.zero;
+            playerRigidbody.angularVelocity = Vector3.zero;
             playerRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
         }
 
@@ -167,8 +165,94 @@ public class VehicleSeats
         ClearReferences();
     }
 
+    private void RepositionPlayerOnExit()
+    {
+        if (playerGameObject == null || exitPosition == null) return;
+
+        Vector3 position = exitPosition.position;
+        Quaternion rotation = Quaternion.Euler(0f, exitPosition.eulerAngles.y, 0f);
+
+        if (playerRigidbody != null)
+        {
+            playerRigidbody.interpolation = RigidbodyInterpolation.None;
+            playerRigidbody.position = position;
+            playerRigidbody.rotation = rotation;
+        }
+        playerGameObject.transform.SetPositionAndRotation(position, rotation);
+
+        if (playerGameObject.TryGetComponent(out NetworkTransform networkTransform) && networkTransform.IsSpawned)
+        {
+            networkTransform.Teleport();
+            networkTransform.ForceSend();
+        }
+    }
+
+    public void AttachPlayer(GameObject player)
+    {
+        if (player == null || playerSeat == null) return;
+
+        if (player.TryGetComponent(out PlayerController controller))
+        {
+            controller.IgnoreVehicleCollisions(playerSeat.GetComponentInParent<Vehicle>());
+            controller.DisableColliders();
+        }
+
+        // Stop transform replication before changing the player's coordinate space.
+        if (player.TryGetComponent(out NetworkTransform networkTransform)) networkTransform.enabled = false;
+        if (player.TryGetComponent(out PlayerProperties properties)) properties.isInVehicle = true;
+        if (player.TryGetComponent(out Rigidbody playerBody))
+        {
+            playerBody.isKinematic = true;
+            playerBody.interpolation = RigidbodyInterpolation.None;
+        }
+
+        player.transform.SetParent(playerSeat, true);
+        player.transform.localPosition = Vector3.zero;
+        player.transform.localRotation = Quaternion.identity;
+
+        // Reset in seat space on every client, including when switching seats.
+        if (controller != null && controller.cameraRotation != null)
+            controller.cameraRotation.ResetRotation();
+
+        // AttachPlayer runs through the buffered seat RPC on every client.
+        ThirdPersonArms arms = player.GetComponentInChildren<ThirdPersonArms>(true);
+        if (arms != null) arms.SetVehicleIKTargets(vehicleLeftHandTarget, vehicleRightHandTarget);
+    }
+
+    public static void DetachPlayer(GameObject player)
+    {
+        if (player == null) return;
+
+        player.TryGetComponent(out NetworkTransform networkTransform);
+        player.TryGetComponent(out PlayerProperties properties);
+        bool wasInVehicle = player.transform.parent != null ||
+            (properties != null && properties.isInVehicle) ||
+            (networkTransform != null && !networkTransform.enabled);
+
+        player.transform.SetParent(null, true);
+        ThirdPersonArms arms = player.GetComponentInChildren<ThirdPersonArms>(true);
+        if (arms != null) arms.ClearVehicleIKTargets();
+        if (player.TryGetComponent(out PlayerController controller)) controller.RestoreVehicleCollisions();
+        if (properties != null) properties.isInVehicle = false;
+        if (networkTransform != null) networkTransform.enabled = true;
+
+        // A repeated exit RPC must not reset a player who has already resumed moving.
+        if (wasInVehicle && player.TryGetComponent(out Rigidbody playerBody))
+        {
+            playerBody.isKinematic = networkTransform != null && !networkTransform.IsController;
+            if (!playerBody.isKinematic)
+            {
+                playerBody.linearVelocity = Vector3.zero;
+                playerBody.angularVelocity = Vector3.zero;
+            }
+            playerBody.interpolation = playerBody.isKinematic
+                ? RigidbodyInterpolation.None : RigidbodyInterpolation.Interpolate;
+        }
+    }
+
     public void ClearReferences()
     {
+        if (playerController != null) playerController.HideOwnerHead(true);
         ResetCameraOffset();
         activeCameraModifier?.SetActive(false);
         activeCameraModifier = null;
@@ -180,7 +264,7 @@ public class VehicleSeats
         if (thirdPersonArms != null)
         {
             thirdPersonArms.RequestToEnableWeapon();
-            //playerAnimation.SetVehicleIKTargets(null, null);
+            thirdPersonArms.ClearVehicleIKTargets();
         }
 
         EnableCamera(GetCurrentCamera(), false);
@@ -194,7 +278,6 @@ public class VehicleSeats
 
         playerRigidbody = null;
         playerGameObject = null;
-        playerProperties = null;
         playerController = null;
         currentArmory = null;
         isOccupied = false;
@@ -213,10 +296,8 @@ public class VehicleSeats
     }
 
     // Verifica se a conexão tem autoridade sobre as armas deste assento
-    public bool HasAuthority(NetworkConnection conn)
-    {
-        return authorizedConnection != null && authorizedConnection == conn;
-    }
+    public bool HasAuthority(NetworkConnection conn) => authorizedConnection != null && authorizedConnection == conn;
+    
 
     // Define a autoridade das armas para uma conexão específica
     public void SetAuthority(NetworkConnection conn)
@@ -317,11 +398,11 @@ public class VehicleSeats
         cameraPositionOffset = Vector3.zero;
     }
 
-    public Camera GetCurrentCamera() => IsArmoryCameraActive ? cameraArmory.ArmoryCamera : seatCameras[activeCameraIndex].camera;
+    public Camera GetCurrentCamera() => IsArmoryCameraActive ? cameraArmory.armoryCamera : seatCameras[activeCameraIndex].camera;
     public Transform GetCurrentCameraRotationPivot() => IsArmoryCameraActive ? cameraArmory.CameraRotationPivot : seatCameras[activeCameraIndex].rotationPivot;
     public bool IsCurrentCameraMain() => !IsArmoryCameraActive && seatCameras[activeCameraIndex].isMainCamera;
     public bool CanMainCameraFreeLook() => IsArmoryCameraActive
-        ? cameraArmory.CanUseCamera && cameraArmory.ArmoryCamera.isActiveAndEnabled && cameraArmory.CanRotateCamera
+        ? cameraArmory.CanUseCamera && cameraArmory.armoryCamera.isActiveAndEnabled && cameraArmory.CanRotateCamera
         : seatCameras[activeCameraIndex].canFreeLook;
     public void ActivateCameraEffect(bool state)
     {
@@ -336,6 +417,7 @@ public class VehicleSeats
             EnableCamera(seatCameras[activeCameraIndex].camera, !IsArmoryCameraActive);
         }
         cameraArmory?.SetCameraActive(true);
+        UpdatePlayerHeadVisibility();
         state = state && !IsArmoryCameraActive;
         CameraModifiers modifier = seatCameras[activeCameraIndex].GetCurrentCameraModifier();
         if (modifier == activeCameraModifier && state == appliedCameraModifierState) return;
@@ -363,6 +445,15 @@ public class VehicleSeats
         ActivateCameraEffect(cameraModifierRequested);
     }
 
+    private void UpdatePlayerHeadVisibility()
+    {
+        if (playerController == null) return;
+
+        // Armory cameras are mounted on the weapon, away from the player's head.
+        bool hideHead = !IsArmoryCameraActive && seatCameras[activeCameraIndex].ShouldHidePlayerHead();
+        playerController.HideOwnerHead(hideHead);
+    }
+
     private void EnableCamera(Camera camera, bool state)
     {
         if (camera == null) return;
@@ -387,6 +478,8 @@ public class VehicleSeats
         public Transform rotationPivot;
         public bool isMainCamera;
         public bool canFreeLook;
+        [Tooltip("Automatic oculta a cabeca na camera principal e mostra nas demais. Use Hidden para cameras junto a cabeca e Visible para cameras externas.")]
+        public PlayerHeadVisibility playerHeadVisibility = PlayerHeadVisibility.Automatic;
         public CameraModifier cameraModifier = CameraModifier.Zoom;
         public bool applyCameraOffset = true;
         [Min(0f), Tooltip("Intensidade do offset de rotacao. Zero usa o valor anterior do veiculo.")]
@@ -421,6 +514,10 @@ public class VehicleSeats
                 case CameraModifier.NightVision:
                     currentCameraModifier = camera.GetComponentInChildren<NightVisionPostFX>(true);
                     break;
+
+                case CameraModifier.Thermal:
+                    currentCameraModifier = camera.GetComponentInChildren<ThermalVisionPostFX>(true);
+                    break;
             }
 
             if (currentCameraModifier == null)
@@ -430,7 +527,22 @@ public class VehicleSeats
 
         public CameraModifiers GetCurrentCameraModifier() => currentCameraModifier;
 
-        public enum CameraModifier { None, Zoom, NightVision }
+        public bool ShouldHidePlayerHead()
+        {
+            switch (playerHeadVisibility)
+            {
+                case PlayerHeadVisibility.Hidden:
+                    return true;
+                case PlayerHeadVisibility.Visible:
+                    return false;
+                default:
+                    return isMainCamera;
+            }
+        }
+
+        public enum PlayerHeadVisibility { Automatic, Hidden, Visible }
+
+        public enum CameraModifier { None, Zoom, NightVision, Thermal }
     }
     #endregion
 }

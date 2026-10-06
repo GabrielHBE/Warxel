@@ -17,7 +17,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
 
     [Header("Body")]
     public GameObject playerHead;
-    
+
     [Header("Colliders")]
     public CapsuleCollider stand_collider;
     public CapsuleCollider crouch_collider;
@@ -28,7 +28,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     [Header("Camera Settings")]
     public Camera playerCamera;
     [SerializeField] private ProcessCameraRecoil processCameraRecoil;
-    [SerializeField] private CameraRotation cameraRotation;
+    public CameraRotation cameraRotation;
 
     [Header("Movement")]
     public Transform orientation;
@@ -65,6 +65,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     [SerializeField] private SwitchWeapon switchWeapon;
     [SerializeField] private WeaponIcon weaponIcon;
     [SerializeField] private float footstepSound_interval = 0.45f;
+    [SerializeField] private PlayerAnimation playerAnimation;
     public CameraShake cameraShake;
     [SerializeField] private FootstepSound footstepSound;
     [SerializeField] private Weapon weapon;
@@ -98,6 +99,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     private bool readyToJump;
     private bool jumpRequested;
     private Vector3 moveDirection;
+    private float speedMultiplier;
 
     // Voxel step state.
     private bool isStepping;
@@ -138,6 +140,15 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     private PlayerStance currentStance = PlayerStance.Disabled;
     private bool vehicleCollisionProtectionActive;
     private uint vehicleCollisionProtectionVersion;
+    private Vehicle collisionIgnoredVehicle;
+    private readonly List<VehicleCollisionPair> vehicleCollisionPairs = new List<VehicleCollisionPair>();
+
+    private struct VehicleCollisionPair
+    {
+        public Collider playerCollider;
+        public Collider vehicleCollider;
+        public bool wasIgnored;
+    }
 
     private readonly struct CapsuleGeometry
     {
@@ -159,6 +170,14 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     #endregion
 
     #region Unity Lifecycle
+    private void OnEnable() => ReapplyVehicleCollisionIgnores();
+
+    public override void OnStopNetwork()
+    {
+        RestoreVehicleCollisions();
+        base.OnStopNetwork();
+    }
+
     public override void OnStartClient()
     {
         base.OnStartClient();
@@ -535,9 +554,9 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     {
         if ((moveForward != 0 || moveHorizontal != 0) && !playerProperties.proned && !playerProperties.roll && grounded)
         {
-            if (playerProperties.sprinting) footstepSound_interval -= Time.deltaTime * 2f;
-            else if (playerProperties.crouched) footstepSound_interval -= Time.deltaTime * 0.5f;
-            else footstepSound_interval -= Time.deltaTime;
+            if (playerProperties.sprinting) footstepSound_interval -= Time.deltaTime * 2f * speedMultiplier;
+            else if (playerProperties.crouched) footstepSound_interval -= Time.deltaTime * 0.5f * speedMultiplier;
+            else footstepSound_interval -= Time.deltaTime * speedMultiplier;
 
             if (footstepSound_interval <= 0)
             {
@@ -1137,6 +1156,82 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
         else CmdEndVehicleCollisionProtection();
     }
 
+    [Server]
+    public void SetVehicleSeatServer(Vehicle vehicle, int seatIndex)
+    {
+        ApplyVehicleSeat(vehicle, seatIndex);
+        RpcSetVehicleSeat(vehicle, seatIndex);
+    }
+
+    public void IgnoreVehicleCollisions(Vehicle vehicle)
+    {
+        if (collisionIgnoredVehicle == vehicle)
+        {
+            ReapplyVehicleCollisionIgnores();
+            return;
+        }
+
+        RestoreVehicleCollisions();
+        if (vehicle == null) return;
+        collisionIgnoredVehicle = vehicle;
+
+        Collider[] playerColliders = GetComponentsInChildren<Collider>(true);
+        Collider[] vehicleColliders = vehicle.GetComponentsInChildren<Collider>(true);
+        foreach (Collider vehicleCollider in vehicleColliders)
+        {
+            // The vehicle hierarchy now also contains independent occupants.
+            if (vehicleCollider.isTrigger || vehicleCollider.GetComponentInParent<PlayerController>() != null) continue;
+            foreach (Collider playerCollider in playerColliders)
+            {
+                if (playerCollider.isTrigger) continue;
+                vehicleCollisionPairs.Add(new VehicleCollisionPair
+                {
+                    playerCollider = playerCollider,
+                    vehicleCollider = vehicleCollider,
+                    wasIgnored = Physics.GetIgnoreCollision(playerCollider, vehicleCollider)
+                });
+                Physics.IgnoreCollision(playerCollider, vehicleCollider, true);
+            }
+        }
+    }
+
+    private void ReapplyVehicleCollisionIgnores()
+    {
+        // Unity clears ignored collision pairs when a collider is deactivated.
+        foreach (VehicleCollisionPair pair in vehicleCollisionPairs)
+        {
+            if (pair.playerCollider != null && pair.vehicleCollider != null)
+                Physics.IgnoreCollision(pair.playerCollider, pair.vehicleCollider, true);
+        }
+    }
+
+    public void RestoreVehicleCollisions()
+    {
+        foreach (VehicleCollisionPair pair in vehicleCollisionPairs)
+        {
+            if (pair.playerCollider != null && pair.vehicleCollider != null)
+                Physics.IgnoreCollision(pair.playerCollider, pair.vehicleCollider, pair.wasIgnored);
+        }
+        vehicleCollisionPairs.Clear();
+        collisionIgnoredVehicle = null;
+    }
+
+    // Buffer each player's latest parent, rather than a single seat update for the whole vehicle.
+    [ObserversRpc(BufferLast = true, ExcludeServer = true)]
+    private void RpcSetVehicleSeat(Vehicle vehicle, int seatIndex) => ApplyVehicleSeat(vehicle, seatIndex);
+
+    private void ApplyVehicleSeat(Vehicle vehicle, int seatIndex)
+    {
+        if (vehicle == null)
+        {
+            VehicleSeats.DetachPlayer(gameObject);
+            return;
+        }
+
+        if (seatIndex < 0 || seatIndex >= vehicle.vehicleSeats.Length) return;
+        vehicle.vehicleSeats[seatIndex].AttachPlayer(gameObject);
+    }
+
     [ServerRpc(RequireOwnership = true)]
     private void CmdEndVehicleCollisionProtection() => SetVehicleCollisionProtectionServer(false);
 
@@ -1223,7 +1318,7 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     #endregion
 
     #region Damage / Kill and Revive
-    public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed, float resetRecoilSpeed)
+    public void UpdateWeaponProperties(float speedModifier, float applyRecoilSpeed)
     {
         if (processCameraRecoil != null)
         {
@@ -1233,9 +1328,11 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
             else processCameraRecoil.ResetState();
         }
 
-        walkSpeed = original_walk_speed + speedModifier;
-        sprintSpeed = original_sprint_speed + speedModifier;
-        crouchSpeed = original_crouch_speed + speedModifier;
+        speedMultiplier = 1f + speedModifier / 100f;
+        walkSpeed = original_walk_speed * speedMultiplier;
+        sprintSpeed = original_sprint_speed * speedMultiplier;
+        crouchSpeed = original_crouch_speed * speedMultiplier;
+        playerAnimation.SetMovementSpeedAnimationMultiplier(speedMultiplier);
         UpdateMovementSpeed();
     }
 
@@ -1381,8 +1478,18 @@ public class PlayerController : ServerSingleton<PlayerController>, ISspottable, 
     #endregion
 
     #region Utility
+    private bool ownerItemsHidden = true;
+
+    public void RefreshOwnerItemVisibility() => HideOwnerItems(ownerItemsHidden);
+
+    public void HideOwnerHead(bool hide)
+    {
+        if (skinApplier != null) skinApplier.SetOwnerHeadHidden(hide);
+    }
+
     public void HideOwnerItems(bool hide)
     {
+        ownerItemsHidden = hide;
         if (skinApplier.instantiatedLeftUpperArm != null) skinApplier.instantiatedLeftUpperArm.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
         if (skinApplier.instantiatedLeftLowerArm != null) skinApplier.instantiatedLeftLowerArm.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
         if (skinApplier.instantiatedLeftHand != null) skinApplier.instantiatedLeftHand.meshRenderer.shadowCastingMode = hide ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;

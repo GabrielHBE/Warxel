@@ -18,6 +18,10 @@ public class ClientManager : ServerSingleton<ClientManager>
     private GameObject instantiated_vehicle_loadout_customization;
     private GameObject instantiated_squad_selection;
 
+    private PlayersInMatch registeredPlayersInMatch;
+    private FactionManager.Faction registeredFaction;
+    private string registeredPlayerName;
+
     private readonly SyncVar<SquadManager.SquadName> selectedSquad = new SyncVar<SquadManager.SquadName>();
     public readonly SyncVar<NetworkConnection> clientNetworkConnection = new SyncVar<NetworkConnection>();
 
@@ -62,7 +66,7 @@ public class ClientManager : ServerSingleton<ClientManager>
 
         // Now initialize
         SpawnClientObjects();
-        PlayersInMatch.Instance.RequestAddPlayer(AccountManager.Instance.selectedFaction, AccountManager.Instance.accountName);
+        RequestRegisterPlayer(AccountManager.Instance.selectedFaction, AccountManager.Instance.accountName);
     }
     private IEnumerator EnterSquad()
     {
@@ -140,15 +144,40 @@ public class ClientManager : ServerSingleton<ClientManager>
     {
         base.OnStopClient();
 
-        if (IsOwner)
-        {
-            PlayersInMatch.Instance.RequestRemovePlayer(AccountManager.Instance.selectedFaction, AccountManager.Instance.accountName);
-            RequestDespawnPlayerSpawner();
-            if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
-            if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
-            if (instantiated_squad_selection != null) Destroy(instantiated_squad_selection);
-        }
+        // Teardown must not send RPCs: the client or its objects may already be stopped.
+        StopAllCoroutines();
+        if (instantiated_infantary_loadout_customization != null) Destroy(instantiated_infantary_loadout_customization);
+        if (instantiated_vehicle_loadout_customization != null) Destroy(instantiated_vehicle_loadout_customization);
+        if (instantiated_squad_selection != null) Destroy(instantiated_squad_selection);
+    }
 
+    public override void OnStopServer()
+    {
+        // Use the identity saved on the server, including for remote disconnects.
+        if (registeredPlayersInMatch != null)
+            registeredPlayersInMatch.RemovePlayerServer(registeredFaction, registeredPlayerName);
+        registeredPlayersInMatch = null;
+        registeredPlayerName = null;
+
+        if (IsServerStarted && instantiated_player_spawner != null &&
+            instantiated_player_spawner.TryGetComponent(out NetworkObject spawner) && spawner.IsSpawned)
+            Despawn(spawner);
+        instantiated_player_spawner = null;
+
+        base.OnStopServer();
+    }
+
+    [ServerRpc]
+    private void RequestRegisterPlayer(FactionManager.Faction faction, string playerName)
+    {
+        PlayersInMatch playersInMatch = PlayersInMatch.Instance;
+        if (playersInMatch == null || !playersInMatch.IsServerInitialized || !playersInMatch.IsServerStarted) return;
+        if (registeredPlayersInMatch != null) return;
+
+        playersInMatch.AddPlayerServer(faction, playerName);
+        registeredPlayersInMatch = playersInMatch;
+        registeredFaction = faction;
+        registeredPlayerName = playerName;
     }
 
     [ServerRpc]
@@ -161,12 +190,6 @@ public class ClientManager : ServerSingleton<ClientManager>
         instantiated_player_spawner = Instantiate(playerSpawnController);
         instantiated_player_spawner.transform.position = playerSpawner.Spawns[0].position;
         Spawn(instantiated_player_spawner, Owner);
-    }
-
-    [ServerRpc]
-    private void RequestDespawnPlayerSpawner()
-    {
-        if (instantiated_player_spawner != null) Despawn(instantiated_player_spawner);
     }
 
     private void EnterSquadAutomatically()

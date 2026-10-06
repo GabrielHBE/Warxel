@@ -18,8 +18,7 @@ public class SkinButtonComponents : MonoBehaviour
         _skin = skin;
         infantryLoadoutCustomization = parent;
         
-        _isUnlocked = skin.battleCoinsToUnlock == 0 ||
-                      PlayerPrefs.GetInt($"Skin_Unlocked_{skin.skingName}_{skin.skinClass}", 0) == 1;
+        _isUnlocked = SkinSelectionManager.IsSkinUnlocked(skin);
 
         SetupImage(skin.HudIcon);
         SetupText();
@@ -42,7 +41,7 @@ public class SkinButtonComponents : MonoBehaviour
     private void SetupText()
     {
         TextMeshProUGUI buttonText = GetComponentInChildren<TextMeshProUGUI>();
-        if (buttonText != null) buttonText.text = _skin.skingName;
+        if (buttonText != null) buttonText.text = SkinsManager.GetSkinName(_skin);
         
     }
 
@@ -108,7 +107,7 @@ public class SkinButtonComponents : MonoBehaviour
             InfantryLoadoutCustomization.reference_purchase_item_sfx.properties);
         
         AccountManager.Instance.RemoveBattleCoin(_skin.battleCoinsToUnlock);
-        PlayerPrefs.SetInt($"Skin_Unlocked_{_skin.skingName}_{_skin.skinClass}", 1);
+        PlayerPrefs.SetInt($"Skin_Unlocked_{SkinsManager.GetSkinName(_skin)}_{_skin.skinClass}", 1);
         PlayerPrefs.Save();
     }
 
@@ -143,7 +142,7 @@ public class SkinButtonComponents : MonoBehaviour
         string currentSkinName = PlayerPrefs.GetString(
             $"Skin_Selected_{infantryLoadoutCustomization._selectedClass}", "");
         
-        bool isSelected = !string.IsNullOrEmpty(currentSkinName) && currentSkinName == _skin.skingName;
+        bool isSelected = !string.IsNullOrEmpty(currentSkinName) && currentSkinName == SkinsManager.GetSkinName(_skin);
 
         if (_outline != null) _outline.enabled = isSelected;
     }

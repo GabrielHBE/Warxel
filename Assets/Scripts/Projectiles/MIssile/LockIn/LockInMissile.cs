@@ -7,6 +7,7 @@ public class LockInMissile : Missile
     [SerializeField] private float timeToExplodeAfterFlare = 2f; // Tempo após ser enganado pelo flare para explodir
 
     private Vehicle vehicleTarget;
+    private Collider targetBody;
     private Flares flare;
     private float currentSpeed;
     private bool isFooledByFlare = false; // Indica se o míssil foi enganado pelo flare
@@ -26,6 +27,7 @@ public class LockInMissile : Missile
 
         // Salva a velocidade inicial para manter o míssil acelerado na direção certa
         currentSpeed = values.muzzleVelocity;
+        SetDirection(prop.direction, currentSpeed);
         
         // Reseta o estado do flare
         isFooledByFlare = false;
@@ -37,7 +39,9 @@ public class LockInMissile : Missile
     protected override void SetProjectileProperties(ProjectileProperties prop)
     {
         base.SetProjectileProperties(prop);
-        vehicleTarget = prop.target.GetComponent<Vehicle>();
+        vehicleTarget = prop.target != null ? prop.target.GetComponent<Vehicle>() : null;
+        targetBody = LockInTargeting.FindTargetBody(vehicleTarget);
+        flare = null;
         if (vehicleTarget != null && vehicleTarget.countermeasures != null)
         {
             flare = vehicleTarget.countermeasures.GetComponent<Flares>();
@@ -46,9 +50,12 @@ public class LockInMissile : Missile
 
     public override void LocalFixedUpdate()
     {
-        if (isDespawning || vehicleTarget == null || rb == null || !isSetup) return;
+        if (isDespawning || rb == null || !isSetup) return;
 
         ProcessRaycastHitValidation();
+        if (isDespawning) return;
+        ApplyProjectileDrag();
+        currentSpeed = rb.linearVelocity.magnitude;
 
         // Verifica se o flare está ativo e se o míssil ainda não foi enganado
         if (!isFooledByFlare && flare != null && flare.is_active)
@@ -63,7 +70,7 @@ public class LockInMissile : Missile
         if (isFooledByFlare)
         {
             // Mantém a direção atual (em linha reta)
-            rb.linearVelocity = transform.forward * currentSpeed;
+            rb.linearVelocity = rb.rotation * Vector3.forward * currentSpeed;
             
             // Incrementa o timer
             flareFoolTimer += Time.fixedDeltaTime;
@@ -74,14 +81,11 @@ public class LockInMissile : Missile
                 ExplodeMissile();
             }
         }
-        else
+        else if (vehicleTarget != null && vehicleTarget.isActiveAndEnabled && !vehicleTarget.vehicle_destroyed.Value)
         {
-            // Comportamento normal de perseguição
-            Vector3 targetDirection = (vehicleTarget.transform.position - transform.position).normalized;
-            Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turnSpeed * Time.fixedDeltaTime);
-
-            rb.linearVelocity = transform.forward * currentSpeed;
+            if (targetBody == null || !targetBody.enabled || !targetBody.gameObject.activeInHierarchy)
+                targetBody = LockInTargeting.FindTargetBody(vehicleTarget);
+            LockInTargeting.Steer(rb, vehicleTarget, targetBody, currentSpeed, turnSpeed, Time.fixedDeltaTime);
         }
     }
 
@@ -111,6 +115,9 @@ public class LockInMissile : Missile
     // Método para resetar manualmente o estado (útil para reutilização do objeto)
     public override void Deactivate()
     {
+        vehicleTarget = null;
+        targetBody = null;
+        flare = null;
         isFooledByFlare = false;
         flareFoolTimer = 0f;
         base.Deactivate();

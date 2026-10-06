@@ -12,7 +12,7 @@ public class PlayerAnimation : NetworkBehaviour
     private readonly SyncVar<bool> isSprinting = new SyncVar<bool>();
     private readonly SyncVar<bool> isProne = new SyncVar<bool>();
 
-    #region Unity 
+    #region Unity Lifeclycle
     private void Update()
     {
         if (IsOwner)
@@ -51,6 +51,8 @@ public class PlayerAnimation : NetworkBehaviour
         anim.SetBool("InVehicle", playerProperties.isInVehicle);
         anim.SetBool("Aiming", playerProperties.aiming);
     }
+
+    public void SetMovementSpeedAnimationMultiplier(float speed) => anim.SetFloat("MovementSpeedMultiplier", speed);
     #endregion
 
     #region  Update SyncVars
@@ -74,7 +76,13 @@ public class PlayerAnimation : NetworkBehaviour
     {
         if (thirdPersonArms == null) return;
 
+        if (playerProperties.isInVehicle)
+        {
+            thirdPersonArms.UpdateVehicleHandIK();
+            return;
+        }
 
+        thirdPersonArms.ClearVehicleIKTargets();
         bool hasLeftHandTarget = thirdPersonArms.HasLeftHandTarget();
 
         bool shouldIncreaseRightIK;
